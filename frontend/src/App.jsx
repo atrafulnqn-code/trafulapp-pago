@@ -9,12 +9,9 @@ const MESES = [
 // --- Componente de Checkout de Mercado Pago ---
 const Checkout = ({ preferenceId }) => {
   useEffect(() => {
-    // La instancia de `mp` ahora se crea una sola vez en el componente App.
-    // Aquí solo usamos la instancia existente en window.mp
     if (preferenceId && window.mp) {
-      // Limpiar el contenedor antes de renderizar un nuevo botón
       const container = document.querySelector('.checkout-btn-container');
-      if(container) container.innerHTML = '';
+      if(container) container.innerHTML = ''; // Limpiar para evitar duplicados si se re-renderiza
 
       window.mp.checkout({
         preference: { id: preferenceId },
@@ -30,11 +27,10 @@ const Checkout = ({ preferenceId }) => {
 };
 
 // --- Componente Base de Búsqueda ---
-// ... (Este componente no necesita cambios, se mantiene igual)
 function BaseSearchComponent({ 
-  API_BASE_URL,
+  API_BASE_URL, // Recibido como prop
   searchEndpoint, 
-  itemType,
+  itemType, 
   searchPlaceholder, 
   renderItems, 
   renderItemDetails,
@@ -51,7 +47,17 @@ function BaseSearchComponent({
   const [successMessage, setSuccessMessage] = useState('');
   const [preferenceId, setPreferenceId] = useState(null);
   
-  const logPayment = async (estado, monto, detalle) => { /* ... */ };
+  const logPayment = async (estado, monto, detalle) => {
+    try {
+      await fetch(`${API_BASE_URL}/log/payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado, monto, detalle }),
+      });
+    } catch (logError) {
+      console.error("Error al registrar el pago en el historial:", logError);
+    }
+  };
 
   const search = async () => {
     setLoading(true);
@@ -61,6 +67,7 @@ function BaseSearchComponent({
     setSelectedItem(null);
     setSelecciones({ deuda: false, meses: {} });
     setPreferenceId(null);
+
     try {
       const response = await fetch(`${API_BASE_URL}/${searchEndpoint}?dni=${dni}`);
       if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
@@ -192,23 +199,20 @@ function BaseSearchComponent({
   );
 }
 
-
 // --- Componente Principal ---
 function App() {
   const [vista, setVista] = useState('menu');
-  const API_BASE_URL = 'http://localhost:5000/api';
   
   // La Public Key ahora se lee desde el archivo .env.local
   const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
-  
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'; // Corregido
+
   useEffect(() => {
     if (MERCADOPAGO_PUBLIC_KEY) {
         const script = document.createElement('script');
         script.src = 'https://sdk.mercadopago.com/js/v2';
         script.async = true;
         script.onload = () => {
-          // Inicializamos la instancia de MercadoPago en el objeto window
-          // para que esté disponible globalmente para el componente Checkout
           window.mp = new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY, { locale: 'es-AR' });
         };
         document.body.appendChild(script);
