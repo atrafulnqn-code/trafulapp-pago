@@ -1,0 +1,20 @@
+# Environments
+.env
+.env*.local
+
+# IDE
+.idea/
+*.vscode/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

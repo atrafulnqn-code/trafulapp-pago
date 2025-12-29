@@ -1,0 +1,244 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f7f6;
+  color: #333;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.App {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2, h3 {
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.search-section, .results-section, .details-section {
+  margin-bottom: 30px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  background-color: #fdfdfd;
+}
+
+.search-section input[type="text"] {
+  width: calc(100% - 100px);
+  padding: 10px;
+  margin-right: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.search-section button {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.search-section button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.search-section button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.success-message {
+  color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+.error-message {
+  color: #e74c3c;
+  background-color: #fdeded;
+  border: 1px solid #e74c3c;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+.results-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.results-section li {
+  padding: 10px;
+  margin-bottom: 8px;
+  background-color: #ecf0f1;
+  border: 1px solid #dcdcdc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.results-section li:hover {
+  background-color: #d0d3d4;
+  border-color: #b0b3b4;
+}
+
+.results-section li.selected {
+  background-color: #cce5ff;
+  border-color: #007bff;
+  font-weight: bold;
+}
+
+.details-section p {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.details-section button {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.1em;
+  transition: background-color 0.3s ease;
+  margin-top: 20px;
+}
+
+.details-section button:hover {
+  background-color: #218838;
+}
+
+.payment-options {
+  margin: 20px 0;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.payment-option input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+}
+
+.payment-option label {
+  font-size: 1.1em;
+}
+
+.total-section {
+  margin-top: 25px;
+  padding: 15px;
+  background-color: #e9ecef;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.total-section h3 {
+  margin: 0 0 15px 0;
+}
+
+.total-section button {
+  width: auto;
+  padding: 12px 25px;
+  background-color: #007bff;
+  font-size: 1.2em;
+}
+
+.total-section button:hover {
+  background-color: #0056b3;
+}
+
+.main-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-width: 400px;
+  margin: 30px auto;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #fdfdfd;
+}
+
+.main-menu button {
+  padding: 12px 20px;
+  font-size: 1.1em;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.main-menu button:hover {
+  background-color: #218838;
+}
+
+.back-button {
+  display: inline-block;
+  margin-bottom: 20px;
+  padding: 8px 15px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.back-button:hover {
+  background-color: #5a6268;
+}
+
+.search-flow {
+  padding-top: 20px; /* Espacio para el botón de volver */
+}
+
+.placeholder-section {
+  text-align: center;
+  padding: 50px;
+  border: 1px dashed #cccccc;
+  border-radius: 8px;
+  margin-top: 30px;
+  background-color: #f9f9f9;
+}
+
+.details-section.multi-item {
+    border: 1px solid #dee2e6;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+
+

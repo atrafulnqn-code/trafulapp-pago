@@ -1,0 +1,6 @@
+Flask
+pyairtable
+flask-cors
+mercadopago
+python-dotenv
+gunicorn
