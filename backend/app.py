@@ -6,16 +6,23 @@ from pyairtable.formulas import match
 from dotenv import load_dotenv
 import mercadopago
 
-# --- DEPURACIÓN INICIAL ---
-print("--- Iniciando aplicación Backend ---")
+# Cargar variables de entorno desde el archivo .env
 load_dotenv()
+
+# --- Verificación de Variables de Entorno ---
+print("--- Iniciando Verificación de Variables de Entorno ---")
 AIRTABLE_PAT_FROM_ENV = os.getenv("AIRTABLE_PAT")
-print(f"AIRTABLE_PAT cargado desde el entorno: {'Sí' if AIRTABLE_PAT_FROM_ENV else 'No'}")
-# --- FIN DEPURACIÓN ---
+MERCADOPAGO_ACCESS_TOKEN_FROM_ENV = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+
+if not AIRTABLE_PAT_FROM_ENV:
+    print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.")
+if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
+    print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no está configurada.")
+print("--- Fin Verificación ---")
+# ---------------------------------------------
 
 
 # --- CONFIGURACION ---
-AIRTABLE_PAT = AIRTABLE_PAT_FROM_ENV
 BASE_ID = "appoJs8XY2j2kwlYf"
 CONTRIBUTIVOS_TABLE_ID = "tblKbSq61LU1XXco0"
 DEUDAS_TABLE_ID = "tblHuS8CdqVqTsA3t"
@@ -25,57 +32,70 @@ HISTORIAL_TABLE_ID = "tbl5p19Hv4cMk9NUS"
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5176")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:5000")
 
-MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-print(f"MERCADOPAGO_ACCESS_TOKEN cargado: {'Sí' if MERCADOPAGO_ACCESS_TOKEN else 'No'}")
-
-sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
-api = Api(AIRTABLE_PAT)
-# --- FIN CONFIGURACION ---
-
 app = Flask(__name__)
 CORS(app)
 
+# Inicializar las SDKs solo si las claves existen
+api = None
+if AIRTABLE_PAT_FROM_ENV:
+    api = Api(AIRTABLE_PAT_FROM_ENV)
+    print("SDK de Airtable inicializada.")
+
+sdk = None
+if MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
+    sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN_FROM_ENV)
+    print("SDK de Mercado Pago inicializada.")
+# --- FIN CONFIGURACION ---
+
 
 # --- Endpoints ---
+@app.route('/api/search/patente', methods=['GET'])
+def search_patente():
+    print("Recibida petición en /api/search/patente")
+    if not api:
+        print("Error en search_patente: La API de Airtable no está inicializada.")
+        return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
+        
+    dni = request.args.get('dni')
+    if not dni: return jsonify({"error": "El parámetro DNI es requerido"}), 400
+    try:
+        table = api.table(BASE_ID, PATENTE_TABLE_ID)
+        records = table.all(formula=match({"dni": dni}))
+        print(f"Búsqueda de patente para DNI {dni} exitosa. Encontrados {len(records)} registros.")
+        return jsonify(records)
+    except Exception as e:
+        print(f"Error en search_patente: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# El resto de endpoints...
 @app.route('/api/search/contributivo', methods=['GET'])
 def search_contributivo():
+    print("Recibida petición en /api/search/contributivo")
+    if not api: return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
     dni = request.args.get('dni')
     if not dni: return jsonify({"error": "El parámetro DNI es requerido"}), 400
     try:
         table = api.table(BASE_ID, CONTRIBUTIVOS_TABLE_ID)
         records = table.all(formula=match({"dni": dni}))
         return jsonify(records)
-    except Exception as e:
-        print(f"Error en search_contributivo: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/search/patente', methods=['GET'])
-def search_patente():
-    dni = request.args.get('dni')
-    if not dni: return jsonify({"error": "El parámetro DNI es requerido"}), 400
-    try:
-        table = api.table(BASE_ID, PATENTE_TABLE_ID)
-        records = table.all(formula=match({"dni": dni}))
-        return jsonify(records)
-    except Exception as e:
-        print(f"Error en search_patente: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# ... (El resto del archivo sigue igual)
 @app.route('/api/search/deuda', methods=['GET'])
 def search_deuda():
+    print("Recibida petición en /api/search/deuda")
+    if not api: return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
     nombre = request.args.get('nombre')
     if not nombre: return jsonify({"error": "El parámetro 'nombre' es requerido"}), 400
     try:
         table = api.table(BASE_ID, DEUDAS_TABLE_ID)
         records = table.all(formula=f"SEARCH('{nombre.lower()}', LOWER({{nombre y apellido}}))")
         return jsonify(records)
-    except Exception as e:
-        print(f"Error en search_deuda: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/update/pago', methods=['POST'])
 def update_pago():
+    print("Recibida petición en /api/update/pago")
+    if not api: return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
     data = request.json
     record_id, table_id, fields = data.get('record_id'), data.get('table_id'), data.get('fields')
     if not all([record_id, table_id, fields]): return jsonify({"error": "Faltan parámetros"}), 400
@@ -83,12 +103,12 @@ def update_pago():
         table = api.table(BASE_ID, table_id)
         updated_record = table.update(record_id, fields)
         return jsonify({"success": True, "updated_record": updated_record})
-    except Exception as e:
-        print(f"Error en update_pago: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/log/payment', methods=['POST'])
 def log_payment():
+    print("Recibida petición en /api/log/payment")
+    if not api: return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
     data = request.json
     estado, monto, detalle = data.get('estado'), data.get('monto'), data.get('detalle')
     if not all([estado, monto, detalle]): return jsonify({"error": "Faltan parámetros"}), 400
@@ -97,12 +117,14 @@ def log_payment():
         fields_to_create = {'Estado': estado, 'Monto': float(monto), 'Detalle': detalle}
         historial_table.create(fields_to_create)
         return jsonify({"success": True})
-    except Exception as e:
-        print(f"Error en log_payment: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/create_preference', methods=['POST'])
 def create_preference():
+    print("Recibida petición en /api/create_preference")
+    if not sdk:
+        print("Error en create_preference: La SDK de Mercado Pago no está inicializada.")
+        return jsonify({"error": "La configuración del servidor para Mercado Pago es incorrecta."}), 500
     data = request.json
     title, unit_price = data.get('title'), data.get('unit_price')
     if not all([title, unit_price]): return jsonify({"error": "Faltan parámetros"}), 400
@@ -116,8 +138,7 @@ def create_preference():
         preference_response = sdk.preference().create(preference_data)
         if preference_response and preference_response.get("response"):
             preference = preference_response["response"]
-            if "id" in preference:
-                return jsonify({"preference_id": preference["id"]})
+            if "id" in preference: return jsonify({"preference_id": preference["id"]})
             else:
                 error_message = preference.get('message', 'Error desconocido de MP.')
                 print(f"Error de MP al crear preferencia: {error_message}")
@@ -136,4 +157,5 @@ def payment_webhook():
     return jsonify({"status": "received"}), 200
 
 if __name__ == '__main__':
-    app.run(debug=False, port=int(os.environ.get('PORT', 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, debug=False)
