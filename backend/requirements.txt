@@ -4,3 +4,4 @@ flask-cors
 mercadopago
 python-dotenv
 gunicorn
+resend
