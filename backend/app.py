@@ -76,7 +76,9 @@ def update_airtable_records(table_id, record_id, fields_to_update):
 @app.route('/api/search/patente', methods=['GET'])
 def search_patente():
     print("Recibida petición en /api/search/patente")
-    if not api: return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
+    if not api:
+        print("Error en search_patente: La API de Airtable no está inicializada.")
+        return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
         
     dni = request.args.get('dni')
     if not dni: return jsonify({"error": "El parámetro DNI es requerido"}), 400
@@ -175,8 +177,14 @@ def payment_webhook():
     data = request.json
     print(f"Datos del Webhook: {data}")
 
-    if data.get("topic") == "payment":
-        payment_id = data.get("id") # En un payment topic, el ID del pago viene directamente en 'id'
+    # Solo procesamos notificaciones de tipo 'payment'
+    if data.get("topic") == "payment" or data.get("type") == "payment":
+        payment_id = data.get("id") or data.get("data", {}).get("id") or data.get("resource")
+        
+        if not payment_id:
+            print("Webhook: No se pudo extraer el ID de pago de la notificación.")
+            return jsonify({"error": "No payment ID found"}), 400
+        
         print(f"Webhook de pago recibido para ID: {payment_id}")
 
         if not sdk:
@@ -184,14 +192,25 @@ def payment_webhook():
             return jsonify({"error": "Servidor sin MP SDK"}), 500
 
         try:
-            payment_info = sdk.payment().get(payment_id)
-            print(f"Detalles del Pago de MP: {payment_info}")
+            payment_info_response = sdk.payment().get(payment_id)
+            print(f"Respuesta de sdk.payment().get({payment_id}): {payment_info_response}")
 
-            payment_status = payment_info["response"]["status"]
-            external_reference = payment_info["response"]["external_reference"]
-            monto_pagado = payment_info["response"]["transaction_amount"]
+            if not payment_info_response or not payment_info_response.get("response"):
+                print(f"Error: No se obtuvieron detalles del pago para {payment_id}")
+                return jsonify({"error": "No se obtuvieron detalles del pago"}), 500
+            
+            payment_info = payment_info_response["response"]
+            
+            payment_status = payment_info["status"]
+            external_reference_str = payment_info.get("external_reference")
+            monto_pagado = payment_info["transaction_amount"]
 
-            items_context = json.loads(external_reference) # Recuperamos el contexto del pago
+            if not external_reference_str:
+                print("Error: external_reference no encontrado en el pago.")
+                log_payment_to_airtable("Fallido", monto_pagado, f"Error: external_reference no encontrado para pago {payment_id}.")
+                return jsonify({"error": "external_reference no encontrado"}), 500
+
+            items_context = json.loads(external_reference_str) # Recuperamos el contexto del pago
             
             pago_estado = "Fallido"
             if payment_status == "approved":
@@ -204,49 +223,66 @@ def payment_webhook():
                 fields_to_update_origin = {}
                 detalle_pago_historial = ""
 
+                # --- Lógica de Contributivos ---
                 if items_context["item_type"] == "lote":
                     table_id_to_update = CONTRIBUTIVOS_TABLE_ID
                     detalle_pago_historial = f"Contributivos DNI {items_context['dni']}, Lote {items_context['lote']}: "
-                    if items_context["selecciones"]["deuda"]:
+                    if items_context["deuda"]:
                         fields_to_update_origin["deuda"] = '0'
-                        detalle_pago_historial += f"Deuda ({items_context['deuda_monto']}), "
-                    for mes in items_context["selecciones"]["meses"]:
-                        if items_context["selecciones"]["meses"][mes]:
-                            fields_to_update_origin[mes.lower()] = '0'
-                            detalle_pago_historial += f"{mes} ({items_context['meses_montos'][mes]}), "
+                        detalle_pago_historial += f"Deuda (${items_context['deuda_monto']}), "
+                    for mes_nombre, mes_seleccionado in items_context["meses"].items():
+                        if mes_seleccionado:
+                            fields_to_update_origin[mes_nombre.lower()] = '0'
+                            detalle_pago_historial += f"{mes_nombre} (${items_context['meses_montos'][mes_nombre]}), "
 
+                # --- Lógica de Patente ---
                 elif items_context["item_type"] == "vehiculo":
                     table_id_to_update = PATENTE_TABLE_ID
                     detalle_pago_historial = f"Patente DNI {items_context['dni']}, Patente {items_context['patente']}: "
-                    if items_context["selecciones"]["deuda"]:
+                    if items_context["deuda"]:
                         fields_to_update_origin["Deuda patente"] = '0' # Ojo con el nombre del campo!
-                        detalle_pago_historial += f"Deuda Patente ({items_context['deuda_monto']}), "
-                    for mes in items_context["selecciones"]["meses"]:
-                        if items_context["selecciones"]["meses"][mes]:
-                            fields_to_update_origin[mes.lower()] = '0'
-                            detalle_pago_historial += f"{mes} ({items_context['meses_montos'][mes]}), "
+                        detalle_pago_historial += f"Deuda Patente (${items_context['deuda_monto']}), "
+                    for mes_nombre, mes_seleccionado in items_context["meses"].items():
+                        if mes_seleccionado:
+                            fields_to_update_origin[mes_nombre.lower()] = '0'
+                            detalle_pago_historial += f"{mes_nombre} (${items_context['meses_montos'][mes_nombre]}), "
                 
+                # --- Lógica de Deudas (si se implementa en el futuro) ---
+                elif items_context["item_type"] == "deuda_general":
+                    table_id_to_update = DEUDAS_TABLE_ID
+                    detalle_pago_historial = f"Deuda General DNI {items_context['dni']}, Nombre {items_context['nombre_contribuyente']}: "
+                    fields_to_update_origin["deuda en concepto de"] = "Pagado"
+                    detalle_pago_historial += f"Monto (${items_context['monto_total']}), "
+
+
                 # Eliminar la coma final si existe
                 if detalle_pago_historial.endswith(", "):
                     detalle_pago_historial = detalle_pago_historial[:-2]
 
 
-                if fields_to_update_origin:
+                if fields_to_update_origin and table_id_to_update and record_id_to_update:
                     print(f"Actualizando Airtable (Tabla: {table_id_to_update}, Record ID: {record_id_to_update}) con: {fields_to_update_origin}")
                     update_airtable_records(table_id_to_update, record_id_to_update, fields_to_update_origin)
+                else:
+                    print("Error: No se pudo determinar qué actualizar en Airtable.")
                 
-            else:
+            else: # Pago no aprobado
                 print(f"Pago {payment_id} {payment_status}. No se realizan actualizaciones de origen.")
-                detalle_pago_historial = f"Intento de pago fallido para {items_context['item_type']} DNI {items_context['dni']}. Estado: {payment_status}"
+                detalle_pago_historial = f"Intento de pago fallido para {items_context.get('item_type', 'N/A')} DNI {items_context.get('dni', 'N/A')}. Estado: {payment_status}"
             
-            # Registrar en el historial de pagos
+            # Registrar en el historial de pagos (siempre, exitoso o fallido)
             print(f"Registrando en historial: {pago_estado}, Monto: {monto_pagado}, Detalle: {detalle_pago_historial}")
             log_payment_to_airtable(pago_estado, monto_pagado, detalle_pago_historial)
 
         except Exception as e:
             print(f"Error procesando webhook de pago {payment_id}: {e}")
             # Considerar registrar este error en el historial como un pago fallido con un detalle de error técnico
+            # Aquí podríamos intentar loggear el error también en Airtable o algún servicio de monitoreo
             return jsonify({"error": str(e)}), 500
+
+    # Esto es para otros topics de webhook que Mercado Pago pueda enviar
+    else:
+        print(f"Webhook recibido con topic desconocido: {data.get('topic')}")
 
     return jsonify({"status": "received"}), 200
 
