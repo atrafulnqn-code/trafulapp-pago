@@ -28,7 +28,7 @@ const Checkout = ({ preferenceId }) => {
 
 // --- Componente Base de Búsqueda ---
 function BaseSearchComponent({ 
-  API_BASE_URL, // Recibido como prop
+  API_BASE_URL, 
   searchEndpoint, 
   itemType, 
   searchPlaceholder, 
@@ -36,7 +36,8 @@ function BaseSearchComponent({
   renderItemDetails,
   getDeudaField,
   getDeudaAmount,
-  updateTableId
+  // updateTableId ya no se usa aquí porque el webhook lo maneja
+  setAppView // Para cambiar la vista a 'menu' después del pago
 }) {
   const [dni, setDni] = useState('');
   const [items, setItems] = useState([]);
@@ -47,18 +48,8 @@ function BaseSearchComponent({
   const [successMessage, setSuccessMessage] = useState('');
   const [preferenceId, setPreferenceId] = useState(null);
   
-  const logPayment = async (estado, monto, detalle) => {
-    try {
-      await fetch(`${API_BASE_URL}/log/payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado, monto, detalle }),
-      });
-    } catch (logError) {
-      console.error("Error al registrar el pago en el historial:", logError);
-    }
-  };
-
+  // logPayment ya no se llama desde aquí, sino desde el webhook en el backend
+  
   const search = async () => {
     setLoading(true);
     setError(null);
@@ -88,7 +79,7 @@ function BaseSearchComponent({
   };
 
   const handleSelectionChange = (tipo, valor) => {
-    setPreferenceId(null);
+    setPreferenceId(null); // Borrar preferencia si cambian la selección
     setSelecciones(prev => {
       if (tipo === 'deuda') return { ...prev, deuda: !prev.deuda };
       if (tipo === 'mes') {
@@ -121,6 +112,25 @@ function BaseSearchComponent({
     setLoading(true);
     setError(null);
     
+    // Construir el objeto items_to_pay para enviar al backend
+    const itemsToPay = {
+        record_id: selectedItem.id,
+        item_type: itemType,
+        dni: dni, // DNI del comprador
+        lote: itemType === 'lote' ? selectedItem.fields.lote : undefined,
+        patente: itemType === 'vehiculo' ? selectedItem.fields.patente : undefined,
+        deuda: selecciones.deuda,
+        deuda_monto: selecciones.deuda ? getDeudaAmount(selectedItem) : 0,
+        meses: selecciones.meses, // { Enero: true, Febrero: false, ...}
+        meses_montos: {} // Para guardar los montos de los meses seleccionados
+    };
+
+    for (const mes in selecciones.meses) {
+        if (selecciones.meses[mes]) {
+            itemsToPay.meses_montos[mes] = selectedItem.fields[mes.toLowerCase()];
+        }
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/create_preference`, {
         method: 'POST',
@@ -128,6 +138,7 @@ function BaseSearchComponent({
         body: JSON.stringify({
           title: `Pago de ${itemType} DNI ${dni}`,
           unit_price: totalAPagar,
+          items_to_pay: itemsToPay // Enviamos el contexto de lo que se va a pagar
         }),
       });
 
@@ -199,13 +210,13 @@ function BaseSearchComponent({
   );
 }
 
+
 // --- Componente Principal ---
 function App() {
   const [vista, setVista] = useState('menu');
   
-  // La Public Key ahora se lee desde el archivo .env.local
   const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'; // Corregido
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
     if (MERCADOPAGO_PUBLIC_KEY) {
@@ -230,7 +241,7 @@ function App() {
     <BaseSearchComponent
       API_BASE_URL={API_BASE_URL}
       searchEndpoint="search/contributivo"
-      updateTableId="tblKbSq61LU1XXco0"
+      // updateTableId="tblKbSq61LU1XXco0" ya no se usa aquí
       itemType="lote"
       searchPlaceholder="Ingrese DNI"
       renderItems={(items, selectItem) => (
@@ -248,6 +259,7 @@ function App() {
       )}
       getDeudaField={() => 'Deuda Acumulada'}
       getDeudaAmount={item => item.fields.deuda || 0}
+      setAppView={setVista}
     />
   );
 
@@ -255,7 +267,7 @@ function App() {
     <BaseSearchComponent
       API_BASE_URL={API_BASE_URL}
       searchEndpoint="search/patente"
-      updateTableId="tbl3CMMwccWeo8XSG"
+      // updateTableId="tbl3CMMwccWeo8XSG" ya no se usa aquí
       itemType="vehiculo"
       searchPlaceholder="Ingrese DNI del titular"
       renderItems={(items, selectItem) => (
@@ -273,6 +285,7 @@ function App() {
       )}
       getDeudaField={() => 'Deuda Patente'}
       getDeudaAmount={item => item.fields['Deuda patente'] || 0}
+      setAppView={setVista}
     />
   );
 
