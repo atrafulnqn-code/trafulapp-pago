@@ -5,3 +5,5 @@ mercadopago
 python-dotenv
 gunicorn
 resend
+weasyprint
+resend
