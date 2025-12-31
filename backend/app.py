@@ -171,8 +171,8 @@ def payment_webhook():
     print(f"Datos del Webhook: {data}")
 
     # Solo procesamos notificaciones de tipo 'payment'
-    if data.get("topic") == "payment" or data.get("type") == "payment":
-        payment_id = data.get("id") or data.get("data", {}).get("id")
+    if data.get("type") == "payment":
+        payment_id = data.get("data", {}).get("id")
         
         if not payment_id:
             print("ERROR: Webhook: No se pudo extraer el ID de pago de la notificación.")
