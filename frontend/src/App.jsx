@@ -269,65 +269,12 @@ function App() {
 
   // --- Vista de Pago Exitoso ---
   const PagoExitosoView = () => {
-    const [email, setEmail] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-
-    const handleSendEmail = async () => {
-        setLoading(true);
-        setMessage('');
-        try {
-            const response = await fetch(`${API_BASE_URL}/send_receipt`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    historial_record_id: paymentResult.historialRecordId, 
-                    email: email
-                })
-            });
-            if (!response.ok) throw new Error("Error al enviar el email.");
-            setMessage("¡Comprobante enviado exitosamente!");
-        } catch (err) {
-            setMessage(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (!paymentResult) return <p>Cargando resultado del pago...</p>; // Esto no debería pasar en el flujo normal
+    if (!paymentResult) return <p>Cargando resultado del pago...</p>;
 
     return (
       <div className="details-section">
         <h2>¡Pago {paymentResult.status === 'approved' ? 'Aprobado' : 'Fallido'}!</h2>
         <p>Tu número de operación de Mercado Pago es: {paymentResult.paymentId}</p>
-        
-        {paymentResult.status === 'approved' && (
-          <div className="receipt-actions">
-            <hr/>
-            <h4>Comprobante de Pago</h4>
-            <a 
-              href={`${API_BASE_URL}/receipt/${paymentResult.historialRecordId}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="button-like"
-            >
-              Descargar Comprobante
-            </a>
-
-            <div className="send-email-section">
-              <input 
-                type="email" 
-                placeholder="Ingresa tu email para enviar el comprobante"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <button onClick={handleSendEmail} disabled={loading}>
-                {loading ? 'Enviando...' : 'Enviar por Email'}
-              </button>
-            </div>
-            {message && <p>{message}</p>}
-          </div>
-        )}
         <hr/>
         <button onClick={() => setVista('menu')}>Volver al Menú Principal</button>
       </div>
