@@ -47,8 +47,8 @@ function BaseSearchComponent({
   const [successMessage, setSuccessMessage] = useState('');
   const [preferenceId, setPreferenceId] = useState(null);
   
-  const logPayment = async (estado, monto, detalle) => { /* ... */ };
-
+  // logPayment ya no se llama desde aquí, sino desde el webhook en el backend
+  
   const search = async () => {
     setLoading(true);
     setError(null);
@@ -211,7 +211,7 @@ function BaseSearchComponent({
 
 // --- Componente Principal ---
 function App() {
-  const [vista, setVista] = useState('menu');
+  const [vista, setVista] = useState('loading'); // Nuevo estado 'loading' al inicio
   const [paymentResult, setPaymentResult] = useState(null);
 
   const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
@@ -219,14 +219,14 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const status = urlParams.get('status');
+    const status = urlParams.get('status'); // 'approved', 'rejected', etc.
     const paymentId = urlParams.get('payment_id');
     const externalReferenceParam = urlParams.get('external_reference');
 
-    // Comprobar si hay parámetros de pago en la URL
+    // Solo procesar si todos los parámetros necesarios están presentes
     if (status && paymentId && externalReferenceParam) {
         // Limpiar la URL para evitar que se reprocese en recargas
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState({}, document.title, window.location.pathname); // Limpiar URL
 
         try {
             const refData = JSON.parse(decodeURIComponent(externalReferenceParam));
@@ -237,7 +237,7 @@ function App() {
             });
             setVista('pago_exitoso'); // Ir a la vista de éxito/fallo
         } catch (e) {
-            console.error("Error al parsear external_reference o no es un JSON válido:", e);
+            console.error("Error al parsear external_reference:", e);
             // Si hay un error, volvemos al menú por seguridad
             setVista('menu'); 
         }
@@ -294,7 +294,7 @@ function App() {
         }
     };
 
-    if (!paymentResult) return <p>Cargando resultado del pago...</p>; // Esto no debería pasar, pero como fallback
+    if (!paymentResult) return <p>Cargando resultado del pago...</p>; // Esto no debería pasar en el flujo normal
 
     return (
       <div className="details-section">
@@ -388,7 +388,10 @@ function App() {
   return (
     <div className="App">
       <h1>Sistema de Pagos</h1>
-      {vista !== 'menu' && vista !== 'pago_exitoso' && (<button className="back-button" onClick={() => setVista('menu')}>← Volver al Menú</button>)}
+      {vista === 'loading' && <p>Cargando aplicación...</p>}
+
+      {vista !== 'loading' && vista !== 'menu' && vista !== 'pago_exitoso' && (<button className="back-button" onClick={() => setVista('menu')}>← Volver al Menú</button>)}
+      
       {vista === 'menu' && (
         <div className="main-menu">
           <h2>Seleccione un Tipo de Pago</h2>
@@ -397,6 +400,7 @@ function App() {
           <button onClick={() => setVista('deudas')}>Pagar Deudas (No implementado)</button>
         </div>
       )}
+      
       {vista === 'contributivos' && renderContributivos()}
       {vista === 'patente' && renderPatente()}
        {vista === 'deudas' && (
