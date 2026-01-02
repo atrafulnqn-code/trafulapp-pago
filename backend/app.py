@@ -79,7 +79,7 @@ except Exception as e:
 # --- Funciones Auxiliares de PDF y Email ---
 def create_receipt_pdf(payment_details):
     try:
-        with open('backend/comprobante_template.html', 'r', encoding='utf-8') as f:
+        with open('comprobante_template.html', 'r', encoding='utf-8') as f:
             html_template = f.read()
 
         items_html = ""
@@ -481,26 +481,40 @@ def admin_login():
 
 @app.route('/api/admin/payments', methods=['GET'])
 def admin_get_payments():
-    print("Recibida petición en /api/admin/payments")
+    log_to_airtable('INFO', 'Admin API', 'Recibida petición en /api/admin/payments', details={'ip_address': request.remote_addr, 'query_params': request.args})
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
     if not ADMIN_PASSWORD:
+        log_to_airtable('ERROR', 'Admin API', 'ADMIN_PASSWORD no configurada en el servidor para /api/admin/payments.', details={'ip_address': request.remote_addr})
         return jsonify({"error": "La clave de administrador no está configurada en el servidor."}), 500
     
-    # En una aplicación real, aquí se verificaría un token de sesión/JWT
-    # Por ahora, simplemente se accede asumiendo que el cliente ya pasó por el login
+    # El dashboard debe enviar la clave en un header 'X-API-Key'
+    # client_api_key = request.headers.get('X-API-Key')
+    # if client_api_key != os.getenv("DASHBOARD_API_KEY"):
+    #     log_to_airtable('WARNING', 'Admin API', 'Acceso no autorizado a /api/admin/payments (API Key inválida).', details={'ip_address': request.remote_addr})
+    #     return jsonify({"error": "Acceso no autorizado. API Key inválida."}), 401
 
     if not api:
+        log_to_airtable('ERROR', 'Admin API', 'Airtable API no inicializada al acceder a /api/admin/payments.', details={'ip_address': request.remote_addr})
         return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
 
     try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        records = historial_table.all() # Obtener todos los registros
+        # Obtener todos los registros y ordenarlos
+        all_records = historial_table.all(sort=['-Fecha de Transacción']) 
+        total_records = len(all_records)
+
+        # Implementar paginación manual
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paginated_records = all_records[start_index:end_index]
         
         formatted_payments = []
-        for record in records:
+        for record in paginated_records:
             fields = record.get('fields', {})
             
-            # Extraer item_type_raw del campo 'detalle'
             item_type_raw = 'N/A'
             detalle_text = fields.get('Detalle', '')
             if 'vehiculo' in detalle_text or 'Patente' in detalle_text:
@@ -526,30 +540,53 @@ def admin_get_payments():
                 'mp_payment_id': fields.get('MP_Payment_ID', 'N/A'),
                 'timestamp': fields.get('Fecha de Transacción', None),
                 'items_pagados_json': fields.get('ItemsPagadosJSON', '[]'),
-                'payment_type': payment_type_display # Nuevo campo
+                'payment_type': payment_type_display
             })
-        print(f"Recuperados {len(formatted_payments)} registros de pagos para administrador.")
-        return jsonify(formatted_payments), 200
+        
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(formatted_payments)} registros de pagos (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+        return jsonify({
+            'payments': formatted_payments,
+            'total_records': total_records,
+            'current_page': page,
+            'per_page': per_page
+        }), 200
     except Exception as e:
-        print(f"ERROR en admin_get_payments: {e}")
+        log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_payments: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/logs', methods=['GET'])
 def admin_get_logs():
-    print("Recibida petición en /api/admin/logs")
+    log_to_airtable('INFO', 'Admin API', 'Recibida petición en /api/admin/logs', details={'ip_address': request.remote_addr, 'query_params': request.args})
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
     if not ADMIN_PASSWORD:
+        log_to_airtable('ERROR', 'Admin API', 'ADMIN_PASSWORD no configurada en el servidor para /api/admin/logs.', details={'ip_address': request.remote_addr})
         return jsonify({"error": "La clave de administrador no está configurada en el servidor."}), 500
     
+    # DASHBOARD_API_KEY verification can be added here if needed
+    # client_api_key = request.headers.get('X-API-Key')
+    # if client_api_key != os.getenv("DASHBOARD_API_KEY"):
+    #     log_to_airtable('WARNING', 'Admin API', 'Acceso no autorizado a /api/admin/logs (API Key inválida).', details={'ip_address': request.remote_addr})
+    #     return jsonify({"error": "Acceso no autorizado. API Key inválida."}), 401
+
     if not api:
+        log_to_airtable('ERROR', 'Admin API', 'Airtable API no inicializada al acceder a /api/admin/logs.', details={'ip_address': request.remote_addr})
         return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
 
     try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
         logs_table = api.table(BASE_ID, LOGS_TABLE_ID)
-        records = logs_table.all(sort=['-Timestamp']) # Obtener todos los registros, ordenados por Timestamp descendente
+        all_records = logs_table.all(sort=['-Timestamp']) # Obtener todos los registros, ordenados por Timestamp descendente
+        total_records = len(all_records)
+
+        # Implementar paginación manual
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paginated_records = all_records[start_index:end_index]
         
         formatted_logs = []
-        for record in records:
+        for record in paginated_records:
             fields = record.get('fields', {})
             formatted_logs.append({
                 'id': record.get('id'),
@@ -560,10 +597,15 @@ def admin_get_logs():
                 'related_id': fields.get('Related ID', None),
                 'details': fields.get('Details', None)
             })
-        print(f"Recuperados {len(formatted_logs)} registros de logs para administrador.")
-        return jsonify(formatted_logs), 200
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(formatted_logs)} registros de logs (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+        return jsonify({
+            'logs': formatted_logs,
+            'total_records': total_records,
+            'current_page': page,
+            'per_page': per_page
+        }), 200
     except Exception as e:
-        print(f"ERROR en admin_get_logs: {e}")
+        log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

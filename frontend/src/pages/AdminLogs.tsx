@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Table, Spinner, Alert, Button } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Spinner, Alert, Button, Pagination } from 'react-bootstrap';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 
@@ -18,6 +18,9 @@ const AdminLogs: React.FC = () => {
     const [logs, setLogs] = useState<LogRecord[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [perPage] = useState<number>(10); // Registros por página
+    const [totalPages, setTotalPages] = useState<number>(0);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -25,14 +28,14 @@ const AdminLogs: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/logs`);
-                const data = await response.json();
+                const response = await fetch(`${API_BASE_URL}/admin/logs?page=${currentPage}&per_page=${perPage}`);
+                const result = await response.json(); // La respuesta es un objeto con 'logs', 'total_records', etc.
 
                 if (response.ok) {
-                    setLogs(data);
+                    setLogs(result.logs);
+                    setTotalPages(Math.ceil(result.total_records / perPage));
                 } else {
-                    setError(data.error || 'Error al cargar los logs. Inténtelo de nuevo.');
-                    // Si hay un error de autenticación (ej. 401), redirigir al login
+                    setError(result.error || 'Error al cargar los logs. Inténtelo de nuevo.');
                     if (response.status === 401) {
                         navigate('/admin');
                     }
@@ -45,7 +48,11 @@ const AdminLogs: React.FC = () => {
         };
 
         fetchLogs();
-    }, [navigate]);
+    }, [navigate, currentPage, perPage]);
+
+    const handlePageChange = (pageNumber: number) => {
+        setCurrentPage(pageNumber);
+    };
 
     return (
         <Container className="py-5">
@@ -56,8 +63,11 @@ const AdminLogs: React.FC = () => {
                             <h3 className="text-center fw-bold mb-4">Panel de Logs Administrador</h3>
                             {error && <Alert variant="danger">{error}</Alert>}
                             <div className="text-end mb-3">
-                                <Button variant="outline-secondary" onClick={() => navigate('/admin/payments')}>
-                                    Volver a Pagos
+                                <Button variant="outline-info" onClick={() => navigate('/admin/payments')} className="me-2">
+                                    Ver Pagos
+                                </Button>
+                                <Button variant="outline-secondary" onClick={() => navigate('/')}>
+                                    Volver al Inicio
                                 </Button>
                             </div>
 
@@ -67,6 +77,7 @@ const AdminLogs: React.FC = () => {
                                     <p>Cargando registros de logs...</p>
                                 </div>
                             ) : (
+                                <>
                                 <Table striped bordered hover responsive className="text-nowrap">
                                     <thead>
                                         <tr>
@@ -92,6 +103,26 @@ const AdminLogs: React.FC = () => {
                                         )}
                                     </tbody>
                                 </Table>
+                                {totalPages > 1 && (
+                                    <div className="d-flex justify-content-center mt-3">
+                                        <Pagination>
+                                            <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
+                                            <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+                                            {[...Array(totalPages)].map((_, index) => (
+                                                <Pagination.Item 
+                                                    key={index + 1} 
+                                                    active={index + 1 === currentPage} 
+                                                    onClick={() => handlePageChange(index + 1)}
+                                                >
+                                                    {index + 1}
+                                                </Pagination.Item>
+                                            ))}
+                                            <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
+                                            <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+                                        </Pagination>
+                                    </div>
+                                )}
+                                </>
                             )}
                         </Card.Body>
                     </Card>
