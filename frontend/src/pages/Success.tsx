@@ -12,10 +12,15 @@ const Success: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  console.log("DEBUG Success Page - location.search:", location.search);
+  console.log("DEBUG Success Page - location.state:", location.state);
+
   const paymentId = location.state?.paymentId || 
                   new URLSearchParams(location.search).get('payment_id') ||
                   new URLSearchParams(location.search).get('collection_id') ||
                   new URLSearchParams(location.search).get('preference_id');
+
+  console.log("DEBUG Success Page - Derived paymentId:", paymentId);
 
   useEffect(() => {
     const fetchPaymentDetails = async () => {
