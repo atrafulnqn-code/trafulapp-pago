@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Pago</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid #eee;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #0056b3;
+            margin: 0;
+            font-size: 24px;
+        }
+        .details {
+            margin-bottom: 20px;
+        }
+        .details p {
+            margin: 5px 0;
+        }
+        .items {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .items th, .items td {
+            border: 1px solid #eee;
+            padding: 8px;
+            text-align: left;
+        }
+        .items th {
+            background-color: #f8f8f8;
+        }
+        .total {
+            text-align: right;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Comprobante de Pago</h1>
+            <p>Municipalidad de Villa Traful</p>
+        </div>
+        <div class="details">
+            <p><strong>Fecha de Pago:</strong> {{FECHA_PAGO}}</p>
+            <p><strong>Estado del Pago:</strong> {{ESTADO_PAGO}}</p>
+            <p><strong>ID de Operación (Mercado Pago):</strong> {{ID_PAGO_MP}}</p>
+
+        </div>
+        <table class="items">
+            <thead>
+                <tr>
+                    <th>Descripción</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ITEMS_PAGADOS}}
+            </tbody>
+        </table>
+        <div class="total">
+            Total Pagado: ${{MONTO_TOTAL}}
+        </div>
+        <div class="footer">
+            <p>Gracias por tu pago.</p>
+            <p>Este es un comprobante generado automáticamente, no requiere firma.</p>
+        </div>
+    </div>
+</body>
+</html>
