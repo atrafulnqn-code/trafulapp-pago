@@ -228,8 +228,12 @@ def create_preference():
         }
         preference_response = sdk.preference().create(preference_data)
         preference = preference_response["response"]
-        log_to_airtable('INFO', 'Mercado Pago', 'Preferencia de pago creada con éxito.', related_id=preference["id"], details={'preference_id': preference["id"], 'items_to_pay': items_to_pay})
-        return jsonify({"preference_id": preference["id"]})
+        log_to_airtable('INFO', 'Mercado Pago', 'Preferencia de pago creada con éxito.', related_id=preference["id"], details={'preference_id': preference["id"], 'init_point': preference.get("init_point"), 'sandbox_init_point': preference.get("sandbox_init_point"), 'items_to_pay': items_to_pay})
+        return jsonify({
+            "preference_id": preference["id"],
+            "init_point": preference.get("init_point"),
+            "sandbox_init_point": preference.get("sandbox_init_point")
+        })
     except Exception as e:
         log_to_airtable('ERROR', 'Mercado Pago', f'ERROR en create_preference: {e}', details={'error_message': str(e), 'payload': data})
         return jsonify({"error": str(e)}), 500

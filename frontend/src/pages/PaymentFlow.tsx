@@ -149,10 +149,13 @@ const PaymentFlow: React.FC = () => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Falló la creación de la preferencia de pago.');
             if (data.preference_id) { 
-                // This would typically redirect to MercadoPago's checkout
-                console.log("Redirecting to MercadoPago with preference ID:", data.preference_id);
-                // For now, we simulate success
-                navigate('/exito', { state: { paymentId: 'MP_' + new Date().getTime() } });
+                if (data.sandbox_init_point) {
+                    window.location.href = data.sandbox_init_point;
+                } else if (data.init_point) {
+                    window.location.href = data.init_point;
+                } else {
+                    throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
+                }
             } 
             else { throw new Error("No se recibió un ID de preferencia de pago.") }
         } catch (err: any) { setError(`Error al procesar el pago: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
