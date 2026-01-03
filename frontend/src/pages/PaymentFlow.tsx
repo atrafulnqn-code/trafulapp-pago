@@ -85,6 +85,7 @@ const PaymentFlow: React.FC = () => {
         setMultipleResults(null); // Clear multiple results
         setSelectedDebts([]); // Clear selected debts
         try {
+            console.log("DEBUG: Calling API with URL:", `${API_BASE_URL}/${systemConfig.endpoint}?${systemConfig.searchParam}=${inputValue}`); // <-- ADDED DEBUG LOG
             const response = await fetch(`${API_BASE_URL}/${systemConfig.endpoint}?${systemConfig.searchParam}=${inputValue}`);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Error en la búsqueda.');
