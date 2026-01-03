@@ -206,6 +206,7 @@ def search_deuda_suggestions():
 
 @app.route('/api/create_preference', methods=['POST'])
 def create_preference():
+    print("--- DENTRO DE CREATE_PREFERENCE ---") # <-- AÑADIDO PARA DEBUG
     log_to_airtable('INFO', 'Mercado Pago', 'Recibida petición en /api/create_preference', details={'ip_address': request.remote_addr, 'payload': request.json})
     if not sdk:
         log_to_airtable('ERROR', 'Mercado Pago', 'SDK de Mercado Pago no inicializada al crear preferencia.', details={'ip_address': request.remote_addr})
@@ -235,6 +236,7 @@ def create_preference():
             "sandbox_init_point": preference.get("sandbox_init_point")
         })
     except Exception as e:
+        print(f"ERROR CAPTURADO EN CREATE_PREFERENCE: {e}") # <-- AÑADIDO PARA DEBUG
         log_to_airtable('ERROR', 'Mercado Pago', f'ERROR en create_preference: {e}', details={'error_message': str(e), 'payload': data})
         return jsonify({"error": str(e)}), 500
 
