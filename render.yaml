@@ -1,0 +1,53 @@
+services:
+  # Servicio para el Backend
+  - type: web
+    name: traful-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    repo: https://github.com/emanuel-ma/traful_tablero # Reemplaza con la URL de tu repo si es diferente
+    branch: main # o la rama que uses para producción
+    envVars:
+      - key: AIRTABLE_PAT
+        fromSecret: true # Debes crear este Secret en el dashboard de Render
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        fromSecret: true # Debes crear este Secret en el dashboard de Render
+      - key: RESEND_API_KEY
+        fromSecret: true # Debes crear este Secret en el dashboard de Render
+      - key: RESEND_FROM_EMAIL
+        value: "trafulnet@geoarg.com" # Puedes ponerlo directamente o como Secret
+      - key: ADMIN_PASSWORD
+        fromSecret: true # Debes crear este Secret en el dashboard de Render
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: traful-frontend
+          property: url
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: traful-backend
+          property: url
+
+  # Servicio para el Frontend
+  - type: web
+    name: traful-frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    repo: https://github.com/emanuel-ma/traful_tablero # Reemplaza con la URL de tu repo si es diferente
+    branch: main # o la rama que uses para producción
+    envVars:
+      # Nginx no necesita variables de entorno en tiempo de ejecución para este setup
+      # Las variables de Vite (VITE_*) se deben construir dentro de la imagen.
+      # Si necesitas pasar la URL del backend a Vite, la mejor práctica es
+      # definirla en el Dockerfile del frontend durante el build.
+      # Por ahora, se asume que el frontend ya sabe cómo contactar al backend
+      # (ej. a través de una ruta relativa /api que Nginx redirige, o una URL hardcodeada).
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: traful-backend
+          property: url
+
+# Nota: Para que VITE_API_BASE_URL funcione en el frontend,
+# el Dockerfile del frontend debe ser modificado para aceptar y usar esta variable
+# durante el `npm run build`.
