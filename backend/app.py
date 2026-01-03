@@ -41,8 +41,12 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
 
 app = Flask(__name__)
-origins = [FRONTEND_URL, "http://localhost:5173"]
-CORS(app, resources={r"/api/*": {"origins": origins}})
+print(f"DEBUG: Configurando CORS. FRONTEND_URL es: {FRONTEND_URL}")
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [FRONTEND_URL, "http://localhost:5173"]
+    }
+})
 
 # Inicializar las SDKs de forma segura
 api = None
