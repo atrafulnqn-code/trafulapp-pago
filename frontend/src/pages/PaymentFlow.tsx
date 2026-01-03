@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PaymentSystem, SearchResult, Debt } from '../types';
 import { Container, Row, Col, Card, Form, Button, Breadcrumb, Table, Spinner, Alert, ButtonGroup, ListGroup } from 'react-bootstrap';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function validateEmail(email: string) {
   const re = /\S+@\S+\.\S+/;
