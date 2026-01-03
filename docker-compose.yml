@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./backend:/app/backend # Monta el código fuente para que los cambios se reflejen (en algunos casos, requiere reinicio)
+    environment:
+      # Asegúrate de que estas variables coincidan con las de tu .env local o las que necesite el backend
+      AIRTABLE_PAT: ${AIRTABLE_PAT}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      FRONTEND_URL: http://localhost:80 # URL del frontend local
+      BACKEND_URL: http://localhost:10000 # URL del backend local (dentro de Docker Compose)
+    # Comando de inicio si difiere del CMD en Dockerfile, pero en este caso el CMD es suficiente
+    # command: gunicorn app:app --bind 0.0.0.0:10000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80" # Mapea el puerto 80 del host al puerto 80 del contenedor Nginx
+    depends_on:
+      - backend # Asegura que el backend se inicie antes que el frontend
+    # Para desarrollo local con hot-reloading de React (en lugar de Nginx sirviendo build)
+    # Puedes comentar la sección 'build' y 'volumes' de Nginx y usar un stage de desarrollo aquí.
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile.dev # Un Dockerfile específico para desarrollo
+    # ports:
+    #   - "3000:3000" # Si tu servidor de desarrollo React corre en el puerto 3000
+    # command: npm start # o npm run dev
+
+# Red de Docker por defecto (creada por docker-compose)
+networks:
+  default:
+    driver: bridge
