@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PaymentSystem, SearchResult, Debt } from '../types';
 import { Container, Row, Col, Card, Form, Button, Breadcrumb, Table, Spinner, Alert, ButtonGroup, ListGroup } from 'react-bootstrap';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// @ts-ignore
+const API_BASE_URL = window._env_.VITE_API_BASE_URL;
 
 function validateEmail(email: string) {
   const re = /\S+@\S+\.\S+/;

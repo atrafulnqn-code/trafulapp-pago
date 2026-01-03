@@ -20,11 +20,15 @@ FROM nginx:alpine
 # Copia los archivos estáticos construidos desde la etapa 'builder'
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
-# Copia la configuración personalizada de Nginx (opcional, si es necesaria)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copia nuestro script de entrypoint y la configuración de Nginx
+COPY ./entrypoint.sh /entrypoint.sh
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf
+
+# Haz que el script de entrypoint sea ejecutable
+RUN chmod +x /entrypoint.sh
 
 # Expón el puerto 80, que es el puerto por defecto de Nginx
 EXPOSE 80
 
-# El comando por defecto de Nginx ya inicia el servidor
-CMD ["nginx", "-g", "daemon off;"]
+# El entrypoint se encargará de iniciar Nginx
+ENTRYPOINT ["/entrypoint.sh"]
