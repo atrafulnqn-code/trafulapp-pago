@@ -316,7 +316,7 @@ def create_payway_payment():
             "site": {
                 "site_id": PAYWAY_SITE_ID,
                 "transaction_id": operation_id,
-                "template": { "id": int(PAYWAY_TEMPLATE_ID) }
+                "template": { "id": 34164 } # Forzamos el ID de producción correcto
             },
             "customer": {
                 "id": payer_email.split('@')[0], # ID de usuario simple
