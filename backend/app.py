@@ -13,6 +13,7 @@ from datetime import datetime
 import base64
 import hashlib
 import urllib.parse
+import requests
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
@@ -276,86 +277,101 @@ def create_preference():
 
 @app.route('/api/create_payway_payment', methods=['POST', 'GET', 'OPTIONS'])
 def create_payway_payment():
-    print(f"DEBUG: Petición {request.method} recibida en /api/create_payway_payment") # DEBUG LOG
-
-    # Manejo explícito de CORS preflight
     if request.method == 'OPTIONS':
         response = jsonify({'status': 'ok'})
         response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,GET,OPTIONS')
         return response, 200
 
-    # Agregar headers CORS también a la respuesta POST/GET exitosa
     def add_cors_headers(resp):
         resp.headers.add('Access-Control-Allow-Origin', '*')
         return resp
 
-    log_to_airtable('INFO', 'Payway', f'Recibida petición {request.method} en /api/create_payway_payment', details={'ip_address': request.remote_addr})
-    
     # Validar configuración
     if not PAYWAY_SITE_ID or not PAYWAY_PRIVATE_KEY:
-         return add_cors_headers(jsonify({"error": "El servidor no tiene configuradas las credenciales de Payway."})), 500
+         return add_cors_headers(jsonify({"error": "Credenciales de Payway no configuradas."})), 500
 
-    # Obtener datos según el método
-    items_to_pay = {}
+    # Obtener datos (Soporte para GET y POST)
     total_amount = None
     payer_email = 'email@test.com'
-
     if request.method == 'POST':
         data = request.json
-        if not data:
-            return add_cors_headers(jsonify({"error": "No se recibieron datos JSON."})), 400
-        items_to_pay = data.get('items_to_pay')
         total_amount = data.get('unit_price')
-        if items_to_pay:
-            payer_email = items_to_pay.get('email', payer_email)
-            
-    elif request.method == 'GET':
-        # Soporte para GET (Bypass CORS Preflight issues)
+        payer_email = data.get('items_to_pay', {}).get('email', payer_email)
+    else:
         total_amount = request.args.get('amount')
         payer_email = request.args.get('email', payer_email)
-        # En GET no pasamos items complejos, asumimos pago simple
-        items_to_pay = {'email': payer_email}
 
     if not total_amount:
-         return add_cors_headers(jsonify({"error": "Falta el monto (unit_price o amount)."})), 400
+        return add_cors_headers(jsonify({"error": "Falta el monto."})), 400
 
     try:
-        # --- INTEGRACIÓN PAYWAY (SPS - Formulario) ---
+        # --- PASO 1: SOLICITAR HASH A PAYWAY ---
+        # El monto debe ser entero en centavos para la API REST
+        amount_cents = int(float(total_amount) * 100)
+        operation_id = f"TR-{int(datetime.now().timestamp())}"
         
-        # 1. Preparar datos básicos
-        operation_id = str(int(datetime.now().timestamp())) # ID numérico único
-        # Ajuste: La mayoría de SPS espera monto con punto como decimal.
-        amount_sps = f"{float(total_amount):.2f}" 
-        currency = "032" # Código numérico para ARS (Pesos Argentinos)
-        
-        # 2. Parámetros para firma
-        params_firma = {
-            "site_id": PAYWAY_SITE_ID,
-            "operacion_id": operation_id,
-            "monto": amount_sps,
-            "moneda": currency
+        payload = {
+            "site": {
+                "site_id": PAYWAY_SITE_ID,
+                "transaction_id": operation_id,
+                "template": { "id": int(PAYWAY_TEMPLATE_ID) }
+            },
+            "customer": {
+                "id": payer_email.split('@')[0], # ID de usuario simple
+                "email": payer_email
+            },
+            "payment": {
+                "amount": amount_cents,
+                "currency": "ARS", # La API moderna prefiere ARS
+                "payment_method_id": 1, # Visa por defecto
+                "installments": 1,
+                "payment_type": "single",
+                "sub_payments": []
+            },
+            "public_apikey": PAYWAY_PUBLIC_KEY,
+            "success_url": f"{FRONTEND_URL}/exito",
+            "cancel_url": FRONTEND_URL
         }
-        
-        # 3. Generar Firma (Usando el código 032)
-        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
-        
-        # 4. Construir URL de Redirección
-        email_encoded = urllib.parse.quote(payer_email)
-        redirect_url_backend = f"{BACKEND_URL}/api/payway/redirect?id={operation_id}&amount={amount_sps}&email={email_encoded}"
 
-        log_to_airtable('INFO', 'Payway', f'Operación Payway {operation_id} iniciada en Producción.', related_id=operation_id)
+        headers = {
+            "apikey": PAYWAY_PRIVATE_KEY,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache"
+        }
+
+        # URL de la API de Formularios (Producción)
+        api_url = "https://api.decidir.com/web/forms"
+        
+        print(f"DEBUG: Solicitando Hash a Payway para op {operation_id}...")
+        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
+        
+        if response.status_code not in [200, 201]:
+            print(f"ERROR API PAYWAY: {response.status_code} - {response.text}")
+            return add_cors_headers(jsonify({"error": f"Payway API Error: {response.text}"})), response.status_code
+
+        res_data = response.json()
+        form_hash = res_data.get('hash')
+        
+        if not form_hash:
+            return add_cors_headers(jsonify({"error": "No se recibió el hash de pago."})), 500
+
+        # --- PASO 2: CONSTRUIR URL DE REDIRECCIÓN FINAL ---
+        # Esta es la URL a la que el usuario debe ir para ver su formulario
+        final_redirect_url = f"https://live.decidir.com/web/forms/{form_hash}?apikey={PAYWAY_PUBLIC_KEY}"
+
+        log_to_airtable('INFO', 'Payway', f'Hash de pago generado: {form_hash}', related_id=operation_id)
         
         return add_cors_headers(jsonify({
             "payment_id": operation_id,
-            "init_point": redirect_url_backend, 
+            "init_point": final_redirect_url, 
             "message": "Redirigiendo a Payway..."
         }))
 
     except Exception as e:
-        log_to_airtable('ERROR', 'Payway', f'ERROR en create_payway_payment: {e}', details={'error_message': str(e)})
-        return jsonify({"error": str(e)}), 500
+        log_to_airtable('ERROR', 'Payway', f'Excepción en create_payway_payment: {e}')
+        return add_cors_headers(jsonify({"error": str(e)})), 500
 
 @app.route('/api/payway/redirect', methods=['GET'])
 def payway_redirect():
