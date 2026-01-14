@@ -320,7 +320,29 @@ def create_payway_payment():
             },
             "customer": {
                 "id": payer_email.split('@')[0], # ID de usuario simple
-                "email": payer_email
+                "email": payer_email,
+                "ip_address": request.remote_addr # IP del cliente
+            },
+            "fraud_detection": {
+                "send_to_cs": True,
+                "channel": "Web",
+                "dispatch_method": "digital",
+                "bill_to": {
+                    "city": "Villa Traful",
+                    "country": "AR",
+                    "customer_id": payer_email.split('@')[0],
+                    "email": payer_email,
+                    "first_name": "Contribuyente", # Genérico si no tenemos nombre
+                    "last_name": "Traful",
+                    "phone_number": "11111111", # Teléfono genérico requerido
+                    "postal_code": "8403", # CP Villa Traful
+                    "state": "NQ",
+                    "street1": "Municipalidad"
+                },
+                "purchase_totals": {
+                    "currency": "ARS",
+                    "amount": int(float(total_amount) * 100)
+                }
             },
             "payment": {
                 "amount": amount_cents,
