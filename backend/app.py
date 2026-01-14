@@ -418,15 +418,16 @@ def payway_redirect():
                 <p>Estás a un paso de realizar tu pago seguro.</p>
                 <p><strong>Monto: ${amount}</strong></p>
                 
-                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests" method="POST">
+                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests/" method="POST">
                     <input type="hidden" name="nro_operacion" value="{op_id}">
                     <input type="hidden" name="monto" value="{amount}">
                     <input type="hidden" name="moneda" value="ARS">
                     <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
                     <input type="hidden" name="email_comprador" value="{email}">
                     <input type="hidden" name="template_id" value="{PAYWAY_TEMPLATE_ID}">
-                    <input type="hidden" name="entity_name" value="">
+                    <input type="hidden" name="mediodepago" value="1">
                     <input type="hidden" name="signature" value="{signature}">
+                    <input type="hidden" name="hash" value="{signature}">
                     
                     <button type="submit" class="btn">Continuar a Payway &rarr;</button>
                 </form>
