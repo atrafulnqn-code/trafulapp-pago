@@ -326,10 +326,9 @@ def create_payway_payment():
         
         # 1. Preparar datos básicos
         operation_id = str(int(datetime.now().timestamp())) # ID numérico único
-        amount_str = f"{float(total_amount):.2f}".replace('.', ',') # Payway suele usar coma decimal en SPS legacy, o punto. Probamos formato estandar.
-        # Ajuste: La mayoría de SPS espera monto con punto como decimal, pero sin separador de miles. Ej: "100.50"
+        # Ajuste: La mayoría de SPS espera monto con punto como decimal.
         amount_sps = f"{float(total_amount):.2f}" 
-        currency = "ARS" # Moneda
+        currency = "032" # Código numérico para ARS (Pesos Argentinos)
         
         # 2. Parámetros para firma
         params_firma = {
@@ -339,37 +338,14 @@ def create_payway_payment():
             "moneda": currency
         }
         
-        # 3. Generar Firma
-        # NOTA CRÍTICA: Algunos SPS usan la API KEY como 'secret', otros una llave específica de encripción. Usamos Private Key.
+        # 3. Generar Firma (Usando el código 032)
         signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
         
-        # 4. Construir URL de Redirección (GET)
-        # URL Base Producción: https://live.decidir.com/sps-service/v1/payment-requests
-        # Se pasan los parámetros por Query String si es GET, o se retorna para hacer un Form POST oculto.
-        # Para simplificar integración, intentaremos pasar params en la URL (GET) si el template lo soporta.
-        
-        # URL Construida
-        base_url = "https://live.decidir.com/sps-service/v1/payment-requests/"
-        query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}"
-        # NOTA: No pasamos la firma en URL abierta por seguridad si no es requerida explicitamente asi, pero SPS suele requerir un POST.
-        
-        # CORRECCIÓN ESTRATEGIA: SPS requiere POST de un formulario HTML.
-        # Como nuestro frontend espera una URL para redirigir (window.location.href),
-        # lo mejor es crear una ruta intermedia en nuestro backend que renderice ese formulario oculto y haga submit automático.
-        
-        # Nueva Estrategia: Devolver una URL de nuestro propio backend que renderice el formulario.
-        # URL: /api/payway/form_submit/<operation_id>
-        
-        # Guardamos datos en memoria temporal o simplemente los reconstruimos (stateless). 
-        # Para hacerlo stateless, codificamos todo en un token o lo pasamos como query params a nuestro endpoint intermedio.
-        
-        # Simplificación para prueba rápida: Retornamos los datos para que el Frontend haga el POST si fuera posible,
-        # PERO como el frontend espera URL, haremos que el frontend navegue a un endpoint nuestro que devuelve el HTML del form.
-        
+        # 4. Construir URL de Redirección
         email_encoded = urllib.parse.quote(payer_email)
         redirect_url_backend = f"{BACKEND_URL}/api/payway/redirect?id={operation_id}&amount={amount_sps}&email={email_encoded}"
 
-        log_to_airtable('INFO', 'Payway', f'Operación Payway {operation_id} iniciada.', related_id=operation_id)
+        log_to_airtable('INFO', 'Payway', f'Operación Payway {operation_id} iniciada en Producción.', related_id=operation_id)
         
         return add_cors_headers(jsonify({
             "payment_id": operation_id,
@@ -395,11 +371,11 @@ def payway_redirect():
             "site_id": PAYWAY_SITE_ID,
             "operacion_id": op_id,
             "monto": amount,
-            "moneda": "ARS"
+            "moneda": "032" # Pesos ARS
         }
-        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY) # Usamos private key como 'secret'
+        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
         
-        # HTML con Botón Manual (para evitar bloqueos de navegador/antivirus)
+        # HTML con Botón Manual y campos duplicados para compatibilidad
         html_form = f"""
         <html>
         <head>
@@ -407,29 +383,36 @@ def payway_redirect():
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
                 body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; }}
-                .card {{ background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }}
-                .btn {{ background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 1rem; }}
-                .btn:hover {{ background-color: #0056b3; }}
+                .card {{ background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 450px; width: 95%; }}
+                .btn {{ background-color: #007bff; color: white; padding: 14px 28px; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 1.5rem; font-weight: bold; width: 100%; }}
+                .btn:hover {{ background-color: #0056b3; transform: translateY(-1px); }}
+                .monto {{ font-size: 2rem; color: #28a745; margin: 10px 0; font-weight: bold; }}
             </style>
         </head>
         <body>
             <div class="card">
-                <h2>Casi listo...</h2>
-                <p>Estás a un paso de realizar tu pago seguro.</p>
-                <p><strong>Monto: ${amount}</strong></p>
+                <h2>Confirmar Pago</h2>
+                <p>Estás por pagar de forma segura con Payway.</p>
+                <div class="monto">${amount}</div>
                 
-                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests/" method="POST">
+                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests" method="POST">
+                    <!-- Campos Estándar -->
+                    <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
+                    <input type="hidden" name="idSite" value="{PAYWAY_SITE_ID}">
                     <input type="hidden" name="nro_operacion" value="{op_id}">
                     <input type="hidden" name="monto" value="{amount}">
-                    <input type="hidden" name="moneda" value="ARS">
-                    <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
+                    <input type="hidden" name="moneda" value="032">
+                    <input type="hidden" name="id_template" value="{PAYWAY_TEMPLATE_ID}">
+                    <input type="hidden" name="template_id" value="{PAYWAY_TEMPLATE_ID}">
                     <input type="hidden" name="email_comprador" value="{email}">
-                    <input type="hidden" name="mediodepago" value="1">
+                    
+                    <!-- Campos de Seguridad -->
                     <input type="hidden" name="signature" value="{signature}">
                     <input type="hidden" name="hash" value="{signature}">
                     
-                    <button type="submit" class="btn">Continuar a Payway &rarr;</button>
+                    <button type="submit" class="btn">Pagar con Tarjeta &rarr;</button>
                 </form>
+                <p style="margin-top: 1rem; font-size: 0.8rem; color: #6c757d;">Serás redirigido a la plataforma segura de pagos.</p>
             </div>
         </body>
         </html>
