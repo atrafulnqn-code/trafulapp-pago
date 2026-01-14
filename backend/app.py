@@ -349,8 +349,8 @@ def create_payway_payment():
         # Para simplificar integración, intentaremos pasar params en la URL (GET) si el template lo soporta.
         
         # URL Construida
-        base_url = "https://sandbox.decidir.com/sps-service/v1/payment-requests/"
-        query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}&template_id={PAYWAY_TEMPLATE_ID}"
+        base_url = "https://developers.decidir.com/sps-service/v1/payment-requests/"
+        query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}"
         # NOTA: No pasamos la firma en URL abierta por seguridad si no es requerida explicitamente asi, pero SPS suele requerir un POST.
         
         # CORRECCIÓN ESTRATEGIA: SPS requiere POST de un formulario HTML.
@@ -424,7 +424,6 @@ def payway_redirect():
                     <input type="hidden" name="moneda" value="ARS">
                     <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
                     <input type="hidden" name="email_comprador" value="{email}">
-                    <input type="hidden" name="template_id" value="{PAYWAY_TEMPLATE_ID}">
                     <input type="hidden" name="mediodepago" value="1">
                     <input type="hidden" name="signature" value="{signature}">
                     <input type="hidden" name="hash" value="{signature}">
