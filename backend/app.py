@@ -344,12 +344,12 @@ def create_payway_payment():
         signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
         
         # 4. Construir URL de Redirección (GET)
-        # URL Base Producción: https://sps.decidir.com/sps-service/v1/payment-requests
+        # URL Base Producción: https://live.decidir.com/sps-service/v1/payment-requests
         # Se pasan los parámetros por Query String si es GET, o se retorna para hacer un Form POST oculto.
         # Para simplificar integración, intentaremos pasar params en la URL (GET) si el template lo soporta.
         
         # URL Construida
-        base_url = "https://sps.decidir.com/sps-service/v1/payment-requests"
+        base_url = "https://live.decidir.com/sps-service/v1/payment-requests"
         query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}&template_id={PAYWAY_TEMPLATE_ID}"
         # NOTA: No pasamos la firma en URL abierta por seguridad si no es requerida explicitamente asi, pero SPS suele requerir un POST.
         
@@ -418,7 +418,7 @@ def payway_redirect():
                 <p>Estás a un paso de realizar tu pago seguro.</p>
                 <p><strong>Monto: ${amount}</strong></p>
                 
-                <form name="payway_form" action="https://sps.decidir.com/sps-service/v1/payment-requests" method="POST">
+                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests" method="POST">
                     <input type="hidden" name="nro_operacion" value="{op_id}">
                     <input type="hidden" name="monto" value="{amount}">
                     <input type="hidden" name="moneda" value="ARS">
