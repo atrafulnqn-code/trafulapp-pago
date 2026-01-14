@@ -27,16 +27,16 @@ if not AIRTABLE_PAT_FROM_ENV: print("FATAL: La variable de entorno AIRTABLE_PAT 
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV: print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no está configurada.")
 if not RESEND_API_KEY_FROM_ENV: print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está configurada. El envío de emails no funcionará.")
 
-# --- CONFIGURACIÓN PAYWAY PRODUCCIÓN ---
-PAYWAY_SITE_ID = os.getenv("PAYWAY_SITE_ID", "93011187")
-PAYWAY_PUBLIC_KEY = os.getenv("PAYWAY_PUBLIC_KEY", "d330243d2197451da95013d030d4e919")
-PAYWAY_PRIVATE_KEY = os.getenv("PAYWAY_PRIVATE_KEY", "157da43a495f42968b13ee8a14df3ce2")
-PAYWAY_TEMPLATE_ID = os.getenv("PAYWAY_TEMPLATE_ID", "34164")
+# --- CONFIGURACIÓN PAYWAY (TESTING / SANDBOX) ---
+PAYWAY_SITE_ID = os.getenv("PAYWAY_SITE_ID", "93019543")
+PAYWAY_PUBLIC_KEY = os.getenv("PAYWAY_PUBLIC_KEY", "CLyzh5rUvnNraWBEafJisCiITVD9oAJa")
+PAYWAY_PRIVATE_KEY = os.getenv("PAYWAY_PRIVATE_KEY", "6P7u7iMy6zFUMDMLcbBjFNrjz0FamU1W")
+PAYWAY_TEMPLATE_ID = os.getenv("PAYWAY_TEMPLATE_ID", "58895")
 
 if not PAYWAY_SITE_ID or not PAYWAY_PRIVATE_KEY: 
     print("ADVERTENCIA: Credenciales de Payway incompletas.")
 else:
-    print(f"Configuración Payway cargada. Site ID: {PAYWAY_SITE_ID}")
+    print(f"Configuración Payway cargada (TESTING). Site ID: {PAYWAY_SITE_ID}")
 
 # Función auxiliar para generar firma SPS
 def generar_firma_sps(params, private_key):
@@ -349,7 +349,7 @@ def create_payway_payment():
         # Para simplificar integración, intentaremos pasar params en la URL (GET) si el template lo soporta.
         
         # URL Construida
-        base_url = "https://live.decidir.com/sps-service/v1/payment-requests"
+        base_url = "https://sandbox.decidir.com/sps-service/v1/payment-requests/"
         query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}&template_id={PAYWAY_TEMPLATE_ID}"
         # NOTA: No pasamos la firma en URL abierta por seguridad si no es requerida explicitamente asi, pero SPS suele requerir un POST.
         
@@ -418,7 +418,7 @@ def payway_redirect():
                 <p>Estás a un paso de realizar tu pago seguro.</p>
                 <p><strong>Monto: ${amount}</strong></p>
                 
-                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests/" method="POST">
+                <form name="payway_form" action="https://sandbox.decidir.com/sps-service/v1/payment-requests/" method="POST">
                     <input type="hidden" name="nro_operacion" value="{op_id}">
                     <input type="hidden" name="monto" value="{amount}">
                     <input type="hidden" name="moneda" value="ARS">
