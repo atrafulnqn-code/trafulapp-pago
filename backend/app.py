@@ -418,7 +418,7 @@ def payway_redirect():
                 <p>Estás a un paso de realizar tu pago seguro.</p>
                 <p><strong>Monto: ${amount}</strong></p>
                 
-                <form name="payway_form" action="https://sandbox.decidir.com/sps-service/v1/payment-requests/" method="POST">
+                <form name="payway_form" action="https://developers.decidir.com/sps-service/v1/payment-requests/" method="POST">
                     <input type="hidden" name="nro_operacion" value="{op_id}">
                     <input type="hidden" name="monto" value="{amount}">
                     <input type="hidden" name="moneda" value="ARS">
