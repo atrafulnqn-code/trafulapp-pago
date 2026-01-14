@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify, send_file, redirect
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from pyairtable import Api
 from pyairtable.formulas import match
 from dotenv import load_dotenv
@@ -11,6 +11,8 @@ import io
 import resend
 from datetime import datetime
 import base64
+import hashlib
+import urllib.parse
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
@@ -24,6 +26,33 @@ RESEND_API_KEY_FROM_ENV = os.getenv("RESEND_API_KEY")
 if not AIRTABLE_PAT_FROM_ENV: print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.")
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV: print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no está configurada.")
 if not RESEND_API_KEY_FROM_ENV: print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está configurada. El envío de emails no funcionará.")
+
+# --- CONFIGURACIÓN PAYWAY PRODUCCIÓN ---
+PAYWAY_SITE_ID = os.getenv("PAYWAY_SITE_ID", "93011187")
+PAYWAY_PUBLIC_KEY = os.getenv("PAYWAY_PUBLIC_KEY", "d330243d2197451da95013d030d4e919")
+PAYWAY_PRIVATE_KEY = os.getenv("PAYWAY_PRIVATE_KEY", "157da43a495f42968b13ee8a14df3ce2")
+PAYWAY_TEMPLATE_ID = os.getenv("PAYWAY_TEMPLATE_ID", "34164")
+
+if not PAYWAY_SITE_ID or not PAYWAY_PRIVATE_KEY: 
+    print("ADVERTENCIA: Credenciales de Payway incompletas.")
+else:
+    print(f"Configuración Payway cargada. Site ID: {PAYWAY_SITE_ID}")
+
+# Función auxiliar para generar firma SPS
+def generar_firma_sps(params, private_key):
+    try:
+        # Estándar común SPS Decidir 2.0:
+        # Cadena a firmar: site_id + operacion_id + monto + moneda + private_key
+        # Importante: El monto suele requerir separador decimal '.' sin separador de miles si es float,
+        # o ',' si es formato legacy. En V2 JSON suele ser string limpio.
+        # Probaremos la concatenación más estándar.
+        
+        raw_string = f"{params['site_id']}{params['operacion_id']}{params['monto']}{params['moneda']}{private_key}"
+        return hashlib.sha256(raw_string.encode('utf-8')).hexdigest()
+    except Exception as e:
+        print(f"Error generando firma: {e}")
+        return ""
+
 ADMIN_PASSWORD_FROM_ENV = os.getenv("ADMIN_PASSWORD")
 if not ADMIN_PASSWORD_FROM_ENV: print("ADVERTENCIA: La variable de entorno ADMIN_PASSWORD no está configurada. El acceso de administrador no funcionará.")
 print("--- Fin Verificación ---")
@@ -41,7 +70,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
 
 app = Flask(__name__)
-CORS(app) # La forma más simple y permisiva
+# Configuración CORS global permisiva
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 @app.route('/healthz')
 def health_check():
@@ -243,6 +273,171 @@ def create_preference():
         print(f"ERROR CAPTURADO EN CREATE_PREFERENCE: {e}") # <-- AÑADIDO PARA DEBUG
         log_to_airtable('ERROR', 'Mercado Pago', f'ERROR en create_preference: {e}', details={'error_message': str(e), 'payload': data})
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/create_payway_payment', methods=['POST', 'GET', 'OPTIONS'])
+def create_payway_payment():
+    print(f"DEBUG: Petición {request.method} recibida en /api/create_payway_payment") # DEBUG LOG
+
+    # Manejo explícito de CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,GET,OPTIONS')
+        return response, 200
+
+    # Agregar headers CORS también a la respuesta POST/GET exitosa
+    def add_cors_headers(resp):
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        return resp
+
+    log_to_airtable('INFO', 'Payway', f'Recibida petición {request.method} en /api/create_payway_payment', details={'ip_address': request.remote_addr})
+    
+    # Validar configuración
+    if not PAYWAY_SITE_ID or not PAYWAY_PRIVATE_KEY:
+         return add_cors_headers(jsonify({"error": "El servidor no tiene configuradas las credenciales de Payway."})), 500
+
+    # Obtener datos según el método
+    items_to_pay = {}
+    total_amount = None
+    payer_email = 'email@test.com'
+
+    if request.method == 'POST':
+        data = request.json
+        if not data:
+            return add_cors_headers(jsonify({"error": "No se recibieron datos JSON."})), 400
+        items_to_pay = data.get('items_to_pay')
+        total_amount = data.get('unit_price')
+        if items_to_pay:
+            payer_email = items_to_pay.get('email', payer_email)
+            
+    elif request.method == 'GET':
+        # Soporte para GET (Bypass CORS Preflight issues)
+        total_amount = request.args.get('amount')
+        payer_email = request.args.get('email', payer_email)
+        # En GET no pasamos items complejos, asumimos pago simple
+        items_to_pay = {'email': payer_email}
+
+    if not total_amount:
+         return add_cors_headers(jsonify({"error": "Falta el monto (unit_price o amount)."})), 400
+
+    try:
+        # --- INTEGRACIÓN PAYWAY (SPS - Formulario) ---
+        
+        # 1. Preparar datos básicos
+        operation_id = str(int(datetime.now().timestamp())) # ID numérico único
+        amount_str = f"{float(total_amount):.2f}".replace('.', ',') # Payway suele usar coma decimal en SPS legacy, o punto. Probamos formato estandar.
+        # Ajuste: La mayoría de SPS espera monto con punto como decimal, pero sin separador de miles. Ej: "100.50"
+        amount_sps = f"{float(total_amount):.2f}" 
+        currency = "ARS" # Moneda
+        
+        # 2. Parámetros para firma
+        params_firma = {
+            "site_id": PAYWAY_SITE_ID,
+            "operacion_id": operation_id,
+            "monto": amount_sps,
+            "moneda": currency
+        }
+        
+        # 3. Generar Firma
+        # NOTA CRÍTICA: Algunos SPS usan la API KEY como 'secret', otros una llave específica de encripción. Usamos Private Key.
+        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
+        
+        # 4. Construir URL de Redirección (GET)
+        # URL Base Producción: https://sps.decidir.com/sps-service/v1/payment-requests
+        # Se pasan los parámetros por Query String si es GET, o se retorna para hacer un Form POST oculto.
+        # Para simplificar integración, intentaremos pasar params en la URL (GET) si el template lo soporta.
+        
+        # URL Construida
+        base_url = "https://sps.decidir.com/sps-service/v1/payment-requests"
+        query_params = f"?nro_operacion={operation_id}&monto={amount_sps}&mediodepago=1&moneda={currency}&id_site={PAYWAY_SITE_ID}&email_comprador={payer_email}&template_id={PAYWAY_TEMPLATE_ID}"
+        # NOTA: No pasamos la firma en URL abierta por seguridad si no es requerida explicitamente asi, pero SPS suele requerir un POST.
+        
+        # CORRECCIÓN ESTRATEGIA: SPS requiere POST de un formulario HTML.
+        # Como nuestro frontend espera una URL para redirigir (window.location.href),
+        # lo mejor es crear una ruta intermedia en nuestro backend que renderice ese formulario oculto y haga submit automático.
+        
+        # Nueva Estrategia: Devolver una URL de nuestro propio backend que renderice el formulario.
+        # URL: /api/payway/form_submit/<operation_id>
+        
+        # Guardamos datos en memoria temporal o simplemente los reconstruimos (stateless). 
+        # Para hacerlo stateless, codificamos todo en un token o lo pasamos como query params a nuestro endpoint intermedio.
+        
+        # Simplificación para prueba rápida: Retornamos los datos para que el Frontend haga el POST si fuera posible,
+        # PERO como el frontend espera URL, haremos que el frontend navegue a un endpoint nuestro que devuelve el HTML del form.
+        
+        email_encoded = urllib.parse.quote(payer_email)
+        redirect_url_backend = f"{BACKEND_URL}/api/payway/redirect?id={operation_id}&amount={amount_sps}&email={email_encoded}"
+
+        log_to_airtable('INFO', 'Payway', f'Operación Payway {operation_id} iniciada.', related_id=operation_id)
+        
+        return add_cors_headers(jsonify({
+            "payment_id": operation_id,
+            "init_point": redirect_url_backend, 
+            "message": "Redirigiendo a Payway..."
+        }))
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Payway', f'ERROR en create_payway_payment: {e}', details={'error_message': str(e)})
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/payway/redirect', methods=['GET'])
+def payway_redirect():
+    # Endpoint auxiliar para generar el formulario POST hacia Payway
+    try:
+        op_id = request.args.get('id')
+        amount = request.args.get('amount')
+        email = request.args.get('email')
+        
+        if not op_id or not amount: return "Datos inválidos", 400
+        
+        params_firma = {
+            "site_id": PAYWAY_SITE_ID,
+            "operacion_id": op_id,
+            "monto": amount,
+            "moneda": "ARS"
+        }
+        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY) # Usamos private key como 'secret'
+        
+        # HTML con Botón Manual (para evitar bloqueos de navegador/antivirus)
+        html_form = f"""
+        <html>
+        <head>
+            <title>Confirmar Pago</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; }}
+                .card {{ background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }}
+                .btn {{ background-color: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 1rem; }}
+                .btn:hover {{ background-color: #0056b3; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>Casi listo...</h2>
+                <p>Estás a un paso de realizar tu pago seguro.</p>
+                <p><strong>Monto: ${amount}</strong></p>
+                
+                <form name="payway_form" action="https://sps.decidir.com/sps-service/v1/payment-requests" method="POST">
+                    <input type="hidden" name="nro_operacion" value="{op_id}">
+                    <input type="hidden" name="monto" value="{amount}">
+                    <input type="hidden" name="moneda" value="ARS">
+                    <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
+                    <input type="hidden" name="email_comprador" value="{email}">
+                    <input type="hidden" name="template_id" value="{PAYWAY_TEMPLATE_ID}">
+                    <input type="hidden" name="entity_name" value="">
+                    <input type="hidden" name="signature" value="{signature}">
+                    
+                    <button type="submit" class="btn">Continuar a Payway &rarr;</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """
+        return html_form
+
+    except Exception as e:
+         return f"Error generando formulario de pago: {str(e)}", 500
 
 def process_payment(payment_id, payment_info, items_context, is_simulation=False):
     log_to_airtable('INFO', 'Payment Process', f'Inicio del procesamiento de pago. ID: {payment_id}', related_id=payment_id, details={'payment_info': payment_info, 'items_context': items_context})
@@ -617,6 +812,10 @@ def admin_get_logs():
     except Exception as e:
         log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/test_cors', methods=['GET', 'POST', 'OPTIONS'])
+def test_cors():
+    return jsonify({"message": "CORS OK", "method": request.method}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
