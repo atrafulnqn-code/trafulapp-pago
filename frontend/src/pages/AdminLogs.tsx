@@ -60,16 +60,15 @@ const AdminLogs: React.FC = () => {
                 <Col lg={12}>
                     <Card className="shadow-lg">
                         <Card.Body className="p-4 p-md-5">
-                            <h3 className="text-center fw-bold mb-4">Panel de Logs Administrador</h3>
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            <div className="text-end mb-3">
-                                <Button variant="outline-info" onClick={() => navigate('/admin/payments')} className="me-2">
-                                    Ver Pagos
-                                </Button>
-                                <Button variant="outline-secondary" onClick={() => navigate('/')}>
-                                    Volver al Inicio
-                                </Button>
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                                <div className="d-flex align-items-center">
+                                    <Button variant="outline-secondary" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+                                    <h3 className="fw-bold mb-0">Logs del Sistema</h3>
+                                </div>
+                                <Button variant="primary" onClick={() => window.location.reload()}>Refrescar</Button>
                             </div>
+
+                            {error && <Alert variant="danger">{error}</Alert>}
 
                             {loading ? (
                                 <div className="text-center">

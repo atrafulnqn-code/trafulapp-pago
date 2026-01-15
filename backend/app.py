@@ -12,11 +12,13 @@ import resend
 from datetime import datetime
 import base64
 import hashlib
-import urllib.parse
-import requests
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
+
+app = Flask(__name__)
+# Configuración CORS global permisiva
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # --- Verificación de Variables de Entorno ---
 print("--- Iniciando Verificación de Variables de Entorno ---")
@@ -66,17 +68,265 @@ DEUDAS_TABLE_ID = "tblHuS8CdqVqTsA3t"
 PATENTE_TABLE_ID = "tbl3CMMwccWeo8XSG"
 HISTORIAL_TABLE_ID = "tbl5p19Hv4cMk9NUS"
 LOGS_TABLE_ID = "tblLihQ9FmU6JD7NR"
+# ID de la tabla de Recaudación real
+RECAUDACION_TABLE_ID = os.getenv("RECAUDACION_TABLE_ID", "tblzRhxpeqbuhrf78")
+# ID de la tabla de Patente Manual real
+PATENTE_MANUAL_TABLE_ID = os.getenv("PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF") 
+# ID de la tabla de Comprobantes MP real
+COMPROBANTES_MP_TABLE_ID = os.getenv("COMPROBANTES_MP_TABLE_ID", "tblpeoDBIEhsvqOKp")
+ACCESOS_PERSONAL_TABLE_ID = os.getenv("ACCESOS_PERSONAL_TABLE_ID", "tblAILbaYmnWkkPiV")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
 
-app = Flask(__name__)
-# Configuración CORS global permisiva
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# ... (código existente) ...
+
+@app.route('/api/send_payment_link', methods=['POST'])
+@cross_origin()
+def send_payment_link():
+    data = request.json
+    email = data.get('email')
+    monto = data.get('monto')
+    concepto = data.get('concepto', 'Tasa Municipal')
+    link_mp = data.get('link')
+
+    if not email or not link_mp:
+        return jsonify({"error": "Faltan datos"}), 400
+
+    try:
+        # Link para subir comprobante
+        upload_link = f"{FRONTEND_URL}/#/comprobante?email={email}&monto={monto}"
+
+        params = {
+            "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+            "to": email,
+            "subject": "Link de Pago - Comuna de Villa Traful",
+            "html": f"""
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+                <h2>Solicitud de Pago</h2>
+                <p>Hola,</p>
+                <p>Se ha generado una solicitud de pago por el concepto: <strong>{concepto}</strong></p>
+                <p>Monto a pagar: <strong>${monto}</strong></p>
+                <br>
+                <a href="{link_mp}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar con Mercado Pago</a>
+                <br><br>
+                <hr>
+                <p>Una vez realizado el pago, por favor adjunte su comprobante aquí:</p>
+                <a href="{upload_link}" style="color: #666; text-decoration: underline;">Subir Comprobante de Pago</a>
+            </div>
+            """
+        }
+        resend.Emails.send(params)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/upload_comprobante', methods=['POST'])
+@cross_origin()
+def upload_comprobante():
+    try:
+        email = request.form.get('email')
+        monto = request.form.get('monto')
+        archivo = request.files.get('archivo')
+
+        if not archivo:
+            return jsonify({"error": "No hay archivo"}), 400
+
+        # Leer archivo en memoria
+        archivo_bytes = archivo.read()
+        archivo_b64 = base64.b64encode(archivo_bytes).decode('utf-8')
+
+        # 1. Enviar Email a Administración con el adjunto
+        # Usamos el mismo mail de origen como destino por defecto, o uno específico ADMIN_EMAIL
+        admin_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+        
+        params = {
+            "from": "onboarding@resend.dev",
+            "to": admin_email,
+            "subject": f"Nuevo Comprobante MP - {email}",
+            "html": f"<p>El usuario <strong>{email}</strong> ha subido un comprobante.</p><p>Monto declarado: ${monto}</p>",
+            "attachments": [{"filename": archivo.filename, "content": archivo_b64}]
+        }
+        resend.Emails.send(params)
+
+        # 2. Registrar en Airtable (Sin archivo, solo registro)
+        if api:
+            table = api.table(BASE_ID, COMPROBANTES_MP_TABLE_ID)
+            table.create({
+                "Fecha": datetime.now().strftime("%Y-%m-%d"),
+                "Email": email,
+                "Monto Declarado": float(monto) if monto else 0,
+                "Concepto": "Pago subido por usuario",
+                "Estado": "Pendiente"
+            })
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error subiendo comprobante: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/patente_manual', methods=['POST'])
+@cross_origin()
+def registrar_patente_manual():
+    log_to_airtable('INFO', 'Patente Manual', 'Recibido nuevo pago de patente manual', details={'ip': request.remote_addr})
+    
+    if not api:
+        return jsonify({"error": "Error de configuración: Airtable no conectado"}), 500
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Sin datos"}), 400
+
+        # 1. Generar PDF del recibo de Patente
+        items_pdf = [
+            {"description": f"Patente: {data.get('patente', '').upper()}", "amount": 0}, # Informativo
+            {"description": f"Vehículo: {data.get('marca')} {data.get('modelo')} ({data.get('anio')})", "amount": 0}, # Informativo
+            {"description": "Pago de Patente Automotor", "amount": float(data.get('monto') or 0)}
+        ]
+        
+        # Agregar descuento si existe
+        if data.get('descuento') and float(data.get('descuento')) > 0:
+             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (float(data.get('monto')) - float(data.get('total_final')))})
+
+        pdf_details = {
+            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "ESTADO_PAGO": "Aprobado (Manual)",
+            "ID_PAGO_MP": f"PAT-{data.get('patente')}-{int(datetime.now().timestamp())}",
+            "NOMBRE_PAGADOR": data.get('nombre'),
+            "IDENTIFICADOR_PAGADOR": data.get('patente'),
+            "items": items_pdf,
+            "MONTO_TOTAL": data.get('total_final')
+        }
+        
+        pdf_file = create_receipt_pdf(pdf_details)
+        
+        # 2. Guardar en Airtable
+        try:
+            patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+            patente_table.create({
+                "Fecha": data.get('fecha'),
+                "Contribuyente": data.get('nombre'),
+                "Dominio": data.get('patente', '').upper(),
+                "Vehículo": f"{data.get('marca')} {data.get('modelo')}",
+                "Año": int(data.get('anio')) if data.get('anio') else None,
+                "Email": data.get('email'),
+                "Total": float(data.get('total_final')),
+                "Operador": data.get('administrativo'),
+                "Transferencia": data.get('transferencia')
+            })
+        except Exception as airtable_err:
+            print(f"Advertencia: No se pudo guardar en tabla Patente Manual ({airtable_err}). Se ignora para no bloquear flujo.")
+            log_to_airtable('WARNING', 'Patente Manual', f'Fallo al guardar en tabla: {airtable_err}')
+
+        # 3. Enviar Email
+        if pdf_file and data.get('email') and resend.api_key:
+            params = {
+                "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+                "to": data.get('email'),
+                "subject": "Comprobante de Pago Patente - Comuna de Villa Traful",
+                "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de pago de patente para el dominio <strong>{data.get('patente', '').upper()}</strong>.</p><p>Gracias por su contribución.</p>",
+                "attachments": [{"filename": f"patente_{data.get('patente')}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+            }
+            resend.Emails.send(params)
+            log_to_airtable('INFO', 'Patente Manual', f'Email enviado a {data.get("email")}')
+
+        return jsonify({
+            "success": True, 
+            "message": "Pago de Patente registrado correctamente",
+            "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+        })
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Patente Manual', f'Error procesando patente manual: {e}')
+        return jsonify({"error": str(e)}), 500
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
 
 @app.route('/healthz')
 def health_check():
     return "OK", 200
+
+# ... (código existente) ...
+
+@app.route('/api/recaudacion', methods=['POST'])
+@cross_origin()
+def registrar_recaudacion():
+    log_to_airtable('INFO', 'Recaudacion', 'Recibida nueva recaudación manual', details={'ip': request.remote_addr})
+    
+    if not api:
+        return jsonify({"error": "Error de configuración: Airtable no conectado"}), 500
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Sin datos"}), 400
+
+        # 1. Generar PDF del recibo
+        # Reusamos la lógica de PDF pero con un template o datos adaptados
+        items_pdf = []
+        for key, val in data.get('importes', {}).items():
+            monto = float(val)
+            if monto > 0:
+                # Buscar label (esto es simplificado, idealmente vendría del front o map)
+                label = key.replace('_', ' ').capitalize() 
+                items_pdf.append({"description": label, "amount": monto})
+        
+        # Agregar descuento si existe
+        if data.get('descuento') and float(data.get('descuento')) > 0:
+             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (data.get('total') - data.get('total_final'))})
+
+        pdf_details = {
+            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "ESTADO_PAGO": "Aprobado (Manual)",
+            "ID_PAGO_MP": f"MAN-{int(datetime.now().timestamp())}",
+            "NOMBRE_PAGADOR": data.get('nombre'),
+            "IDENTIFICADOR_PAGADOR": data.get('email'),
+            "items": items_pdf,
+            "MONTO_TOTAL": data.get('total_final')
+        }
+        
+        pdf_file = create_receipt_pdf(pdf_details)
+        
+        # 2. Guardar en Airtable
+        # Intentamos guardar en la tabla específica, si falla, al menos queda en Logs
+        try:
+            recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+            recaudacion_table.create({
+                "Fecha": data.get('fecha'),
+                "Contribuyente": data.get('nombre'),
+                "Email": data.get('email'),
+                "Total": data.get('total_final'),
+                "Detalle JSON": json.dumps(data.get('importes')),
+                "Operador": data.get('administrativa'),
+                "Transferencia": data.get('transferencia')
+            })
+        except Exception as airtable_err:
+            print(f"Advertencia: No se pudo guardar en tabla Recaudacion ({airtable_err}). Se ignora para no bloquear flujo.")
+            log_to_airtable('WARNING', 'Recaudacion', f'Fallo al guardar en tabla Recaudacion: {airtable_err}')
+
+        # 3. Enviar Email
+        if pdf_file and data.get('email') and resend.api_key:
+            params = {
+                "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+                "to": data.get('email'),
+                "subject": "Comprobante de Pago - Comuna de Villa Traful",
+                "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de su pago realizado el {data.get('fecha')}.</p><p>Gracias por su contribución.</p>",
+                "attachments": [{"filename": "comprobante_pago.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+            }
+            resend.Emails.send(params)
+            log_to_airtable('INFO', 'Recaudacion', f'Email enviado a {data.get("email")}')
+
+        return jsonify({
+            "success": True, 
+            "message": "Recaudación registrada correctamente",
+            "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+        })
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Recaudacion', f'Error procesando recaudación: {e}')
+        return jsonify({"error": str(e)}), 500
 
 # Inicializar las SDKs de forma segura
 api = None
@@ -114,7 +364,11 @@ except Exception as e:
 # --- Funciones Auxiliares de PDF y Email ---
 def create_receipt_pdf(payment_details):
     try:
-        with open('comprobante_template.html', 'r', encoding='utf-8') as f:
+        # Usar ruta absoluta para encontrar el template
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(base_dir, 'comprobante_template.html')
+        
+        with open(template_path, 'r', encoding='utf-8') as f:
             html_template = f.read()
 
         items_html = ""
@@ -397,7 +651,64 @@ def create_payway_payment():
 
 @app.route('/api/payway/redirect', methods=['GET'])
 def payway_redirect():
-    # ... (código existente) ...
+    # Endpoint auxiliar para generar el formulario POST hacia Payway
+    try:
+        op_id = request.args.get('id')
+        amount = request.args.get('amount')
+        email = request.args.get('email')
+        
+        if not op_id or not amount: return "Datos inválidos", 400
+        
+        params_firma = {
+            "site_id": PAYWAY_SITE_ID,
+            "operacion_id": op_id,
+            "monto": amount,
+            "moneda": "032" # Pesos ARS
+        }
+        signature = generar_firma_sps(params_firma, PAYWAY_PRIVATE_KEY)
+        
+        # HTML con Botón Manual y campos duplicados para compatibilidad
+        html_form = f"""
+        <html>
+        <head>
+            <title>Confirmar Pago</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; }}
+                .card {{ background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 450px; width: 95%; }}
+                .btn {{ background-color: #007bff; color: white; padding: 14px 28px; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 1.5rem; font-weight: bold; width: 100%; }}
+                .btn:hover {{ background-color: #0056b3; transform: translateY(-1px); }}
+                .monto {{ font-size: 2rem; color: #28a745; margin: 10px 0; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>Confirmar Pago</h2>
+                <p>Estás por pagar de forma segura con Payway.</p>
+                <div class="monto">${amount}</div>
+                
+                <form name="payway_form" action="https://live.decidir.com/sps-service/v1/payment-requests" method="POST">
+                    <!-- Campos Estándar -->
+                    <input type="hidden" name="id_site" value="{PAYWAY_SITE_ID}">
+                    <input type="hidden" name="idSite" value="{PAYWAY_SITE_ID}">
+                    <input type="hidden" name="nro_operacion" value="{op_id}">
+                    <input type="hidden" name="monto" value="{amount}">
+                    <input type="hidden" name="moneda" value="032">
+                    <input type="hidden" name="id_template" value="{PAYWAY_TEMPLATE_ID}">
+                    <input type="hidden" name="template_id" value="{PAYWAY_TEMPLATE_ID}">
+                    <input type="hidden" name="email_comprador" value="{email}">
+                    
+                    <!-- Campos de Seguridad -->
+                    <input type="hidden" name="signature" value="{signature}">
+                    <input type="hidden" name="hash" value="{signature}">
+                    
+                    <button type="submit" class="btn">Pagar con Tarjeta &rarr;</button>
+                </form>
+                <p style="margin-top: 1rem; font-size: 0.8rem; color: #6c757d;">Serás redirigido a la plataforma segura de pagos.</p>
+            </div>
+        </body>
+        </html>
+        """
         return html_form
 
     except Exception as e:
@@ -602,6 +913,119 @@ def get_receipt(historial_record_id):
         return "Error al generar el PDF.", 500
     except Exception as e:
         return jsonify({"error": "No se pudo encontrar o generar el comprobante."}), 404
+
+# --- NUEVOS ENDPOINTS ADMINISTRATIVOS ---
+
+@app.route('/api/staff/register_access', methods=['POST'])
+def register_staff_access():
+    data = request.json
+    username = data.get('username')
+    if not username or not api:
+        return jsonify({"error": "Datos incompletos"}), 400
+    
+    try:
+        table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
+        now = datetime.now()
+        table.create({
+            "Fecha": now.strftime("%Y-%m-%d"),
+            "Hora": now.strftime("%H:%M:%S"),
+            "Usuario": username,
+            "IP": request.remote_addr
+        })
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/recaudacion', methods=['GET'])
+def admin_get_recaudacion():
+    if not api: return jsonify({"error": "Airtable no inicializada"}), 500
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = 10
+        table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+        all_records = table.all(sort=['-Fecha'])
+        
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = all_records[start:end]
+        
+        records = []
+        for r in paginated:
+            f = r['fields']
+            records.append({
+                "id": r['id'],
+                "fecha": f.get('Fecha'),
+                "contribuyente": f.get('Contribuyente'),
+                "email": f.get('Email'),
+                "total": f.get('Total'),
+                "operador": f.get('Operador'),
+                "transferencia": f.get('Transferencia'),
+                "detalle": f.get('Detalle JSON')
+            })
+            
+        return jsonify({"records": records, "total_records": len(all_records), "per_page": per_page})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/patentes_manuales', methods=['GET'])
+def admin_get_patentes():
+    if not api: return jsonify({"error": "Airtable no inicializada"}), 500
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = 10
+        table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+        all_records = table.all(sort=['-Fecha'])
+        
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = all_records[start:end]
+        
+        records = []
+        for r in paginated:
+            f = r['fields']
+            records.append({
+                "id": r['id'],
+                "fecha": f.get('Fecha'),
+                "dominio": f.get('Dominio'),
+                "vehiculo": f.get('Vehículo'),
+                "anio": f.get('Año'),
+                "contribuyente": f.get('Contribuyente'),
+                "operador": f.get('Operador'),
+                "total": f.get('Total'),
+                "transferencia": f.get('Transferencia')
+            })
+            
+        return jsonify({"records": records, "total_records": len(all_records), "per_page": per_page})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/access_logs', methods=['GET'])
+def admin_get_access_logs():
+    if not api: return jsonify({"error": "Airtable no inicializada"}), 500
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = 10
+        table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
+        all_records = table.all(sort=['-Fecha', '-Hora'])
+        
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated = all_records[start:end]
+        
+        logs = []
+        for r in paginated:
+            f = r['fields']
+            logs.append({
+                "id": r['id'],
+                "fecha": f.get('Fecha'),
+                "hora": f.get('Hora'),
+                "usuario": f.get('Usuario'),
+                "ip": f.get('IP')
+            })
+            
+        return jsonify({"logs": logs, "total_records": len(all_records), "per_page": per_page})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/send_receipt', methods=['OPTIONS'])

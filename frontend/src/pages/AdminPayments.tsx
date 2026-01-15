@@ -77,16 +77,15 @@ const AdminPayments: React.FC = () => {
                 <Col lg={12}>
                     <Card className="shadow-lg">
                         <Card.Body className="p-4 p-md-5">
-                            <h3 className="text-center fw-bold mb-4">Panel de Pagos Administrador</h3>
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            <div className="text-end mb-3">
-                                <Button variant="info" onClick={() => navigate('/admin/logs')} className="me-2">
-                                    Ver Logs
-                                </Button>
-                                <Button variant="outline-secondary" onClick={() => navigate('/')}>
-                                    Volver al Inicio
-                                </Button>
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                                <div className="d-flex align-items-center">
+                                    <Button variant="outline-secondary" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+                                    <h3 className="fw-bold mb-0">Historial de Pagos</h3>
+                                </div>
+                                <Button variant="primary" onClick={() => window.location.reload()}>Refrescar</Button>
                             </div>
+                            
+                            {error && <Alert variant="danger">{error}</Alert>}
 
                             {loading ? (
                                 <div className="text-center">

@@ -27,9 +27,8 @@ const AdminLogin: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // En una aplicación real, aquí se guardaría el token o se gestionaría la sesión
-        // Por ahora, simplemente redirigimos
-        navigate('/admin/payments');
+        localStorage.setItem('adminUser', 'Super Admin'); 
+        navigate('/admin/dashboard');
       } else {
         setError(data.message || 'Error al iniciar sesión. Inténtelo de nuevo.');
       }
@@ -44,16 +43,26 @@ const AdminLogin: React.FC = () => {
     <Container className="py-5">
       <Row className="justify-content-center">
         <Col md={6} lg={4}>
-          <Card className="shadow-lg">
+          <Card className="shadow-lg border-0 rounded-3">
             <Card.Body className="p-4 p-md-5">
-              <h3 className="text-center fw-bold mb-4">Acceso Administrador</h3>
-              {error && <Alert variant="danger">{error}</Alert>}
+              <div className="text-center mb-4">
+                <div className="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '60px', height: '60px' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" className="bi bi-person-lock" viewBox="0 0 16 16">
+                    <path d="M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm0 5.996V14H3s-1 0-1-1 1-4 6-4c.564 0 1.077.038 1.544.107a4.524 4.524 0 0 0-.803.918A10.46 10.46 0 0 0 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h5ZM9 13a1 1 0 0 1 1-1v-1a2 2 0 1 1 4 0v1a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-2Zm3-3a1 1 0 0 0-1 1v1h2v-1a1 1 0 0 0-1-1Z"/>
+                  </svg>
+                </div>
+                <h3 className="fw-bold">Administrativo</h3>
+                <p className="text-muted">Acceso restringido a personal</p>
+              </div>
+              
+              {error && <Alert variant="danger" className="text-center">{error}</Alert>}
+              
               <Form onSubmit={handleSubmit}>
-                <Form.Group className="mb-3" controlId="adminPassword">
-                  <Form.Label>Contraseña</Form.Label>
+                <Form.Group className="mb-4" controlId="adminPassword">
+                  <Form.Label>Clave de Acceso</Form.Label>
                   <Form.Control
                     type="password"
-                    placeholder="Ingrese la contraseña de administrador"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -61,8 +70,9 @@ const AdminLogin: React.FC = () => {
                     disabled={loading}
                   />
                 </Form.Group>
-                <Button variant="primary" type="submit" className="w-100" size="lg" disabled={loading}>
-                  {loading ? 'Cargando...' : 'Iniciar Sesión'}
+                
+                <Button variant="primary" type="submit" className="w-100 py-3 fw-bold rounded-3" disabled={loading}>
+                  {loading ? 'Verificando...' : 'Ingresar al Sistema'}
                 </Button>
               </Form>
             </Card.Body>

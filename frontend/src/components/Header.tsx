@@ -24,7 +24,9 @@ const Header: React.FC = () => {
             <LinkContainer to="/">
               <Nav.Link className="me-3">Inicio</Nav.Link>
             </LinkContainer>
-            <Button variant="primary" className="rounded-pill px-4">Mi Gestión</Button>
+            <LinkContainer to="/staff/login">
+              <Button variant="outline-success" className="rounded-pill px-4">Acceso Personal</Button>
+            </LinkContainer>
           </Nav>
         </Navbar.Collapse>
       </Container>

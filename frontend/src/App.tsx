@@ -7,26 +7,56 @@ import Home from './pages/Home';
 import PaymentFlow from './pages/PaymentFlow';
 import Success from './pages/Success';
 import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 import AdminPayments from './pages/AdminPayments';
 import AdminLogs from './pages/AdminLogs';
+import AdminRecaudacion from './pages/AdminRecaudacion';
+import AdminPatentes from './pages/AdminPatentes';
+import AdminAccessLogs from './pages/AdminAccessLogs';
+import StaffLogin from './pages/StaffLogin';
+import StaffDashboard from './pages/StaffDashboard';
+import RecaudacionForm from './pages/RecaudacionForm';
+import PatenteForm from './pages/PatenteForm';
+import LinkMPModule from './pages/LinkMPModule';
+import UploadComprobante from './pages/UploadComprobante';
+import { useLocation } from 'react-router-dom';
+
+const AppContent: React.FC = () => {
+  const location = useLocation();
+  const isAdminPath = location.pathname.startsWith('/admin') || location.pathname.startsWith('/staff');
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <Header />
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/pagar/:system" element={<PaymentFlow />} />
+          <Route path="/exito" element={<Success />} />
+          <Route path="/comprobante" element={<UploadComprobante />} />
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/payments" element={<AdminPayments />} />
+          <Route path="/admin/logs" element={<AdminLogs />} />
+          <Route path="/admin/access_logs" element={<AdminAccessLogs />} />
+          <Route path="/admin/recaudacion" element={<AdminRecaudacion />} />
+          <Route path="/admin/patentes" element={<AdminPatentes />} />
+          <Route path="/staff/login" element={<StaffLogin />} />
+          <Route path="/staff/dashboard" element={<StaffDashboard />} />
+          <Route path="/staff/recaudacion" element={<RecaudacionForm />} />
+          <Route path="/staff/patente" element={<PatenteForm />} />
+          <Route path="/staff/link-mp" element={<LinkMPModule />} />
+        </Routes>
+      </main>
+      {!isAdminPath && <Footer />}
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   return (
     <Router>
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        <Header />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/pagar/:system" element={<PaymentFlow />} />
-            <Route path="/exito" element={<Success />} />
-            <Route path="/admin" element={<AdminLogin />} />
-            <Route path="/admin/payments" element={<AdminPayments />} />
-            <Route path="/admin/logs" element={<AdminLogs />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+      <AppContent />
     </Router>
   );
 };
