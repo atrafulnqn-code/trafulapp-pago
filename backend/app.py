@@ -112,7 +112,7 @@ def send_payment_link():
                 <br><br>
                 <hr>
                 <p>Una vez realizado el pago, por favor adjunte su comprobante aquí:</p>
-                <a href="{upload_link}" style="color: #666; text-decoration: underline;">Subir Comprobante de Pago</a>
+                <a href="{upload_link}" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Subir Comprobante de Pago</a>
             </div>
             """
         }
