@@ -66,6 +66,8 @@ const AdminRecaudacion: React.FC = () => {
                 <th>Contribuyente</th>
                 <th>Administrativa</th>
                 <th>Email</th>
+                <th>Subtotal</th>
+                <th>Desc.</th>
                 <th>Total</th>
                 <th>Transferencia</th>
                 <th>Conceptos</th>
@@ -73,9 +75,9 @@ const AdminRecaudacion: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-5"><Spinner animation="border" /></td></tr>
+                <tr><td colSpan={9} className="text-center py-5"><Spinner animation="border" /></td></tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-5">No hay registros encontrados.</td></tr>
+                <tr><td colSpan={9} className="text-center py-5">No hay registros encontrados.</td></tr>
               ) : (
                 records.map((rec) => (
                   <tr key={rec.id}>
@@ -83,7 +85,9 @@ const AdminRecaudacion: React.FC = () => {
                     <td>{rec.contribuyente}</td>
                     <td>{rec.operador}</td>
                     <td>{rec.email}</td>
-                    <td className="fw-bold text-success">${rec.total}</td>
+                    <td>${parseFloat(rec.subtotal || rec.total).toFixed(2)}</td>
+                    <td className="text-danger">{rec.descuento ? `${rec.descuento}%` : '-'}</td>
+                    <td className="fw-bold text-success">${parseFloat(rec.total).toFixed(2)}</td>
                     <td>{rec.transferencia || '-'}</td>
                     <td>
                         <small className="text-muted" title={rec.detalle}>Ver Detalle</small>

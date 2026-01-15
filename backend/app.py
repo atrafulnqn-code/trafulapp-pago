@@ -958,6 +958,8 @@ def admin_get_recaudacion():
                 "contribuyente": f.get('Contribuyente'),
                 "email": f.get('Email'),
                 "total": f.get('Total'),
+                "subtotal": f.get('Total') / (1 - (float(f.get('Descuento', 0))/100)) if f.get('Descuento') else f.get('Total'), # Estimado si no se guardó
+                "descuento": f.get('Descuento', 0), # Asumiendo que agregamos este campo a Airtable o lo sacamos del JSON
                 "operador": f.get('Operador'),
                 "transferencia": f.get('Transferencia'),
                 "detalle": f.get('Detalle JSON')
