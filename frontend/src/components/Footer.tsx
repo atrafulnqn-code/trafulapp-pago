@@ -19,7 +19,6 @@ const Footer: React.FC = () => {
               <Nav.Link href="#" className="text-white-50">Términos y Condiciones</Nav.Link>
               <Nav.Link href="#" className="text-white-50">Privacidad de Datos</Nav.Link>
               <Nav.Link href="#" className="text-white-50">Transparencia</Nav.Link>
-              <Nav.Link href="#/admin" className="text-white-50">Administrador</Nav.Link>
             </Nav>
           </Col>
           <Col md={3}>

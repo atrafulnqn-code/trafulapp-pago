@@ -1,1 +1,77 @@
-/* Se ha eliminado el contenido de Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-bg: rgba(255, 255, 255, 0.1); /* Más sutil */
+  --primary-color: #0f4c81; /* Azul Institucional */
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; /* Tipografía más limpia */
+  -webkit-font-smoothing: antialiased;
+  background-color: #f1f5f9; /* Fondo gris claro suave para leer mejor */
+  color: #1e293b; /* Texto gris oscuro, no negro */
+  min-height: 100vh;
+}
+
+/* Clases Glassmorphism Corporativo */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85); /* Blanco casi sólido */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 2rem !important; /* Bordes muy redondeados */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Botones Corporativos */
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 2px 4px rgba(15, 76, 129, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: #0c3b66 !important;
+  box-shadow: 0 4px 6px rgba(15, 76, 129, 0.4);
+}
+
+/* Ajustes de Bootstrap */
+.form-control, .form-select {
+  background-color: #fff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 0.25rem rgba(15, 76, 129, 0.15) !important;
+}
+
+.table {
+  color: #334155 !important;
+}
+
+.table thead th {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
