@@ -18,7 +18,6 @@ import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
 import PatenteForm from './pages/PatenteForm';
 import LinkMPModule from './pages/LinkMPModule';
-import UploadComprobante from './pages/UploadComprobante';
 import { useLocation } from 'react-router-dom';
 
 const AppContent: React.FC = () => {
@@ -33,7 +32,6 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/pagar/:system" element={<PaymentFlow />} />
           <Route path="/exito" element={<Success />} />
-          <Route path="/comprobante" element={<UploadComprobante />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/payments" element={<AdminPayments />} />

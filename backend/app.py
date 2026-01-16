@@ -72,8 +72,6 @@ LOGS_TABLE_ID = "tblLihQ9FmU6JD7NR"
 RECAUDACION_TABLE_ID = os.getenv("RECAUDACION_TABLE_ID", "tblzRhxpeqbuhrf78")
 # ID de la tabla de Patente Manual real
 PATENTE_MANUAL_TABLE_ID = os.getenv("PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF") 
-# ID de la tabla de Comprobantes MP real
-COMPROBANTES_MP_TABLE_ID = os.getenv("COMPROBANTES_MP_TABLE_ID", "tblpeoDBIEhsvqOKp")
 ACCESOS_PERSONAL_TABLE_ID = os.getenv("ACCESOS_PERSONAL_TABLE_ID", "tblAILbaYmnWkkPiV")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -126,50 +124,6 @@ def send_payment_link():
     except Exception as e:
         print(f"ERROR CRÍTICO en send_payment_link: {str(e)}") # Esto saldrá en los logs de Render
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
-
-@app.route('/api/upload_comprobante', methods=['POST'])
-@cross_origin()
-def upload_comprobante():
-    try:
-        email = request.form.get('email')
-        monto = request.form.get('monto')
-        archivo = request.files.get('archivo')
-
-        if not archivo:
-            return jsonify({"error": "No hay archivo"}), 400
-
-        # Leer archivo en memoria
-        archivo_bytes = archivo.read()
-        archivo_b64 = base64.b64encode(archivo_bytes).decode('utf-8')
-
-        # 1. Enviar Email a Administración con el adjunto
-        # Usamos el mismo mail de origen como destino por defecto, o uno específico ADMIN_EMAIL
-        admin_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
-        
-        params = {
-            "from": "onboarding@resend.dev",
-            "to": admin_email,
-            "subject": f"Nuevo Comprobante MP - {email}",
-            "html": f"<p>El usuario <strong>{email}</strong> ha subido un comprobante.</p><p>Monto declarado: ${monto}</p>",
-            "attachments": [{"filename": archivo.filename, "content": archivo_b64}]
-        }
-        resend.Emails.send(params)
-
-        # 2. Registrar en Airtable (Sin archivo, solo registro)
-        if api:
-            table = api.table(BASE_ID, COMPROBANTES_MP_TABLE_ID)
-            table.create({
-                "Fecha": datetime.now().strftime("%Y-%m-%d"),
-                "Email": email,
-                "Monto Declarado": float(monto) if monto else 0,
-                "Concepto": "Pago subido por usuario",
-                "Estado": "Pendiente"
-            })
-
-        return jsonify({"success": True})
-    except Exception as e:
-        print(f"Error subiendo comprobante: {e}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/patente_manual', methods=['POST'])
 @cross_origin()
