@@ -76,7 +76,6 @@ const PaymentFlow: React.FC = () => {
     const [multipleResults, setMultipleResults] = useState<any[] | null>(null);
     const [suggestions, setSuggestions] = useState<any[]>([]); // New state for suggestions
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false); // New state to control suggestion visibility
-    const [paymentMethod, setPaymentMethod] = useState<'mercadopago' | 'payway'>('mercadopago');
 
     const systemConfig = useMemo(() => {
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
@@ -139,7 +138,7 @@ const PaymentFlow: React.FC = () => {
 
     const getItemsToPay = () => {
         const selectedDebtDetails = result?.debts.filter(d => selectedDebts.includes(d.id));
-        const systemKey = system?.toUpperCase().replace('-', '_') as Paymentasyon;
+        const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
         let itemTypeForBackend = '';
         if (systemKey === PaymentSystem.PATENTE) itemTypeForBackend = 'vehiculo';
         else if (systemKey === PaymentSystem.TASAS) itemTypeForBackend = 'lote';
@@ -155,79 +154,69 @@ const PaymentFlow: React.FC = () => {
         };
     };
 
-    const handleFinalPayment = async () => {
-        if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
-        setLoading(true);
-        setError(null);
-        try {
-            const itemsToPay = getItemsToPay();
-            let endpoint = '/create_preference'; // Default Mercado Pago
-            let method = 'POST';
-            let body = JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount });
-            let finalUrl = `${API_BASE_URL}${endpoint}`;
+        const handleFinalPayment = async () => {
 
-            if (paymentMethod === 'payway') {
-                endpoint = '/create_payway_payment';
-                method = 'GET';
-                // Para Payway usamos GET para evitar problemas de CORS Preflight en local
-                const queryParams = new URLSearchParams({
-                    amount: totalAmount.toString(),
-                    email: email
-                }).toString();
-                finalUrl = `${API_BASE_URL}${endpoint}?${queryParams}`;
-                body = undefined as any; // No body in GET
-            }
+            if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
 
-            const response = await fetch(finalUrl, { 
-                method: method, 
-                headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined, 
-                body: body 
-            });
-            
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Falló la creación del pago.');
-            
-            if (paymentMethod === 'mercadopago') {
+            setLoading(true);
+
+            setError(null);
+
+            try {
+
+                const itemsToPay = getItemsToPay();
+
+                const endpoint = '/create_preference'; // Solo Mercado Pago
+
+                
+
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, { 
+
+                    method: 'POST', 
+
+                    headers: { 'Content-Type': 'application/json' }, 
+
+                    body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount }) 
+
+                });
+
+                
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Falló la creación del pago.');
+
+                
+
                 if (data.preference_id) { 
-                    // Priorizar Producción (init_point) sobre Sandbox
-                    if (data.init_point) {
-                        window.location.href = data.init_point;
-                    } else if (data.sandbox_init_point) {
-                        window.location.href = data.sandbox_init_point;
-                    } else {
-                        throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
-                    }
-                } 
-                else { throw new Error("No se recibió un ID de preferencia de pago.") }
-            } else if (paymentMethod === 'payway') {
-                 if (data.init_point) {
-                    window.location.href = data.init_point;
-                } else {
-                    // Fallback para simulación o mensaje
-                    alert("Payway: " + (data.message || "Pago iniciado. Revise la consola del servidor."));
-                }
-            }
-        } catch (err: any) { setError(`Error al procesar el pago: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
-    };
 
-    const handleSimulatedPayment = async () => {
-        if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
-        setLoading(true);
-        setError(null);
-        try {
-            const itemsToPay = getItemsToPay();
-            const response = await fetch(`${API_BASE_URL}/debug/simulate_payment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items_to_pay: itemsToPay }) });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Falló la simulación del pago.');
-            if (data.mp_payment_id) {
-                navigate('/exito', { state: { paymentId: data.mp_payment_id } });
-            } else {
-                throw new Error("La simulación no devolvió un ID de pago.");
-            }
-        } catch (err: any) { setError(`Error en la simulación: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
-    };
+                    // Priorizar Producción (init_point) sobre Sandbox
+
+                    if (data.init_point) {
+
+                        window.location.href = data.init_point;
+
+                    } else if (data.sandbox_init_point) {
+
+                        window.location.href = data.sandbox_init_point;
+
+                    } else {
+
+                        throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
+
+                    }
+
+                } else { throw new Error("No se recibió un ID de preferencia de pago.") }
+
     
-    const renderStepContent = () => {
+
+            } catch (err: any) { setError(`Error al procesar el pago: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
+
+        };
+
+        
+
+        const renderStepContent = () => {
         switch (currentStep) {
             case 1: // Identification
                 return (
@@ -355,44 +344,32 @@ const PaymentFlow: React.FC = () => {
                         </Card>
                         <Form>
                            <Form.Group className="mb-3" controlId="emailInput">
-                             <Form.Label>Email para recibir el comprobante</Form.Label>
+                             <Form.Label>Email para recibir el comprobante <span className="text-danger fw-bold ms-1" style={{fontSize: '0.8rem'}}>(OBLIGATORIO COMPLETAR CON EMAIL)</span></Form.Label>
                              <Form.Control type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="ejemplo@email.com" isInvalid={!isEmailValid && email.length > 0} required size="lg"/>
                              <Form.Control.Feedback type="invalid">Por favor, ingrese un email válido.</Form.Control.Feedback>
                            </Form.Group>
 
-                           <div className="mb-4">
-                             <Form.Label className="fw-bold text-muted small text-uppercase">Seleccione Medio de Pago</Form.Label>
-                             <div className="d-flex gap-3">
-                               <Card 
-                                 className={`flex-fill border-2 ${paymentMethod === 'mercadopago' ? 'border-primary bg-primary bg-opacity-10' : 'border-light shadow-sm'}`} 
-                                 onClick={() => setPaymentMethod('mercadopago')}
-                                 style={{cursor: 'pointer', transition: 'all 0.2s'}}
-                               >
-                                 <Card.Body className="text-center py-3">
-                                   <div className="fw-bold text-dark">Mercado Pago</div>
-                                   <small className="text-muted" style={{fontSize: '0.75rem'}}>Dinero en cuenta, Tarjetas</small>
-                                 </Card.Body>
-                               </Card>
-                               <Card 
-                                 className={`flex-fill border-2 ${paymentMethod === 'payway' ? 'border-primary bg-primary bg-opacity-10' : 'border-light shadow-sm'}`}
-                                 onClick={() => setPaymentMethod('payway')}
-                                 style={{cursor: 'pointer', transition: 'all 0.2s'}}
-                               >
-                                  <Card.Body className="text-center py-3">
-                                   <div className="fw-bold text-dark">Payway</div>
-                                   <small className="text-muted" style={{fontSize: '0.75rem'}}>Débito y Crédito</small>
-                                 </Card.Body>
-                               </Card>
-                             </div>
-                           </div>
-
-                           <ButtonGroup vertical className="w-100 mb-2">
-                                <Button variant="success" size="lg" onClick={handleFinalPayment} disabled={!isEmailValid || loading || totalAmount === 0}>
-                                    Pagar con {paymentMethod === 'mercadopago' ? 'Mercado Pago' : 'Payway'}
+                           <div className="d-grid gap-2">
+                                <Button 
+                                    size="lg" 
+                                    onClick={handleFinalPayment} 
+                                    disabled={!isEmailValid || loading || totalAmount === 0}
+                                    style={{ backgroundColor: '#009EE3', borderColor: '#009EE3', color: 'white', fontWeight: 'bold', padding: '15px' }}
+                                    className="d-flex align-items-center justify-content-center gap-2 shadow-sm"
+                                >
+                                    {loading ? (
+                                        <div className="spinner-border spinner-border-sm text-light" role="status"></div>
+                                    ) : (
+                                        <>
+                                            <span>Pagar con Mercado Pago</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-credit-card-2-back-fill" viewBox="0 0 16 16">
+                                                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5H0V4zm11.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-2zM0 11v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1H0z"/>
+                                            </svg>
+                                        </>
+                                    )}
                                 </Button>
-                                <Button variant="info" size="lg" onClick={handleSimulatedPayment} disabled={!isEmailValid || loading || totalAmount === 0}>Simular Pago (para Pruebas)</Button>
-                           </ButtonGroup>
-                           <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100">&larr; Volver a seleccionar</Button>
+                           </div>
+                           <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100 mt-3">&larr; Volver a seleccionar</Button>
                         </Form>
                     </div>
                 );

@@ -22,7 +22,7 @@ const StaffDashboard: React.FC = () => {
   };
 
   return (
-    <Container className="py-5">
+    <Container className="py-5 mt-5">
       <div className="d-flex justify-content-between align-items-center mb-5 bg-white p-4 rounded-3 shadow-sm border">
         <div>
           <h2 className="fw-bold text-dark mb-0">Panel de Personal</h2>

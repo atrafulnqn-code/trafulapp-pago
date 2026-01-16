@@ -60,7 +60,7 @@ const StaffLogin: React.FC = () => {
   };
 
   return (
-    <Container className="py-5">
+    <Container className="py-5 mt-5">
       <Row className="justify-content-center">
         <Col md={6} lg={4}>
           <Card className="shadow-lg border-0 rounded-3">

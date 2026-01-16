@@ -103,9 +103,9 @@ const PatenteForm: React.FC = () => {
   };
 
   return (
-    <Container className="py-5">
+    <Container className="py-5 mt-5">
       <div className="d-flex align-items-center mb-4">
-        <Button variant="outline-secondary" onClick={() => navigate('/staff/dashboard')} className="me-3">&larr; Volver</Button>
+        <Button variant="outline-secondary" size="sm" onClick={() => navigate('/staff/dashboard')} className="me-3">&larr; Volver</Button>
         <h2 className="fw-bold mb-0">Pago de Patente</h2>
       </div>
 

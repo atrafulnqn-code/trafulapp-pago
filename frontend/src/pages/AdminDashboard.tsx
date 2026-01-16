@@ -19,7 +19,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <Container className="py-5">
+    <Container className="py-5 mt-5">
       <div className="d-flex justify-content-between align-items-center mb-5">
         <div>
           <h1 className="fw-bold text-primary">Panel de Control</h1>

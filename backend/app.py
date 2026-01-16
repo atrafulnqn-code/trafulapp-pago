@@ -277,11 +277,15 @@ def registrar_recaudacion():
         # 1. Generar PDF del recibo
         # Reusamos la lógica de PDF pero con un template o datos adaptados
         items_pdf = []
+        notas = data.get('notas', {})
         for key, val in data.get('importes', {}).items():
             monto = float(val)
             if monto > 0:
                 # Buscar label (esto es simplificado, idealmente vendría del front o map)
-                label = key.replace('_', ' ').capitalize() 
+                label = key.replace('_', ' ').capitalize()
+                # Agregar nota si existe
+                if notas.get(key):
+                    label += f" ({notas.get(key)})"
                 items_pdf.append({"description": label, "amount": monto})
         
         # Agregar descuento si existe
@@ -300,19 +304,50 @@ def registrar_recaudacion():
         
         pdf_file = create_receipt_pdf(pdf_details)
         
+        # 1.5 Generar Preferencia de Pago MP
+        mp_link = None
+        mp_id = None
+        if sdk and data.get('total_final') > 0:
+            try:
+                preference_data = {
+                    "items": [{"title": "Tasas y Derechos Municipales", "quantity": 1, "unit_price": float(data.get('total_final'))}],
+                    "back_urls": {"success": f"{FRONTEND_URL}/exito", "failure": FRONTEND_URL, "pending": FRONTEND_URL},
+                    "auto_return": "approved",
+                    "notification_url": f"{BACKEND_URL}/api/payment_webhook",
+                    "external_reference": json.dumps({"type": "recaudacion_manual", "email": data.get('email')}) 
+                }
+                preference_response = sdk.preference().create(preference_data)
+                mp_link = preference_response["response"]["init_point"]
+                mp_id = preference_response["response"]["id"]
+            except Exception as mp_err:
+                print(f"Error generando link MP: {mp_err}")
+
         # 2. Guardar en Airtable
-        # Intentamos guardar en la tabla específica, si falla, al menos queda en Logs
         try:
+            detalle_completo = {
+                "importes": data.get('importes'),
+                "notas": notas
+            }
             recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
-            recaudacion_table.create({
+            record = recaudacion_table.create({
                 "Fecha": data.get('fecha'),
                 "Contribuyente": data.get('nombre'),
                 "Email": data.get('email'),
                 "Total": data.get('total_final'),
-                "Detalle JSON": json.dumps(data.get('importes')),
+                "Detalle JSON": json.dumps(detalle_completo),
                 "Operador": data.get('administrativa'),
-                "Transferencia": data.get('transferencia')
+                "Estado Pago": "Pendiente", # Nuevo campo
+                "MP Preference ID": mp_id # Nuevo campo para vincular
             })
+            
+            # Actualizar external_reference con el ID de airtable para el webhook
+            if mp_id:
+                 # Nota: No podemos editar la preferencia ya creada fácilmente sin crear otra, 
+                 # pero confiamos en el ID de preferencia guardado en Airtable para el cruce, 
+                 # o usamos el ID de airtable en el external_reference si lo creamos antes (huevo y gallina).
+                 # Estrategia simple: El webhook buscará por ID de preferencia si no halla external_ref exacto.
+                 pass
+
         except Exception as airtable_err:
             print(f"Advertencia: No se pudo guardar en tabla Recaudacion ({airtable_err}). Se ignora para no bloquear flujo.")
             log_to_airtable('WARNING', 'Recaudacion', f'Fallo al guardar en tabla Recaudacion: {airtable_err}')
@@ -320,19 +355,32 @@ def registrar_recaudacion():
         # 3. Enviar Email
         if pdf_file and data.get('email') and resend.api_key:
             from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
+            
+            html_content = f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el detalle de tasas y derechos generados el {data.get('fecha')}.</p>"
+            
+            if mp_link:
+                html_content += f"""
+                <br>
+                <p><strong>Total a Pagar: ${data.get('total_final')}</strong></p>
+                <a href="{mp_link}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar Ahora con Mercado Pago</a>
+                <br><br>
+                """
+            
+            html_content += "<p>Gracias por su contribución.</p>"
+
             params = {
                 "from": from_email,
                 "to": data.get('email'),
-                "subject": "Comprobante de Pago - Comuna de Villa Traful",
-                "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de su pago realizado el {data.get('fecha')}.</p><p>Gracias por su contribución.</p>",
-                "attachments": [{"filename": "comprobante_pago.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+                "subject": "Solicitud de Pago - Comuna de Villa Traful",
+                "html": html_content,
+                "attachments": [{"filename": "detalle_tasas.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
             }
             resend.Emails.send(params)
             log_to_airtable('INFO', 'Recaudacion', f'Email enviado a {data.get("email")}')
 
         return jsonify({
             "success": True, 
-            "message": "Recaudación registrada correctamente",
+            "message": "Recaudación registrada y link enviado",
             "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
         })
 
@@ -789,36 +837,58 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             pago_estado = "Exitoso"
             log_to_airtable('INFO', 'Payment Process', f'Pago APROBADO. Procesando actualizaciones de deuda. ID MP: {payment_id}', related_id=payment_id)
             
-            record_id_to_update = items_context["record_id"]
-            table_id_to_update = ""
-            fields_to_update_origin = {}
-            item_type = items_context.get("item_type")
+            # Caso Especial: Recaudación Manual
+            if items_context.get('type') == 'recaudacion_manual':
+                # Buscar en tabla Recaudacion por Preference ID (que es el external_reference o linked)
+                # Como el external reference del webhook es lo que mandamos, pero el ID de preferencia esta en el payment info
+                pref_id = payment_info.get('order', {}).get('id') or payment_info.get('authorization_code') # MP a veces varia estructura
+                # Mejor estrategia: Buscar por Email y Monto o intentar matchear Preference ID si lo guardamos.
+                
+                # Búsqueda en Airtable
+                recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+                # Buscamos registros pendientes con ese email (simplificación)
+                records = recaudacion_table.all(formula=match({"Email": items_context.get('email'), "Estado Pago": "Pendiente"}))
+                
+                for r in records:
+                    # Verificar monto aproximado (float safe)
+                    if abs(float(r['fields'].get('Total', 0)) - float(monto_pagado)) < 1.0:
+                        recaudacion_table.update(r['id'], {"Estado Pago": "Pagado", "MP Payment ID": str(payment_id)})
+                        items_for_pdf.append({"description": "Pago Recaudación Manual", "amount": monto_pagado})
+                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro recaudación {r["id"]}')
+                        break
+            
+            # Caso Estándar (Deudas previas)
+            elif "record_id" in items_context:
+                record_id_to_update = items_context["record_id"]
+                table_id_to_update = ""
+                fields_to_update_origin = {}
+                item_type = items_context.get("item_type")
 
-            if item_type == "deuda_general":
-                table_id_to_update = DEUDAS_TABLE_ID
-                fields_to_update_origin["monto total deuda"] = "0"
-                fields_to_update_origin["deuda en concepto de"] = "Pagado"
-                items_for_pdf.append({"description": "Deuda General", "amount": items_context.get('total_amount', 0)})
-            else:
-                if item_type == "lote":
-                    table_id_to_update = CONTRIBUTIVOS_TABLE_ID
-                elif item_type == "vehiculo":
-                    table_id_to_update = PATENTE_TABLE_ID
-                if items_context.get("deuda"):
+                if item_type == "deuda_general":
+                    table_id_to_update = DEUDAS_TABLE_ID
+                    fields_to_update_origin["monto total deuda"] = "0"
+                    fields_to_update_origin["deuda en concepto de"] = "Pagado"
+                    items_for_pdf.append({"description": "Deuda General", "amount": items_context.get('total_amount', 0)})
+                else:
                     if item_type == "lote":
-                        fields_to_update_origin["deuda"] = "0"
+                        table_id_to_update = CONTRIBUTIVOS_TABLE_ID
                     elif item_type == "vehiculo":
-                        fields_to_update_origin["Deuda patente"] = "0"
-                    
-                    items_for_pdf.append({"description": f"Deuda {item_type.capitalize()}", "amount": items_context.get('deuda_monto', 0)})
-                for mes, sel in items_context.get("meses", {}).items():
-                    if sel:
-                        fields_to_update_origin[mes.lower()] = "0"
-                        items_for_pdf.append({"description": mes, "amount": items_context.get('meses_montos', {}).get(mes, 0)})
+                        table_id_to_update = PATENTE_TABLE_ID
+                    if items_context.get("deuda"):
+                        if item_type == "lote":
+                            fields_to_update_origin["deuda"] = "0"
+                        elif item_type == "vehiculo":
+                            fields_to_update_origin["Deuda patente"] = "0"
+                        
+                        items_for_pdf.append({"description": f"Deuda {item_type.capitalize()}", "amount": items_context.get('deuda_monto', 0)})
+                    for mes, sel in items_context.get("meses", {}).items():
+                        if sel:
+                            fields_to_update_origin[mes.lower()] = "0"
+                            items_for_pdf.append({"description": mes, "amount": items_context.get('meses_montos', {}).get(mes, 0)})
 
-            if fields_to_update_origin:
-                api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
-                log_to_airtable('INFO', 'Payment Process', f'Airtable de deuda actualizado para ID: {record_id_to_update}', related_id=payment_id, details={'updates': fields_to_update_origin})
+                if fields_to_update_origin:
+                    api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
+                    log_to_airtable('INFO', 'Payment Process', f'Airtable de deuda actualizado para ID: {record_id_to_update}', related_id=payment_id, details={'updates': fields_to_update_origin})
             
             historial_table.update(historial_record['id'], {
                 'Estado': pago_estado,
