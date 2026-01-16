@@ -352,13 +352,13 @@ except Exception as e:
     print(f"ERROR: Falló la inicialización de la SDK de Airtable: {e}")
     api = None
 
-sdk = None
 try:
-    if MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
-        sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN_FROM_ENV)
-        print("SDK de Mercado Pago inicializada con éxito.")
+    MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "APP_USR-4503490593720184-011614-66692f938236762e3d1709ccc0c94f66-2533057250")
+    if MERCADOPAGO_ACCESS_TOKEN:
+        sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
+        print("SDK de Mercado Pago inicializada con éxito (Producción).")
     else:
-        print("ADVERTENCIA: MERCADOPAGO_ACCESS_TOKEN no disponible, SDK de Mercado Pago NO inicializada.")
+        print("ADVERTENCIA: MERCADOPAGO_ACCESS_TOKEN no disponible.")
 except Exception as e:
     print(f"ERROR: Falló la inicialización de la SDK de Mercado Pago: {e}")
     sdk = None
