@@ -117,10 +117,19 @@ def send_payment_link():
             </div>
             """
         }
-        resend.Emails.send(params)
+        print(f"DEBUG: Intentando enviar email a {email} desde {from_email}...")
+        res_email = resend.Emails.send(params)
+        print(f"DEBUG: Respuesta Resend: {res_email}")
+        
+        # Verificar si Resend devolvió un ID (éxito) o si lanzó excepción
+        if not res_email.get('id'):
+             print(f"ERROR: Resend no devolvió ID. Respuesta: {res_email}")
+             return jsonify({"error": "No se pudo enviar el email (Error proveedor)"}), 500
+
         return jsonify({"success": True})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"ERROR CRÍTICO en send_payment_link: {str(e)}") # Esto saldrá en los logs de Render
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 @app.route('/api/upload_comprobante', methods=['POST'])
 @cross_origin()
