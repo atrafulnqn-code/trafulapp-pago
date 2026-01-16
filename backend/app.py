@@ -96,9 +96,10 @@ def send_payment_link():
     try:
         # Link para subir comprobante
         upload_link = f"{FRONTEND_URL}/#/comprobante?email={email}&monto={monto}"
+        from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
 
         params = {
-            "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+            "from": from_email,
             "to": email,
             "subject": "Link de Pago - Comuna de Villa Traful",
             "html": f"""
@@ -221,8 +222,9 @@ def registrar_patente_manual():
 
         # 3. Enviar Email
         if pdf_file and data.get('email') and resend.api_key:
+            from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
             params = {
-                "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+                "from": from_email,
                 "to": data.get('email'),
                 "subject": "Comprobante de Pago Patente - Comuna de Villa Traful",
                 "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de pago de patente para el dominio <strong>{data.get('patente', '').upper()}</strong>.</p><p>Gracias por su contribución.</p>",
@@ -308,8 +310,9 @@ def registrar_recaudacion():
 
         # 3. Enviar Email
         if pdf_file and data.get('email') and resend.api_key:
+            from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
             params = {
-                "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+                "from": from_email,
                 "to": data.get('email'),
                 "subject": "Comprobante de Pago - Comuna de Villa Traful",
                 "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de su pago realizado el {data.get('fecha')}.</p><p>Gracias por su contribución.</p>",
