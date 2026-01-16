@@ -72,20 +72,23 @@ const AdminPayments: React.FC = () => {
     }
 
     return (
-        <Container className="py-5">
+        <Container className="py-5 mt-5">
             <Row className="justify-content-center">
                 <Col lg={12}>
-                    <Card className="shadow-lg">
-                        <Card.Body className="p-4 p-md-5">
+                    <Card className="shadow-lg border-0">
+                        <Card.Body className="p-4">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <div className="d-flex align-items-center">
-                                    <Button variant="outline-secondary" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
-                                    <h3 className="fw-bold mb-0">Historial de Pagos</h3>
+                                    <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+                                    <h4 className="fw-bold mb-0">Historial de Pagos</h4>
                                 </div>
-                                <Button variant="primary" onClick={() => window.location.reload()}>Refrescar</Button>
+                                <Button variant="primary" size="sm" onClick={() => window.location.reload()}>Refrescar</Button>
                             </div>
                             
                             {error && <Alert variant="danger">{error}</Alert>}
+                            <div className="text-end mb-3">
+                                {/* ... other buttons if needed ... */}
+                            </div>
 
                             {loading ? (
                                 <div className="text-center">
@@ -94,33 +97,34 @@ const AdminPayments: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                <Table striped bordered hover responsive className="text-nowrap">
-                                    <thead>
+                                <div className="table-responsive">
+                                <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
+                                    <thead className="bg-light">
                                         <tr>
-                                            <th>Fecha/Hora</th><th>Estado</th><th>Tipo de Pago</th><th>DNI/Nombre (Detalle)</th><th>Conceptos Pagados</th><th>ID MP</th><th className="text-end">Monto</th><th>Acciones</th>
+                                            <th>Fecha</th><th>Estado</th><th>Tipo</th><th>Detalle</th><th>Conceptos</th><th>ID MP</th><th className="text-end">Monto</th><th>Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {payments.length === 0 ? (
                                             <tr>
-                                                <td colSpan={8} className="text-center">No se encontraron registros de pago.</td>
+                                                <td colSpan={8} className="text-center py-3">No se encontraron registros.</td>
                                             </tr>
                                         ) : (
                                             payments.map((payment) => (
                                                 <tr key={payment.id}>
                                                     <td>
-                                                        {payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR') : 'N/A'}
+                                                        {payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR') : '-'}
                                                     </td>
-                                                    <td>{payment.estado}</td>
+                                                    <td><span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : 'secondary'}`}>{payment.estado}</span></td>
                                                     <td>{payment.payment_type}</td>
-                                                    <td>{payment.detalle}</td>
-                                                    <td>{parseItemsPagados(payment.items_pagados_json)}</td>
-                                                    <td>{payment.mp_payment_id}</td>
-                                                    <td className="text-end">{formatCurrency(payment.monto)}</td>
+                                                    <td className="text-truncate" style={{maxWidth: '200px'}} title={payment.detalle}>{payment.detalle}</td>
+                                                    <td className="text-truncate" style={{maxWidth: '200px'}} title={parseItemsPagados(payment.items_pagados_json)}>{parseItemsPagados(payment.items_pagados_json)}</td>
+                                                    <td className="font-monospace">{payment.mp_payment_id}</td>
+                                                    <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                     <td>
                                                         {payment.mp_payment_id && payment.mp_payment_id.startsWith('SIM_') && (
-                                                            <Button variant="outline-info" size="sm" onClick={() => navigate(`/exito`, { state: { paymentId: payment.mp_payment_id }})}>
-                                                                Ver Simulación
+                                                            <Button variant="outline-info" size="sm" className="py-0" onClick={() => navigate(`/exito`, { state: { paymentId: payment.mp_payment_id }})}>
+                                                                Ver
                                                             </Button>
                                                         )}
                                                     </td>
@@ -129,6 +133,7 @@ const AdminPayments: React.FC = () => {
                                         )}
                                     </tbody>
                                 </Table>
+                                </div>
                                 {totalPages > 1 && (
                                     <div className="d-flex justify-content-center mt-3">
                                         <Pagination>

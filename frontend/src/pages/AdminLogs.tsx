@@ -55,17 +55,17 @@ const AdminLogs: React.FC = () => {
     };
 
     return (
-        <Container className="py-5">
+        <Container className="py-5 mt-5">
             <Row className="justify-content-center">
                 <Col lg={12}>
-                    <Card className="shadow-lg">
-                        <Card.Body className="p-4 p-md-5">
+                    <Card className="shadow-lg border-0">
+                        <Card.Body className="p-4">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <div className="d-flex align-items-center">
-                                    <Button variant="outline-secondary" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
-                                    <h3 className="fw-bold mb-0">Logs del Sistema</h3>
+                                    <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+                                    <h4 className="fw-bold mb-0">Logs del Sistema</h4>
                                 </div>
-                                <Button variant="primary" onClick={() => window.location.reload()}>Refrescar</Button>
+                                <Button variant="primary" size="sm" onClick={() => window.location.reload()}>Refrescar</Button>
                             </div>
 
                             {error && <Alert variant="danger">{error}</Alert>}
@@ -77,8 +77,9 @@ const AdminLogs: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                <Table striped bordered hover responsive className="text-nowrap">
-                                    <thead>
+                                <div className="table-responsive">
+                                <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
+                                    <thead className="bg-light">
                                         <tr>
                                             <th>Fecha/Hora</th><th>Nivel</th><th>Fuente</th><th>Mensaje</th><th>ID Relacionado</th><th>Detalles</th>
                                         </tr>
@@ -86,22 +87,23 @@ const AdminLogs: React.FC = () => {
                                     <tbody>
                                         {logs.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="text-center">No se encontraron registros de logs.</td>
+                                                <td colSpan={6} className="text-center py-3">No se encontraron registros.</td>
                                             </tr>
                                         ) : (
                                             logs.map((log) => (
                                                 <tr key={log.id}>
-                                                    <td>{log.timestamp ? new Date(log.timestamp).toLocaleString('es-AR') : 'N/A'}</td>
-                                                    <td>{log.level}</td>
+                                                    <td>{log.timestamp ? new Date(log.timestamp).toLocaleString('es-AR') : '-'}</td>
+                                                    <td><span className={`badge bg-${log.level === 'ERROR' ? 'danger' : log.level === 'WARNING' ? 'warning' : 'info'}`}>{log.level}</span></td>
                                                     <td>{log.source}</td>
-                                                    <td>{log.message}</td>
-                                                    <td>{log.related_id || 'N/A'}</td>
-                                                    <td className="text-break" style={{ maxWidth: '200px' }}>{log.details ? JSON.stringify(JSON.parse(log.details), null, 2) : 'N/A'}</td>
+                                                    <td className="text-truncate" style={{maxWidth: '300px'}} title={log.message}>{log.message}</td>
+                                                    <td className="font-monospace">{log.related_id || '-'}</td>
+                                                    <td className="text-truncate" style={{ maxWidth: '150px' }} title={log.details}>{log.details ? '...' : '-'}</td>
                                                 </tr>
                                             ))
                                         )}
                                     </tbody>
                                 </Table>
+                                </div>
                                 {totalPages > 1 && (
                                     <div className="d-flex justify-content-center mt-3">
                                         <Pagination>

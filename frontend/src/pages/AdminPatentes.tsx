@@ -46,13 +46,13 @@ const AdminPatentes: React.FC = () => {
   }, [currentPage]);
 
   return (
-    <Container className="py-5" fluid>
+    <Container className="py-5 mt-5" fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div className="d-flex align-items-center">
-            <Button variant="outline-secondary" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
-            <h2 className="fw-bold mb-0">Reporte de Patentes</h2>
+            <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+            <h4 className="fw-bold mb-0">Reporte de Patentes</h4>
         </div>
-        <Button variant="success" onClick={() => fetchRecords(currentPage)}>Actualizar</Button>
+        <Button variant="success" size="sm" onClick={() => fetchRecords(currentPage)}>Actualizar</Button>
       </div>
 
       {error && <Alert variant="danger">{error}</Alert>}
