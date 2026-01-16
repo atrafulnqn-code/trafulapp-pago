@@ -104,9 +104,11 @@ const PatenteForm: React.FC = () => {
 
   return (
     <Container className="py-5 mt-5">
-      <div className="d-flex align-items-center mb-4">
-        <Button variant="outline-secondary" size="sm" onClick={() => navigate('/staff/dashboard')} className="me-3">&larr; Volver</Button>
-        <h2 className="fw-bold mb-0">Pago de Patente</h2>
+      <div className="sticky-top bg-slate-50 py-3 mb-4 border-bottom" style={{ zIndex: 1020, top: '70px' }}>
+        <div className="d-flex align-items-center">
+          <Button variant="outline-secondary" size="sm" onClick={() => navigate('/staff/dashboard')} className="me-3">&larr; Volver</Button>
+          <h2 className="fw-bold mb-0 text-dark">Pago de Patente</h2>
+        </div>
       </div>
 
       {status && <Alert variant={status.type} onClose={() => setStatus(null)} dismissible>{status.msg}</Alert>}
