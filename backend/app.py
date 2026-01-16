@@ -110,10 +110,6 @@ def send_payment_link():
                 <p>Monto a pagar: <strong>${monto}</strong></p>
                 <br>
                 <a href="{link_mp}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar con Mercado Pago</a>
-                <br><br>
-                <hr>
-                <p>Una vez realizado el pago, por favor adjunte su comprobante aquí:</p>
-                <a href="{upload_link}" style="background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Subir Comprobante de Pago</a>
             </div>
             """
         }
@@ -195,7 +191,6 @@ def registrar_patente_manual():
             {"description": "Pago de Patente Automotor", "amount": float(data.get('monto') or 0)}
         ]
         
-        # Agregar descuento si existe
         if data.get('descuento') and float(data.get('descuento')) > 0:
              items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (float(data.get('monto')) - float(data.get('total_final')))})
 
@@ -211,6 +206,24 @@ def registrar_patente_manual():
         
         pdf_file = create_receipt_pdf(pdf_details)
         
+        # 1.5 Generar Preferencia MP
+        mp_link = None
+        mp_id = None
+        if sdk and data.get('total_final') > 0:
+            try:
+                preference_data = {
+                    "items": [{"title": f"Patente {data.get('patente').upper()}", "quantity": 1, "unit_price": float(data.get('total_final'))}],
+                    "back_urls": {"success": f"{FRONTEND_URL}/exito", "failure": FRONTEND_URL, "pending": FRONTEND_URL},
+                    "auto_return": "approved",
+                    "notification_url": f"{BACKEND_URL}/api/payment_webhook",
+                    "external_reference": json.dumps({"type": "patente_manual", "email": data.get('email'), "dominio": data.get('patente').upper()})
+                }
+                preference_response = sdk.preference().create(preference_data)
+                mp_link = preference_response["response"]["init_point"]
+                mp_id = preference_response["response"]["id"]
+            except Exception as mp_err:
+                print(f"Error generando link MP Patente: {mp_err}")
+
         # 2. Guardar en Airtable
         try:
             patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
@@ -223,33 +236,42 @@ def registrar_patente_manual():
                 "Email": data.get('email'),
                 "Total": float(data.get('total_final')),
                 "Operador": data.get('administrativo'),
-                "Transferencia": data.get('transferencia')
+                "Estado Pago": "Pendiente",
+                "MP Preference ID": mp_id
             })
         except Exception as airtable_err:
-            print(f"Advertencia: No se pudo guardar en tabla Patente Manual ({airtable_err}). Se ignora para no bloquear flujo.")
-            log_to_airtable('WARNING', 'Patente Manual', f'Fallo al guardar en tabla: {airtable_err}')
+            log_to_airtable('WARNING', 'Patente Manual', f'Fallo Airtable: {airtable_err}')
 
         # 3. Enviar Email
         if pdf_file and data.get('email') and resend.api_key:
             from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
+            
+            html_content = f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de liquidación de patente para el dominio <strong>{data.get('patente', '').upper()}</strong>.</p>"
+            
+            if mp_link:
+                html_content += f"""
+                <br>
+                <p><strong>Total a Pagar: ${data.get('total_final')}</strong></p>
+                <a href="{mp_link}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar Patente con Mercado Pago</a>
+                <br><br>
+                """
+
             params = {
                 "from": from_email,
                 "to": data.get('email'),
-                "subject": "Comprobante de Pago Patente - Comuna de Villa Traful",
-                "html": f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el comprobante de pago de patente para el dominio <strong>{data.get('patente', '').upper()}</strong>.</p><p>Gracias por su contribución.</p>",
+                "subject": "Solicitud de Pago Patente - Comuna de Villa Traful",
+                "html": html_content,
                 "attachments": [{"filename": f"patente_{data.get('patente')}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
             }
             resend.Emails.send(params)
-            log_to_airtable('INFO', 'Patente Manual', f'Email enviado a {data.get("email")}')
 
         return jsonify({
             "success": True, 
-            "message": "Pago de Patente registrado correctamente",
+            "message": "Pago de Patente registrado y link enviado",
             "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
         })
 
     except Exception as e:
-        log_to_airtable('ERROR', 'Patente Manual', f'Error procesando patente manual: {e}')
         return jsonify({"error": str(e)}), 500
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -839,22 +861,28 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             
             # Caso Especial: Recaudación Manual
             if items_context.get('type') == 'recaudacion_manual':
-                # Buscar en tabla Recaudacion por Preference ID (que es el external_reference o linked)
-                # Como el external reference del webhook es lo que mandamos, pero el ID de preferencia esta en el payment info
-                pref_id = payment_info.get('order', {}).get('id') or payment_info.get('authorization_code') # MP a veces varia estructura
-                # Mejor estrategia: Buscar por Email y Monto o intentar matchear Preference ID si lo guardamos.
-                
                 # Búsqueda en Airtable
                 recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
-                # Buscamos registros pendientes con ese email (simplificación)
                 records = recaudacion_table.all(formula=match({"Email": items_context.get('email'), "Estado Pago": "Pendiente"}))
                 
                 for r in records:
-                    # Verificar monto aproximado (float safe)
                     if abs(float(r['fields'].get('Total', 0)) - float(monto_pagado)) < 1.0:
                         recaudacion_table.update(r['id'], {"Estado Pago": "Pagado", "MP Payment ID": str(payment_id)})
                         items_for_pdf.append({"description": "Pago Recaudación Manual", "amount": monto_pagado})
                         log_to_airtable('INFO', 'Payment Process', f'Actualizado registro recaudación {r["id"]}')
+                        break
+
+            # Caso Especial: Patente Manual
+            elif items_context.get('type') == 'patente_manual':
+                patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+                # Buscamos por email y dominio
+                records = patente_table.all(formula=match({"Email": items_context.get('email'), "Dominio": items_context.get('dominio'), "Estado Pago": "Pendiente"}))
+                
+                for r in records:
+                    if abs(float(r['fields'].get('Total', 0)) - float(monto_pagado)) < 1.0:
+                        patente_table.update(r['id'], {"Estado Pago": "Pagado", "MP Payment ID": str(payment_id)})
+                        items_for_pdf.append({"description": f"Pago Patente {items_context.get('dominio')}", "amount": monto_pagado})
+                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro patente {r["id"]}')
                         break
             
             # Caso Estándar (Deudas previas)

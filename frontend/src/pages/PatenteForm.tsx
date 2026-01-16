@@ -186,16 +186,10 @@ const PatenteForm: React.FC = () => {
 
             <h5 className="mb-3 text-primary border-bottom pb-2 mt-4">Datos de Pago</h5>
             <Row className="mb-3">
-              <Col md={6}>
+              <Col md={12}>
                 <Form.Group controlId="email">
                   <Form.Label>Email <span className="text-danger">*</span></Form.Label>
                   <Form.Control type="email" name="email" value={formData.email} onChange={handleChange} required />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group controlId="transferencia">
-                  <Form.Label>Número de transferencia</Form.Label>
-                  <Form.Control type="text" name="transferencia" value={formData.transferencia} onChange={handleChange} />
                 </Form.Group>
               </Col>
             </Row>
