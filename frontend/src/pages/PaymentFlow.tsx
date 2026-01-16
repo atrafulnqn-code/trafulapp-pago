@@ -189,10 +189,11 @@ const PaymentFlow: React.FC = () => {
             
             if (paymentMethod === 'mercadopago') {
                 if (data.preference_id) { 
-                    if (data.sandbox_init_point) {
-                        window.location.href = data.sandbox_init_point;
-                    } else if (data.init_point) {
+                    // Priorizar Producción (init_point) sobre Sandbox
+                    if (data.init_point) {
                         window.location.href = data.init_point;
+                    } else if (data.sandbox_init_point) {
+                        window.location.href = data.sandbox_init_point;
                     } else {
                         throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
                     }
