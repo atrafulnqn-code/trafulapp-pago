@@ -14,6 +14,14 @@ const Home: React.FC = () => {
       variant: 'success',
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-success" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg> // Home icon
     },
+    // NUEVA TARJETA DE AGUA
+    {
+      id: PaymentSystem.AGUA,
+      title: 'Agua',
+      description: 'Pague sus servicios de agua de forma rápida y segura.',
+      variant: 'info',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-info" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z"/></svg> // Water droplet icon
+    },
     {
       id: PaymentSystem.OTRAS,
       title: 'Plan de Pago',
@@ -69,7 +77,8 @@ const Home: React.FC = () => {
       <Hero />
       
       <Container id="services" className="py-5 my-5" style={{ position: 'relative', zIndex: 10 }}>
-          <Row xs={1} md={3} className="g-5">
+          {/* Changed column sizing to ensure all 4 cards fit in one row */}
+          <Row xs={1} sm={2} md={4} className="g-4"> 
             {services.map((service) => (
               <Col key={service.id}>
                 <div className={`glass-card p-2 h-100 d-flex flex-column border-0 ${service.disabled ? 'opacity-75' : ''}`}>
@@ -77,8 +86,9 @@ const Home: React.FC = () => {
                     <div className="mb-4 p-4 rounded-circle d-inline-block bg-light shadow-sm text-primary" style={{ width: '80px', height: '80px' }}>
                         {service.icon}
                     </div>
-                    <h3 className="fw-bold h5 mb-3 text-dark text-uppercase letter-spacing-1">{service.title}</h3>
-                    <p className="text-secondary small px-2">{service.description}</p>
+                    {/* Adjusted font size for title and description */}
+                    <h3 className="fw-bold h6 mb-2 text-dark text-uppercase letter-spacing-1">{service.title}</h3> {/* h6 for smaller title */}
+                    <p className="text-secondary" style={{fontSize: '0.75rem'}}>{service.description}</p> {/* custom smaller font size */}
                   </div>
                   <div className="p-4 pt-0">
                     <Button 

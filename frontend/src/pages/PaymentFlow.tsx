@@ -32,27 +32,78 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
     const debts: Debt[] = [];
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     let originalRecordId = record.id;
-    if (system === PaymentSystem.PATENTE || system === PaymentSystem.TASAS) {
+    
+    console.log("DEBUG_TRANSFORM: Iniciando transformData para sistema:", system); // Debugging
+    console.log("DEBUG_TRANSFORM: Record completo:", record); // Debugging
+    console.log("DEBUG_TRANSFORM: Campos (fields):", fields); // Debugging
+
+    if (system === PaymentSystem.PATENTE || system === PaymentSystem.TASAS || system === PaymentSystem.AGUA) {
         taxpayerName = fields.titular || fields.contribuyente || 'N/A';
         referenceNumber = fields.patente || fields.lote || searchTerm;
         const deudaField = system === PaymentSystem.PATENTE ? 'Deuda patente' : 'deuda';
-        if (fields[deudaField] && parseFloat(fields[deudaField]) > 0) {
-            debts.push({ id: `deuda-${originalRecordId}`, period: 'Deuda Acumulada', description: `Deuda ${system}`, dueDate: 'N/A', amount: parseFloat(fields[deudaField]), surcharge: 0 });
-        }
-        meses.forEach(mes => {
-            if (fields[mes] && parseFloat(fields[mes]) > 0) {
-                debts.push({ id: `${mes}-${originalRecordId}`, period: mes.charAt(0).toUpperCase() + mes.slice(1), description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mes]), surcharge: 0 });
+        
+        // Handle monthly water/commercial debts
+        if (system === PaymentSystem.AGUA) {
+            console.log("DEBUG_TRANSFORM: Procesando sistema AGUA"); // Debugging
+            for (const mes of meses) {
+                // Capitalizar la primera letra del mes para que coincida con los campos de Airtable
+                const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
+                const aguaField = `${mesCapitalized} agua`;
+                const comercialField = `${mesCapitalized} Comercial`;
+                
+                console.log(`DEBUG_TRANSFORM: Buscando campos: '${aguaField}' y '${comercialField}'`); // Debugging
+                
+                const valorAgua = fields[aguaField];
+                const valorComercial = fields[comercialField];
+
+                console.log(`DEBUG_TRANSFORM: Valor ${aguaField}: ${valorAgua}, Valor ${comercialField}: ${valorComercial}`); // Debugging
+
+                if (valorAgua !== undefined && valorAgua !== null && parseFloat(valorAgua) > 0) {
+                    debts.push({ id: `${mesCapitalized}-agua-${originalRecordId}`, period: `${mesCapitalized} (Agua)`, description: 'Cuota Agua', dueDate: 'N/A', amount: parseFloat(valorAgua), surcharge: 0 });
+                    console.log(`DEBUG_TRANSFORM: Añadida deuda agua para ${mesCapitalized}: ${valorAgua}`); // Debugging
+                }
+                if (valorComercial !== undefined && valorComercial !== null && parseFloat(valorComercial) > 0) {
+                    debts.push({ id: `${mesCapitalized}-comercial-${originalRecordId}`, period: `${mesCapitalized} (Comercial)`, description: 'Cuota Comercial', dueDate: 'N/A', amount: parseFloat(valorComercial), surcharge: 0 });
+                    console.log(`DEBUG_TRANSFORM: Añadida deuda comercial para ${mesCapitalized}: ${valorComercial}`); // Debugging
+                }
             }
-        });
+        } else if (system === PaymentSystem.TASAS) { // Corrección para TASAS
+            console.log("DEBUG_TRANSFORM: Procesando sistema TASAS"); // Debugging
+            if (fields[deudaField] && parseFloat(fields[deudaField]) > 0) {
+                debts.push({ id: `deuda-${originalRecordId}`, period: 'Deuda Acumulada', description: `Deuda ${system}`, dueDate: 'N/A', amount: parseFloat(fields[deudaField]), surcharge: 0 });
+                console.log(`DEBUG_TRANSFORM: Añadida deuda acumulada (Tasas): ${fields[deudaField]}`); // Debugging
+            }
+            meses.forEach(mes => {
+                // Para TASAS, los campos de los meses están en minúscula
+                if (fields[mes] !== undefined && fields[mes] !== null && parseFloat(fields[mes]) > 0) {
+                    debts.push({ id: `${mes}-${originalRecordId}`, period: mes.charAt(0).toUpperCase() + mes.slice(1), description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mes]), surcharge: 0 });
+                    console.log(`DEBUG_TRANSFORM: Añadida cuota mensual para ${mes}: ${fields[mes]}`); // Debugging
+                }
+            });
+        } else { // PATENTE logic
+            console.log("DEBUG_TRANSFORM: Procesando sistema PATENTE"); // Debugging
+            if (fields[deudaField] && parseFloat(fields[deudaField]) > 0) {
+                debts.push({ id: `deuda-${originalRecordId}`, period: 'Deuda Acumulada', description: `Deuda ${system}`, dueDate: 'N/A', amount: parseFloat(fields[deudaField]), surcharge: 0 });
+                console.log(`DEBUG_TRANSFORM: Añadida deuda acumulada (Patente): ${fields[deudaField]}`); // Debugging
+            }
+            meses.forEach(mes => { // Para Patente, los meses también deberían ser capitalizados si Airtable los tiene así
+                 const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
+                 if (fields[mesCapitalized] && parseFloat(fields[mesCapitalized]) > 0) {
+                     debts.push({ id: `${mesCapitalized}-${originalRecordId}`, period: mesCapitalized, description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mesCapitalized]), surcharge: 0 });
+                     console.log(`DEBUG_TRANSFORM: Añadida cuota mensual (Patente) para ${mesCapitalized}: ${fields[mesCapitalized]}`); // Debugging
+                 }
+             });
+        }
     } else if (system === PaymentSystem.OTRAS) {
-        console.log("DEBUG: Datos de deuda recibidos para DEUDAS:", record.fields);
+        console.log("DEBUG_TRANSFORM: Procesando sistema OTRAS"); // Debugging
         taxpayerName = fields['nombre y apellido'] || 'N/A';
         referenceNumber = searchTerm;
         if (fields['monto total deuda'] && parseFloat(fields['monto total deuda']) > 0) {
             debts.push({ id: record.id, period: 'Deuda General', description: record.fields['deuda en concepto de'] || 'Deuda General', dueDate: 'N/A', amount: parseFloat(record.fields['monto total deuda']), surcharge: 0 });
+            console.log(`DEBUG_TRANSFORM: Añadida deuda general: ${fields['monto total deuda']}`); // Debugging
         }
     }
-    console.log("DEBUG: Array de deudas final en transformData:", debts);
+    console.log("DEBUG_TRANSFORM: Array de deudas final en transformData:", debts); // Debugging
     return { taxpayerName, referenceNumber, debts, originalRecordId };
 };
 
@@ -76,12 +127,17 @@ const PaymentFlow: React.FC = () => {
     const [multipleResults, setMultipleResults] = useState<any[] | null>(null);
     const [suggestions, setSuggestions] = useState<any[]>([]); // New state for suggestions
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false); // New state to control suggestion visibility
+    
+    // NUEVO ESTADO: Controla si se muestran todos los meses o solo los adeudados/actuales
+    const [showAllMonths, setShowAllMonths] = useState(false);
 
     const systemConfig = useMemo(() => {
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
         switch (systemKey) {
             case PaymentSystem.PATENTE: return { name: 'Patente Automotor', endpoint: 'search/patente', searchParam: 'dni', inputLabel: 'DNI del Titular', inputPlaceholder: 'Ingrese su DNI sin puntos' };
-            case PaymentSystem.TASAS: return { name: 'Tasas Retributivas', endpoint: 'search/contributivo', searchParam: 'dni', inputLabel: 'DNI del Contribuyente', inputPlaceholder: 'Ingrese su DNI sin puntos' };
+            // MODIFIED: Changed searchParam to 'query' and updated labels for TASAS
+            case PaymentSystem.TASAS: return { name: 'Tasas Retributivas', endpoint: 'search/contributivo', searchParam: 'query', inputLabel: 'DNI o Nombre del Contribuyente', inputPlaceholder: 'Ingrese DNI (sin puntos) o nombre completo' };
+            case PaymentSystem.AGUA: return { name: 'Agua', endpoint: 'search/agua', searchParam: 'query', inputLabel: 'DNI o Nombre del Contribuyente', inputPlaceholder: 'Ingrese DNI (sin puntos) o nombre completo' }; // NUEVO
             case PaymentSystem.OTRAS: return { name: 'Plan de Pago', endpoint: 'search/deuda', searchParam: 'nombre', inputLabel: 'Nombre y Apellido', inputPlaceholder: 'Ingrese nombre y apellido' };
             default: navigate('/'); return null;
         }
@@ -98,30 +154,44 @@ const PaymentFlow: React.FC = () => {
         setMultipleResults(null); // Clear multiple results
         setSelectedDebts([]); // Clear selected debts
         try {
-            console.log("DEBUG: Calling API with URL:", `${API_BASE_URL}/${systemConfig.endpoint}?${systemConfig.searchParam}=${inputValue}`); // <-- ADDED DEBUG LOG
+            // console.log("DEBUG: Calling API with URL:", `${API_BASE_URL}/${systemConfig.endpoint}?${systemConfig.searchParam}=${inputValue}`); // <-- ADDED DEBUG LOG
             const response = await fetch(`${API_BASE_URL}/${systemConfig.endpoint}?${systemConfig.searchParam}=${inputValue}`);
             const data = await response.json();
+            // console.log("DEBUG: Respuesta del backend:", data); // Debugging
             if (!response.ok) throw new Error(data.error || 'Error en la búsqueda.');
+
+            const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem; // Get systemKey here
 
             if (data.length === 0) {
                 setError('No se encontraron deudas para los datos ingresados. Verifique la información e intente nuevamente.');
-            } else if (data.length === 1 || (system?.toUpperCase().replace('-', '_') !== PaymentSystem.PATENTE)) {
-                // If only one result, or if not patente system, proceed directly
-                const transformed = transformData(data[0], system?.toUpperCase().replace('-', '_') as PaymentSystem, inputValue);
+            } else if (data.length === 1 || systemKey === PaymentSystem.OTRAS ) { // Direct to debt selection if one result or for 'otras'
+                const transformed = transformData(data[0], systemKey, inputValue);
                 if (!transformed || transformed.debts.length === 0) {
+                    // console.log("DEBUG: transformData devolvió sin deudas o nulo."); // Debugging
                     setError('No se encontraron deudas para los datos ingresados. Verifique la información e intente nuevamente.');
                 } else {
+                    // console.log("DEBUG: transformData devolvió deudas. Estableciendo resultados y paso."); // Debugging
                     setResult(transformed);
-                    if (system?.toUpperCase().replace('-', '_') as PaymentSystem === PaymentSystem.OTRAS) {
+                    if (systemKey === PaymentSystem.OTRAS) {
                         setSelectedDebts(transformed.debts.map(d => d.id));
                     }
+                    // Reiniciar showAllMonths al cargar un nuevo resultado
+                    setShowAllMonths(false); 
                     setCurrentStep(2);
                 }
-            } else { // Multiple results for patente
+            } else { // Multiple results for patente, tasas or agua
+                // console.log("DEBUG: Múltiples resultados. Estableciendo multipleResults y paso 1.5."); // Debugging
                 setMultipleResults(data);
+                // Reiniciar showAllMonths al cargar un nuevo resultado
+                setShowAllMonths(false);
                 setCurrentStep(1.5); // Intermediate step for selection
             }
-        } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+        } catch (err: any) { 
+            console.error("DEBUG: Error en handleSearch:", err); // Debugging
+            setError(err.message); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const toggleDebt = (id: string) => {
@@ -129,19 +199,60 @@ const PaymentFlow: React.FC = () => {
         setSelectedDebts(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
     
+    // Meses para filtrar y mostrar
+    const meses = useMemo(() => ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'], []);
+    const currentMonthIndex = useMemo(() => new Date().getMonth(), []); // 0 for Jan, 1 for Feb...
+
+    const filteredDebtsByMonth = useMemo(() => {
+        if (!result) return [];
+        
+        const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
+
+        if (systemKey === PaymentSystem.OTRAS) { // "Plan de Pago" siempre muestra todo
+            return result.debts;
+        }
+
+        // Si showAllMonths es true, mostrar todas las deudas, excepto las que no tienen monto (no se deberían generar)
+        if (showAllMonths) {
+            return result.debts;
+        }
+        
+        // Lógica corregida: Mostrar si es el mes actual O (es un mes pasado Y tiene deuda)
+        return result.debts.filter(debt => {
+            // "Deuda Acumulada" o "Deuda General" siempre se muestran
+            if (debt.period.includes('Deuda Acumulada') || debt.period.includes('General')) return true;
+
+            const debtMonthName = debt.period.split(' ')[0].toLowerCase(); // "Enero (Agua)" -> "enero"
+            const mesIndex = meses.indexOf(debtMonthName);
+
+            if (mesIndex === -1) return false; // No es un mes válido, ocultarlo
+
+            // Mostrar si es el mes actual O (es un mes pasado Y tiene un monto > 0)
+            return (mesIndex === currentMonthIndex) || 
+                   (mesIndex < currentMonthIndex && debt.amount > 0);
+        });
+    }, [result, showAllMonths, currentMonthIndex, meses, system]);
+
+
     const toggleAllDebts = () => {
-        if (selectedDebts.length === result?.debts.length) { setSelectedDebts([]); } 
-        else { setSelectedDebts(result?.debts.map(d => d.id) || []); }
+        if (!result) return;
+        // Usar filteredDebtsByMonth en lugar de result.debts directamente para la selección masiva
+        if (selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0) { 
+            setSelectedDebts([]); 
+        } else { 
+            setSelectedDebts(filteredDebtsByMonth.map(d => d.id) || []); 
+        }
     };
 
-    const totalAmount = result?.debts.filter(d => selectedDebts.includes(d.id)).reduce((acc, curr) => acc + curr.amount + curr.surcharge, 0) || 0;
+    const totalAmount = filteredDebtsByMonth.filter(d => selectedDebts.includes(d.id)).reduce((acc, curr) => acc + curr.amount + curr.surcharge, 0) || 0;
 
     const getItemsToPay = () => {
-        const selectedDebtDetails = result?.debts.filter(d => selectedDebts.includes(d.id));
+        const selectedDebtDetails = result?.debts.filter(d => selectedDebts.includes(d.id)); // Usar result.debts, no filtered, para obtener todos los detalles
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
         let itemTypeForBackend = '';
         if (systemKey === PaymentSystem.PATENTE) itemTypeForBackend = 'vehiculo';
         else if (systemKey === PaymentSystem.TASAS) itemTypeForBackend = 'lote';
+        else if (systemKey === PaymentSystem.AGUA) itemTypeForBackend = 'agua'; // NUEVO
         else if (systemKey === PaymentSystem.OTRAS) itemTypeForBackend = 'deuda_general';
 
         return {
@@ -149,8 +260,9 @@ const PaymentFlow: React.FC = () => {
             nombre_contribuyente: systemConfig?.searchParam === 'nombre' ? inputValue : undefined,
             email: email, total_amount: totalAmount,
             deuda: selectedDebts.some(id => id.includes('deuda')), deuda_monto: result?.debts.find(d => d.id.includes('deuda'))?.amount || 0,
-            meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.toLowerCase()]: true }), {}),
-            meses_montos: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.toLowerCase()]: d.amount }), {})
+            // Los meses enviados al backend deben reflejar los meses seleccionados, no necesariamente solo los filtrados
+            meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.split(' ')[0].toLowerCase()]: true }), {}), // "Enero (Agua)" -> "enero"
+            meses_montos: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.split(' ')[0].toLowerCase()]: d.amount }), {})
         };
     };
 
@@ -174,7 +286,7 @@ const PaymentFlow: React.FC = () => {
 
                     method: 'POST', 
 
-                    headers: { 'Content-Type': 'application/json' }, 
+                    headers: { 'Content-Type': 'application/json' }, // Corrected: application/json
 
                     body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount }) 
 
@@ -215,14 +327,16 @@ const PaymentFlow: React.FC = () => {
         };
 
         
-
         const renderStepContent = () => {
-        switch (currentStep) {
-            case 1: // Identification
-                return (
+        const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
+
+        return (
+            <>
+                {currentStep === 1 && ( // Identification
                     <div className="text-center">
                       <h3 className="mb-3 fw-bold">Comencemos</h3>
-                      <p className="text-muted mb-4">Por favor, ingrese su {systemConfig?.inputLabel?.toLowerCase()} para encontrar sus deudas.</p>
+                      {/* Adjusted font size for the instruction text */}
+                      <p className="text-muted mb-4" style={{fontSize: '0.9rem'}}>Por favor, ingrese su {systemConfig?.inputLabel?.toLowerCase()} para encontrar sus deudas.</p>
                       <Form onSubmit={handleSearch} className="mx-auto" style={{ maxWidth: '400px' }}>
                         <Form.Group className="mb-3" controlId="searchInput">
                           <Form.Control 
@@ -233,7 +347,7 @@ const PaymentFlow: React.FC = () => {
                                 setShowSuggestions(true); // Always show suggestions when typing
                             }} 
                             placeholder={systemConfig?.inputPlaceholder} 
-                            size="lg" 
+                            // Removed size="lg" to allow placeholder text to fit better
                             required 
                             list={systemConfig?.searchParam === 'nombre' ? "suggestions-list" : undefined}
                           />
@@ -245,90 +359,146 @@ const PaymentFlow: React.FC = () => {
                             </datalist>
                           )}
                         </Form.Group>
-                        <Button type="submit" size="lg" disabled={!inputValue || loading} className="w-100">Buscar Deuda</Button>
+                        <Button type="submit" /* Changed text here */ disabled={!inputValue || loading} className="w-100">Buscar</Button>
                       </Form>
                     </div>
-                );
-            case 1.5: // Vehicle Selection for Patente
-                if (!multipleResults) return null;
-                return (
-                    <>
-                      <h3 className="fw-bold mb-3 text-center">Múltiples Vehículos Encontrados</h3>
-                      <p className="text-muted mb-4 text-center">Seleccione el vehículo cuya deuda desea consultar.</p>
-                      <ListGroup className="mb-4">
-                          {multipleResults.map((record, index) => (
-                              <ListGroup.Item 
-                                key={record.id} 
-                                action 
-                                onClick={() => {
-                                    const transformed = transformData(record, system?.toUpperCase().replace('-', '_') as PaymentSystem, inputValue);
-                                    if (transformed && transformed.debts.length > 0) {
-                                        setResult(transformed);
-                                        setCurrentStep(2);
-                                    } else {
-                                        setError('No se encontraron deudas para el vehículo seleccionado.');
-                                        setMultipleResults(null); // Clear selection
-                                        setCurrentStep(1); // Go back to search
-                                    }
-                                }}
-                                className="d-flex justify-content-between align-items-center"
-                              >
+                )}
+
+                {currentStep === 1.5 && ( // Multiple Results Selection for Patente OR Tasas OR Agua
+                    (() => { // Usamos una IIFE para poder usar constantes y returns condicionales
+                        if (!multipleResults) return null;
+                        const isPatente = systemKey === PaymentSystem.PATENTE;
+                        const isAgua = systemKey === PaymentSystem.AGUA;
+                        let title = "Múltiples Propiedades Encontradas";
+                        let instruction = "Seleccione la propiedad cuya deuda desea consultar.";
+
+                        if (isPatente) {
+                            title = "Múltiples Vehículos Encontrados";
+                            instruction = "Seleccione el vehículo cuya deuda desea consultar.";
+                        } else if (isAgua) {
+                            title = "Múltiples Conexiones de Agua Encontradas";
+                            instruction = "Seleccione la conexión de agua cuya deuda desea consultar.";
+                        }
+
+                        return (
+                            <>
+                              <h3 className="fw-bold mb-3 text-center">{title}</h3>
+                              <p className="text-muted mb-4 text-center">{instruction}</p>
+                              <ListGroup className="mb-4">
+                                  {multipleResults.map((record, index) => (
+                                      <ListGroup.Item 
+                                        key={record.id} 
+                                        action 
+                                        onClick={() => {
+                                            const transformed = transformData(record, systemKey, inputValue);
+                                            if (!transformed || transformed.debts.length === 0) {
+                                                setError('No se encontraron deudas para la selección. Intente con otra.');
+                                                setMultipleResults(null); // Clear selection
+                                                setCurrentStep(1); // Go back to search
+                                            } else {
+                                                setResult(transformed);
+                                                // Seleccionar automáticamente deudas filtradas por mes
+                                                const defaultSelectedDebts = transformed.debts.filter(debt => {
+                                                    if (debt.period.includes('Deuda Acumulada') || debt.period.includes('General')) return true;
+                                                    const debtMonthName = debt.period.split(' ')[0].toLowerCase();
+                                                    const mesIndex = meses.indexOf(debtMonthName);
+                                                    return (mesIndex === currentMonthIndex) || (mesIndex < currentMonthIndex && debt.amount > 0);
+                                                }).map(d => d.id);
+                                                setSelectedDebts(defaultSelectedDebts);
+                                                setShowAllMonths(false); // Reiniciar estado
+                                                setCurrentStep(2);
+                                            }
+                                        }}
+                                        className="d-flex justify-content-between align-items-center"
+                                      >
+                                        <div>
+                                            <h5 className="mb-1">
+                                                {isPatente ? 
+                                                    (record.fields.patente || 'Patente Desconocida') :
+                                                    (isAgua ? `Conexión: ${record.fields.lote || 'Desconocida'}` : 
+                                                    (record.fields.lote ? `Lote: ${record.fields.lote}` : 'Lote Desconocido'))
+                                                }
+                                            </h5>
+                                            <small className="text-muted">
+                                                {isPatente ? 
+                                                    `Titular: ${record.fields.titular || record.fields.contribuyente || 'Desconocido'}` :
+                                                    `Contribuyente: ${record.fields.contribuyente || 'Desconocido'}${record.fields.nomenclatura_catastral ? ` - Nomenclatura Catastral: ${record.fields.nomenclatura_catastral}` : ''}`
+                                                }
+                                            </small>
+                                        </div>
+                                        <div className="btn btn-outline-primary btn-sm">Seleccionar</div>
+                                      </ListGroup.Item>
+                                  ))}
+                              </ListGroup>
+                              <div className="text-center">
+                                  <Button variant="outline-secondary" onClick={() => { setMultipleResults(null); setCurrentStep(1); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
+                              </div>
+                            </>
+                        );
+                    })() // Cierre de la IIFE
+                )}
+
+                {currentStep === 2 && ( // Debt Selection
+                    (() => { // Usamos una IIFE para poder usar constantes y returns condicionales
+                        if (!result) return null;
+                        const systemKeyForDebts = system?.toUpperCase().replace('-', '_') as PaymentSystem;
+
+                        return (
+                            <>
+                              <div className="d-flex justify-content-between align-items-start mb-4">
                                 <div>
-                                    <h5 className="mb-1">{record.fields.patente || 'Patente Desconocida'}</h5>
-                                    <small className="text-muted">Titular: {record.fields.titular || record.fields.contribuyente || 'Desconocido'}</small>
+                                  <h3 className="fw-bold mb-1">Deudas Encontradas</h3>
+                                  <p className="mb-0 text-muted">Contribuyente: <span className="fw-semibold text-dark">{result.taxpayerName}</span></p>
+                                  <p className="text-muted">Referencia: <span className="fw-semibold text-dark">{result.referenceNumber}</span></p>
                                 </div>
-                                <div className="btn btn-outline-primary btn-sm">Seleccionar</div>
-                              </ListGroup.Item>
-                          ))}
-                      </ListGroup>
-                      <div className="text-center">
-                          <Button variant="outline-secondary" onClick={() => { setMultipleResults(null); setCurrentStep(1); }}>&larr; Volver a buscar</Button>
-                      </div>
-                    </>
-                );
-            case 2: // Debt Selection
-                if (!result) return null;
-                return (
-                    <>
-                      <div className="d-flex justify-content-between align-items-start mb-4">
-                        <div>
-                          <h3 className="fw-bold mb-1">Deudas Encontradas</h3>
-                          <p className="mb-0 text-muted">Contribuyente: <span className="fw-semibold text-dark">{result.taxpayerName}</span></p>
-                          <p className="text-muted">Referencia: <span className="fw-semibold text-dark">{result.referenceNumber}</span></p>
-                        </div>
-                        <Button variant="outline-secondary" size="sm" onClick={() => { setCurrentStep(1); setResult(null); setError(null); }}>&larr; Volver a buscar</Button>
-                      </div>
-                      <Table striped bordered hover responsive>
-                        <thead>
-                          <tr>
-                            <th><Form.Check type="checkbox" checked={selectedDebts.length === result.debts.length && result.debts.length > 0} onChange={toggleAllDebts} disabled={system?.toUpperCase().replace('-', '_') === PaymentSystem.OTRAS} /></th>
-                            <th>Período</th>
-                            <th>Concepto</th>
-                            <th className="text-end">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {result.debts.map((debt) => (
-                            <tr key={debt.id}>
-                              <td><Form.Check type="checkbox" checked={selectedDebts.includes(debt.id)} onChange={() => toggleDebt(debt.id)} disabled={system?.toUpperCase().replace('-', '_') === PaymentSystem.OTRAS} /></td>
-                              <td>{debt.period}</td>
-                              <td>{debt.description}</td>
-                              <td className="text-end fw-semibold">${debt.amount.toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                      <div className="mt-4 d-flex justify-content-end align-items-center">
-                        <div className="text-end me-4">
-                          <p className="text-muted mb-0">Total a Pagar</p>
-                          <p className="h2 fw-bold">${totalAmount.toFixed(2)}</p>
-                        </div>
-                        <Button size="lg" variant="primary" onClick={() => setCurrentStep(3)} disabled={selectedDebts.length === 0}>Continuar al Pago</Button>
-                      </div>
-                    </>
-                );
-            case 3: // Confirmation
-                return (
+                                <Button variant="outline-secondary" size="sm" onClick={() => { setCurrentStep(1); setResult(null); setError(null); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
+                              </div>
+
+                              {/* Botones para mostrar/ocultar meses y seleccionar todo */}
+                              {systemKeyForDebts !== PaymentSystem.OTRAS && ( // No mostrar para Plan de Pago
+                                <div className="d-flex justify-content-end mb-3 gap-2">
+                                    <Button variant="outline-primary" size="sm" onClick={() => setShowAllMonths(!showAllMonths)}>
+                                        {showAllMonths ? 'Ocultar meses futuros' : 'Mostrar todo el año'}
+                                    </Button>
+                                    <Button variant="outline-success" size="sm" onClick={toggleAllDebts}>
+                                        {selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0 ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                                    </Button>
+                                </div>
+                              )}
+
+                              <Table striped bordered hover responsive>
+                                <thead>
+                                  <tr>
+                                    <th><Form.Check type="checkbox" checked={selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0} onChange={toggleAllDebts} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></th>
+                                    <th>Período</th>
+                                    <th>Concepto</th>
+                                    <th className="text-end">Monto</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredDebtsByMonth.map((debt) => ( // Usar deudas filtradas aquí
+                                    <tr key={debt.id}>
+                                      <td><Form.Check type="checkbox" checked={selectedDebts.includes(debt.id)} onChange={() => toggleDebt(debt.id)} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></td>
+                                      <td>{debt.period}</td>
+                                      <td>{debt.description}</td>
+                                      <td className="text-end fw-semibold">${debt.amount.toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </Table>
+                              <div className="mt-4 d-flex justify-content-end align-items-center">
+                                <div className="text-end me-4">
+                                  <p className="text-muted mb-0">Total a Pagar</p>
+                                  <p className="h2 fw-bold">${totalAmount.toFixed(2)}</p>
+                                </div>
+                                <Button size="lg" variant="primary" onClick={() => setCurrentStep(3)} disabled={totalAmount === 0}>Continuar al Pago</Button>
+                              </div>
+                            </>
+                        );
+                    })() // Cierre de la IIFE
+                )}
+
+                {currentStep === 3 && ( // Confirmation
                     <div className="mx-auto" style={{ maxWidth: '500px' }}>
                         <h3 className="text-center fw-bold mb-3">Confirmar y Pagar</h3>
                         <p className="text-center text-muted mb-4">Revise el resumen y complete su email para generar el link de pago.</p>
@@ -372,9 +542,9 @@ const PaymentFlow: React.FC = () => {
                            <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100 mt-3">&larr; Volver a seleccionar</Button>
                         </Form>
                     </div>
-                );
-            default: return null;
-        }
+                )}
+            </>
+        );
     };
 
     return (

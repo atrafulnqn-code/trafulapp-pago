@@ -1,8 +1,9 @@
+import traceback
 import os
 from flask import Flask, request, jsonify, send_file, redirect
 from flask_cors import CORS, cross_origin
 from pyairtable import Api
-from pyairtable.formulas import match
+from pyairtable.formulas import match, AND, OR, SEARCH, LOWER, Field # Importar Field
 from dotenv import load_dotenv
 import mercadopago
 import json
@@ -68,11 +69,10 @@ DEUDAS_TABLE_ID = "tblHuS8CdqVqTsA3t"
 PATENTE_TABLE_ID = "tbl3CMMwccWeo8XSG"
 HISTORIAL_TABLE_ID = "tbl5p19Hv4cMk9NUS"
 LOGS_TABLE_ID = "tblLihQ9FmU6JD7NR"
-# ID de la tabla de Recaudación real
 RECAUDACION_TABLE_ID = os.getenv("RECAUDACION_TABLE_ID", "tblzRhxpeqbuhrf78")
-# ID de la tabla de Patente Manual real
 PATENTE_MANUAL_TABLE_ID = os.getenv("PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF") 
 ACCESOS_PERSONAL_TABLE_ID = os.getenv("ACCESOS_PERSONAL_TABLE_ID", "tblAILbaYmnWkkPiV")
+WATER_TABLE_ID = "tblTgcF3XczjkpK3H" # ID de la tabla de Agua
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
@@ -111,13 +111,13 @@ def send_payment_link():
             </div>
             """
         }
-        print(f"DEBUG: Intentando enviar email a {email} desde {from_email}...")
+        # print(f"DEBUG: Intentando enviar email a {email} desde {from_email}...") # REMOVED DEBUG LOG
         res_email = resend.Emails.send(params)
-        print(f"DEBUG: Respuesta Resend: {res_email}")
+        # print(f"DEBUG: Respuesta Resend: {res_email}") # REMOVED DEBUG LOG
         
         # Verificar si Resend devolvió un ID (éxito) o si lanzó excepción
         if not res_email.get('id'):
-             print(f"ERROR: Resend no devolvió ID. Respuesta: {res_email}")
+             # print(f"ERROR: Resend no devolvió ID. Respuesta: {res_email}") # REMOVED DEBUG LOG
              return jsonify({"error": "No se pudo enviar el email (Error proveedor)"}), 500
 
         return jsonify({"success": True})
@@ -251,7 +251,6 @@ def registrar_recaudacion():
             return jsonify({"error": "Sin datos"}), 400
 
         # 1. Generar PDF del recibo
-        # Reusamos la lógica de PDF pero con un template o datos adaptados
         items_pdf = []
         notas = data.get('notas', {})
         for key, val in data.get('importes', {}).items():
@@ -266,7 +265,7 @@ def registrar_recaudacion():
         
         # Agregar descuento si existe
         if data.get('descuento') and float(data.get('descuento')) > 0:
-             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (data.get('total') - data.get('total_final'))})
+             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (float(data.get('total')) - float(data.get('total_final')))})
 
         pdf_details = {
             "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -471,21 +470,105 @@ def search_patente():
 
 @app.route('/api/search/contributivo', methods=['GET'])
 def search_contributivo():
-    log_to_airtable('INFO', 'API Search', 'Recibida petición en /api/search/contributivo', details={'ip_address': request.remote_addr, 'dni_param': request.args.get('dni')})
+    log_to_airtable('INFO', 'API Search', 'Recibida petición en /api/search/contributivo', details={'ip_address': request.remote_addr, 'query_param': request.args.get('query')})
     if not api: 
         log_to_airtable('ERROR', 'API Search', 'Airtable API no inicializada al buscar contributivo.', details={'ip_address': request.remote_addr})
         return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
-    dni = request.args.get('dni')
-    if not dni: 
-        log_to_airtable('WARNING', 'API Search', 'Parámetro DNI requerido para búsqueda de contributivo.', details={'ip_address': request.remote_addr})
-        return jsonify({"error": "El parámetro DNI es requerido"}), 400
+    
+    query = request.args.get('query')
+    if not query: 
+        log_to_airtable('WARNING', 'API Search', 'Parámetro "query" requerido para búsqueda de contributivo.', details={'ip_address': request.remote_addr})
+        return jsonify({"error": "El parámetro 'query' es requerido para la búsqueda"}), 400
+    
     try:
         table = api.table(BASE_ID, CONTRIBUTIVOS_TABLE_ID)
-        records = table.all(formula=match({"dni": dni}))
-        log_to_airtable('INFO', 'API Search', f'Búsqueda de contributivo exitosa para DNI {dni}. Encontrados {len(records)} registros.', related_id=dni, details={'records_found': len(records)})
+        
+        lower_query = query.lower()
+        search_terms = lower_query.split() # Dividir la consulta en palabras individuales
+
+        conditions_for_dni = []
+        conditions_for_contribuyente = []
+
+        for term in search_terms:
+            conditions_for_dni.append(SEARCH(term, LOWER(Field('dni'))))
+            conditions_for_contribuyente.append(SEARCH(term, LOWER(Field('contribuyente'))))
+        
+        # Construir la fórmula combinando las condiciones
+        # Si hay múltiples términos, buscamos que todas las palabras estén en DNI O todas las palabras estén en Contribuyente
+        # Si hay un solo término, buscamos ese término en DNI O en Contribuyente
+        if len(search_terms) > 1:
+            formula_obj = OR(
+                AND(*conditions_for_dni),
+                AND(*conditions_for_contribuyente)
+            )
+        else: # Un solo término de búsqueda
+            formula_obj = OR(
+                SEARCH(lower_query, LOWER(Field('dni'))),
+                SEARCH(lower_query, LOWER(Field('contribuyente')))
+            )
+        
+        formula_str = str(formula_obj) # Convertir el objeto Formula a string
+        # print(f"DEBUG: Fórmula Airtable para contributivo: {formula_str}") # Debugging REMOVED
+        records = table.all(formula=formula_str)
+        # print(f"DEBUG: Registros encontrados para contributivo: {len(records)}") # Debugging REMOVED
+        # for i, rec in enumerate(records[:3]): # Imprimir los primeros 3 registros REMOVED
+        # print(f"DEBUG: Contributivo Record {i}: ID={rec.get('id')}, Fields={rec.get('fields')}") # Debugging REMOVED
+        
+        log_to_airtable('INFO', 'API Search', f'Búsqueda de contributivo exitosa para "{query}". Encontrados {len(records)} registros.', related_id=query, details={'records_found': len(records)})
         return jsonify(records)
     except Exception as e:
-        log_to_airtable('ERROR', 'API Search', f'ERROR en search_contributivo: {e}', related_id=dni, details={'error_message': str(e)})
+        log_to_airtable('ERROR', 'API Search', f'ERROR en search_contributivo: {e}', related_id=query, details={'error_message': str(e)})
+        print(f"ERROR: Excepción en search_contributivo: {e}") # Debugging
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/search/agua', methods=['GET'])
+def search_agua():
+    log_to_airtable('INFO', 'API Search', 'Recibida petición en /api/search/agua', details={'ip_address': request.remote_addr, 'query_param': request.args.get('query')})
+    if not api: 
+        log_to_airtable('ERROR', 'API Search', 'Airtable API no inicializada al buscar agua.', details={'ip_address': request.remote_addr})
+        return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
+    
+    query = request.args.get('query')
+    if not query: 
+        log_to_airtable('WARNING', 'API Search', 'Parámetro "query" requerido para búsqueda de agua.', details={'ip_address': request.remote_addr})
+        return jsonify({"error": "El parámetro 'query' es requerido para la búsqueda"}), 400
+    
+    try:
+        table = api.table(BASE_ID, WATER_TABLE_ID) # Usar la nueva tabla de Agua
+        
+        lower_query = query.lower()
+        search_terms = lower_query.split()
+
+        conditions_for_dni = []
+        conditions_for_contribuyente = []
+
+        for term in search_terms:
+            conditions_for_dni.append(SEARCH(term, LOWER(Field('dni'))))
+            conditions_for_contribuyente.append(SEARCH(term, LOWER(Field('contribuyente'))))
+        
+        if len(search_terms) > 1:
+            formula_obj = OR(
+                AND(*conditions_for_dni),
+                AND(*conditions_for_contribuyente)
+            )
+        else: # Un solo término de búsqueda
+            formula_obj = OR(
+                SEARCH(lower_query, LOWER(Field('dni'))),
+                SEARCH(lower_query, LOWER(Field('contribuyente')))
+            )
+        
+        formula_str = str(formula_obj) # Convertir el objeto Formula a string
+        # print(f"DEBUG: Fórmula Airtable para agua: {formula_str}") # Debugging REMOVED
+        records = table.all(formula=formula_str)
+        # print(f"DEBUG: Registros encontrados para agua: {len(records)}") # Debugging REMOVED
+        # for i, rec in enumerate(records[:3]): # Imprimir los primeros 3 registros REMOVED
+        # print(f"DEBUG: Agua Record {i}: ID={rec.get('id')}, Fields={rec.get('fields')}") # Debugging REMOVED
+
+        log_to_airtable('INFO', 'API Search', f'Búsqueda de agua exitosa para "{query}". Encontrados {len(records)} registros.', related_id=query, details={'records_found': len(records)})
+        return jsonify(records)
+    except Exception as e:
+        log_to_airtable('ERROR', 'API Search', f'ERROR en search_agua: {e}', related_id=query, details={'error_message': str(e)})
+        print(f"ERROR: Excepción en search_agua: {e}") # Debugging
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/search/deuda', methods=['GET'])
@@ -531,7 +614,6 @@ def search_deuda_suggestions():
 
 @app.route('/api/create_preference', methods=['POST'])
 def create_preference():
-    print("--- DENTRO DE CREATE_PREFERENCE ---") # <-- AÑADIDO PARA DEBUG
     log_to_airtable('INFO', 'Mercado Pago', 'Recibida petición en /api/create_preference', details={'ip_address': request.remote_addr, 'payload': request.json})
     if not sdk:
         log_to_airtable('ERROR', 'Mercado Pago', 'SDK de Mercado Pago no inicializada al crear preferencia.', details={'ip_address': request.remote_addr})
@@ -548,11 +630,12 @@ def create_preference():
         preference_data = {
             "items": [{"title": title, "quantity": 1, "unit_price": float(unit_price)}],
             "back_urls": {"success": FRONTEND_URL, "failure": FRONTEND_URL, "pending": FRONTEND_URL},
-            "auto_return": "approved",
+            "auto_return": "approved", # Vuelve a "approved" para Render
             "notification_url": f"{BACKEND_URL}/api/payment_webhook",
             "external_reference": external_reference
         }
         preference_response = sdk.preference().create(preference_data)
+        print(f"DEBUG MP Response: {preference_response}") # AÑADIDO PARA DEPURACIÓN
         preference = preference_response["response"]
         log_to_airtable('INFO', 'Mercado Pago', 'Preferencia de pago creada con éxito.', related_id=preference["id"], details={'preference_id': preference["id"], 'init_point': preference.get("init_point"), 'sandbox_init_point': preference.get("sandbox_init_point"), 'items_to_pay': items_to_pay})
         return jsonify({
@@ -561,9 +644,11 @@ def create_preference():
             "sandbox_init_point": preference.get("sandbox_init_point")
         })
     except Exception as e:
-        print(f"ERROR CAPTURADO EN CREATE_PREFERENCE: {e}") # <-- AÑADIDO PARA DEBUG
-        log_to_airtable('ERROR', 'Mercado Pago', f'ERROR en create_preference: {e}', details={'error_message': str(e), 'payload': data})
+        error_traceback = traceback.format_exc()
+        log_to_airtable('ERROR', 'Mercado Pago', f'ERROR en create_preference: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payload': data, 'traceback': error_traceback})
         return jsonify({"error": str(e)}), 500
+
+
 
 @app.route('/api/create_payway_payment', methods=['POST', 'GET', 'OPTIONS'])
 def create_payway_payment():
@@ -656,7 +741,7 @@ def create_payway_payment():
         # URL de la API de Formularios (Producción)
         api_url = "https://api.decidir.com/web/forms"
         
-        print(f"DEBUG: Solicitando Hash a Payway para op {operation_id}...")
+        # print(f"DEBUG: Solicitando Hash a Payway para op {operation_id}...") # REMOVED DEBUG LOG
         response = requests.post(api_url, json=payload, headers=headers, timeout=15)
         
         if response.status_code not in [200, 201]:
@@ -856,17 +941,33 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                         table_id_to_update = CONTRIBUTIVOS_TABLE_ID
                     elif item_type == "vehiculo":
                         table_id_to_update = PATENTE_TABLE_ID
+                    elif item_type == "agua": # NUEVO
+                        table_id_to_update = WATER_TABLE_ID
                     if items_context.get("deuda"):
                         if item_type == "lote":
                             fields_to_update_origin["deuda"] = "0"
                         elif item_type == "vehiculo":
                             fields_to_update_origin["Deuda patente"] = "0"
+                        elif item_type == "agua": # NUEVO - Added this line myself previously
+                            fields_to_update_origin["deuda"] = "0" # Asumiendo un campo 'deuda' para agua
                         
                         items_for_pdf.append({"description": f"Deuda {item_type.capitalize()}", "amount": items_context.get('deuda_monto', 0)})
-                    for mes, sel in items_context.get("meses", {}).items():
-                        if sel:
-                            fields_to_update_origin[mes.lower()] = "0"
-                            items_for_pdf.append({"description": mes, "amount": items_context.get('meses_montos', {}).get(mes, 0)})
+                    
+                    # Iterar por los meses para ponerlos a cero
+                    # Asumo que `meses` en `items_context` son los meses seleccionados para pagar.
+                    # Los nombres de los campos en Airtable deben coincidir con esta capitalización (ej. "Enero", "Enero agua")
+                    meses_a_actualizar = items_context.get("meses", {})
+                    for mes_key, sel in meses_a_actualizar.items():
+                        if sel: # Si el mes fue seleccionado para pagar
+                            # Para el backend, los meses vienen en minúscula desde el frontend, capitalizamos aquí
+                            mesCapitalized = mes_key.capitalize() 
+                            if item_type == "agua":
+                                fields_to_update_origin[f"{mesCapitalized} agua"] = 0 # Valor numérico
+                                fields_to_update_origin[f"{mesCapitalized} Comercial"] = 0 # Valor numérico
+                            elif item_type == "lote":
+                                # Para TASAS, los campos son en minúscula
+                                fields_to_update_origin[mes_key] = 0 # Usar mes_key directamente (en minúscula)
+                            # Nota: para 'vehiculo' no se procesan meses individuales, solo 'Deuda patente'
 
                 if fields_to_update_origin:
                     api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
@@ -902,7 +1003,7 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 "attachments": [{"filename": f"comprobante_{payment_id}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
             }
             resend.Emails.send(params)
-            log_to_airtable('INFO', 'Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id, details={'to_email': items_context.get("email")})
+            log_to_airtable('INFO', 'Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
             historial_table.update(historial_record['id'], {"Comprobante_Status": f"Enviado a {items_context.get('email')}"})
         elif not items_context.get("email"):
             log_to_airtable('WARNING', 'Email Service', f'No se envió email de comprobante porque no se proporcionó dirección de correo.', related_id=payment_id)
@@ -969,9 +1070,10 @@ def get_receipt(historial_record_id):
             "FECHA_PAGO": record['fields'].get('Timestamp', datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
             "ESTADO_PAGO": record['fields'].get('Estado', 'Desconocido'),
             "ID_PAGO_MP": record['fields'].get('MP_Payment_ID', 'N/A'),
-            "items": items_for_pdf, "MONTO_TOTAL": record['fields'].get('Monto', 0)
+            "items": items_for_pdf,
+            "MONTO_TOTAL": record['fields'].get('Monto', 0)
         }
-        pdf_file = create_receipt_pdf(payment_details)
+        pdf_file = create_receipt_pdf(pdf_details)
         if pdf_file:
             return send_file(pdf_file, mimetype='application/pdf', as_attachment=True, download_name=f"comprobante_{historial_record_id}.pdf")
         return "Error al generar el PDF.", 500
@@ -1072,207 +1174,6 @@ def admin_get_access_logs():
     if not api: return jsonify({"error": "Airtable no inicializada"}), 500
     try:
         page = int(request.args.get('page', 1))
-        per_page = 10
-        table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
-        all_records = table.all(sort=['-Fecha', '-Hora'])
-        
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated = all_records[start:end]
-        
-        logs = []
-        for r in paginated:
-            f = r['fields']
-            logs.append({
-                "id": r['id'],
-                "fecha": f.get('Fecha'),
-                "hora": f.get('Hora'),
-                "usuario": f.get('Usuario'),
-                "ip": f.get('IP')
-            })
-            
-        return jsonify({"logs": logs, "total_records": len(all_records), "per_page": per_page})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/send_receipt', methods=['OPTIONS'])
-def handle_send_receipt_options():
-    response = jsonify(success=True)
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-    response.headers.add('Access-Control-Allow-Methods', 'POST')
-    return response
-
-@app.route('/api/send_receipt', methods=['POST'])
-def send_receipt():
-    if not resend.api_key: return "Error: Servicio de email no configurado.", 500
-    if not api: return "Error: API de Airtable no inicializada.", 500
-
-    data = request.json
-    historial_record_id = data.get('historial_record_id')
-    email_to = data.get('email')
-
-    if not all([historial_record_id, email_to]):
-        return jsonify({"error": "Faltan parámetros"}), 400
-
-    try:
-        historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        record = historial_table.get(historial_record_id)
-        
-        items_for_pdf_str = record['fields'].get('ItemsPagadosJSON', '[]')
-        items_for_pdf = json.loads(items_for_pdf_str)
-
-        payment_details_from_history = {
-            "FECHA_PAGO": record['fields'].get('Timestamp', datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
-            "ESTADO_PAGO": record['fields'].get('Estado', 'Desconocido'),
-            "ID_PAGO_MP": record['fields'].get('MP_Payment_ID', 'N/A'),
-            "items": items_for_pdf,
-            "MONTO_TOTAL": record['fields'].get('Monto', 0)
-        }
-        pdf_file = create_receipt_pdf(payment_details_from_history)
-        
-        if not pdf_file:
-            raise Exception("No se pudo generar el PDF para enviar.")
-
-        pdf_base64 = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
-        
-        params = {
-            "from": "onboarding@resend.dev",
-            "to": email_to,
-            "subject": f"Comprobante de Pago #{historial_record_id} - Municipalidad de Villa Traful",
-            "html": f"<p>Hola, adjuntamos tu comprobante de pago con ID de operación MP: {payment_details_from_history['ID_PAGO_MP']}.</p><p>¡Gracias por tu pago!</p>",
-            "attachments": [
-                {
-                    "filename": f"comprobante_{historial_record_id}.pdf",
-                    "content": pdf_base64
-                }
-            ]
-        }
-        
-        email_response = resend.Emails.send(params)
-        print(f"Email enviado con Resend: {email_response}")
-        return jsonify({"success": True, "email_id": email_response.get('id')})
-    except Exception as e:
-        print(f"ERROR enviando email: {e}")
-        return jsonify({"error": "No se pudo enviar el email."}), 500
-
-    except Exception as e:
-        print(f"ERROR enviando email: {e}")
-        return jsonify({"error": "No se pudo enviar el email."}), 500
-
-@app.route('/api/admin/login', methods=['POST'])
-def admin_login():
-    print("Recibida petición en /api/admin/login")
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") # Get from env for each request to allow dynamic updates
-    if not ADMIN_PASSWORD:
-        return jsonify({"error": "La clave de administrador no está configurada en el servidor."}), 500
-
-    data = request.json
-    password_attempt = data.get('password')
-
-    if password_attempt == ADMIN_PASSWORD:
-        log_to_airtable('INFO', 'Admin Login', 'Intento de inicio de sesión de administrador exitoso.', details={'ip_address': request.remote_addr})
-        return jsonify({"success": True, "message": "Inicio de sesión de administrador exitoso."}), 200
-    else:
-        log_to_airtable('WARNING', 'Admin Login', 'Intento de inicio de sesión de administrador fallido (clave incorrecta).', details={'ip_address': request.remote_addr})
-        return jsonify({"success": False, "message": "Clave incorrecta."}), 401
-
-@app.route('/api/admin/payments', methods=['GET'])
-def admin_get_payments():
-    log_to_airtable('INFO', 'Admin API', 'Recibida petición en /api/admin/payments', details={'ip_address': request.remote_addr, 'query_params': request.args})
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-    if not ADMIN_PASSWORD:
-        log_to_airtable('ERROR', 'Admin API', 'ADMIN_PASSWORD no configurada en el servidor para /api/admin/payments.', details={'ip_address': request.remote_addr})
-        return jsonify({"error": "La clave de administrador no está configurada en el servidor."}), 500
-    
-    # El dashboard debe enviar la clave en un header 'X-API-Key'
-    # client_api_key = request.headers.get('X-API-Key')
-    # if client_api_key != os.getenv("DASHBOARD_API_KEY"):
-    #     log_to_airtable('WARNING', 'Admin API', 'Acceso no autorizado a /api/admin/payments (API Key inválida).', details={'ip_address': request.remote_addr})
-    #     return jsonify({"error": "Acceso no autorizado. API Key inválida."}), 401
-
-    if not api:
-        log_to_airtable('ERROR', 'Admin API', 'Airtable API no inicializada al acceder a /api/admin/payments.', details={'ip_address': request.remote_addr})
-        return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
-
-    try:
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
-        
-        historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        # Obtener todos los registros y ordenarlos
-        all_records = historial_table.all(sort=['-Fecha de Transacción']) 
-        total_records = len(all_records)
-
-        # Implementar paginación manual
-        start_index = (page - 1) * per_page
-        end_index = start_index + per_page
-        paginated_records = all_records[start_index:end_index]
-        
-        formatted_payments = []
-        for record in paginated_records:
-            fields = record.get('fields', {})
-            
-            item_type_raw = 'N/A'
-            detalle_text = fields.get('Detalle', '')
-            if 'vehiculo' in detalle_text or 'Patente' in detalle_text:
-                item_type_raw = 'vehiculo'
-            elif 'lote' in detalle_text:
-                item_type_raw = 'lote'
-            elif 'deuda_general' in detalle_text:
-                item_type_raw = 'deuda_general'
-
-            payment_type_display = 'Desconocido'
-            if item_type_raw == 'vehiculo':
-                payment_type_display = 'Patente'
-            elif item_type_raw == 'lote':
-                payment_type_display = 'Contributivo'
-            elif item_type_raw == 'deuda_general':
-                payment_type_display = 'Plan de Pago'
-
-            formatted_payments.append({
-                'id': record.get('id'),
-                'estado': fields.get('Estado', 'N/A'),
-                'monto': fields.get('Monto', 0),
-                'detalle': fields.get('Detalle', 'N/A'),
-                'mp_payment_id': fields.get('MP_Payment_ID', 'N/A'),
-                'timestamp': fields.get('Fecha de Transacción', None),
-                'items_pagados_json': fields.get('ItemsPagadosJSON', '[]'),
-                'payment_type': payment_type_display
-            })
-        
-        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(formatted_payments)} registros de pagos (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
-        return jsonify({
-            'payments': formatted_payments,
-            'total_records': total_records,
-            'current_page': page,
-            'per_page': per_page
-        }), 200
-    except Exception as e:
-        log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_payments: {e}', details={'error_message': str(e), 'query_params': request.args})
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/logs', methods=['GET'])
-def admin_get_logs():
-    log_to_airtable('INFO', 'Admin API', 'Recibida petición en /api/admin/logs', details={'ip_address': request.remote_addr, 'query_params': request.args})
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-    if not ADMIN_PASSWORD:
-        log_to_airtable('ERROR', 'Admin API', 'ADMIN_PASSWORD no configurada en el servidor para /api/admin/logs.', details={'ip_address': request.remote_addr})
-        return jsonify({"error": "La clave de administrador no está configurada en el servidor."}), 500
-    
-    # DASHBOARD_API_KEY verification can be added here if needed
-    # client_api_key = request.headers.get('X-API-Key')
-    # if client_api_key != os.getenv("DASHBOARD_API_KEY"):
-    #     log_to_airtable('WARNING', 'Admin API', 'Acceso no autorizado a /api/admin/logs (API Key inválida).', details={'ip_address': request.remote_addr})
-    #     return jsonify({"error": "Acceso no autorizado. API Key inválida."}), 401
-
-    if not api:
-        log_to_airtable('ERROR', 'Admin API', 'Airtable API no inicializada al acceder a /api/admin/logs.', details={'ip_address': request.remote_addr})
-        return jsonify({"error": "La configuración del servidor para Airtable es incorrecta."}), 500
-
-    try:
-        page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 10))
 
         logs_table = api.table(BASE_ID, LOGS_TABLE_ID)
@@ -1282,12 +1183,12 @@ def admin_get_logs():
         # Implementar paginación manual
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
-        paginated_records = all_records[start_index:end_index]
+        paginated = all_records[start_index:end_index]
         
-        formatted_logs = []
-        for record in paginated_records:
+        logs = []
+        for record in paginated:
             fields = record.get('fields', {})
-            formatted_logs.append({
+            logs.append({
                 'id': record.get('id'),
                 'timestamp': fields.get('Timestamp', None),
                 'level': fields.get('Level', 'N/A'),
@@ -1296,19 +1197,11 @@ def admin_get_logs():
                 'related_id': fields.get('Related ID', None),
                 'details': fields.get('Details', None)
             })
-        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(formatted_logs)} registros de logs (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
-        return jsonify({
-            'logs': formatted_logs,
-            'total_records': total_records,
-            'current_page': page,
-            'per_page': per_page
-        }), 200
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(logs)} registros de logs (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+        return jsonify({"logs": logs, "total_records": total_records, "per_page": per_page}) # CORRECTED: "per_page"
     except Exception as e:
         log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
-
-from pyairtable.formulas import match, AND
-# ... (código existente) ...
 
 @app.route('/api/admin/stats-login', methods=['POST'])
 def stats_login():

@@ -1,8 +1,8 @@
-
 export enum PaymentSystem {
   TASAS = 'TASAS',
   PATENTE = 'PATENTE',
-  OTRAS = 'OTRAS'
+  OTRAS = 'OTRAS',
+  AGUA = 'AGUA' // Added AGUA enum member
 }
 
 export interface Debt {
