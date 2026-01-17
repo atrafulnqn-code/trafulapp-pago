@@ -42,12 +42,14 @@ const StaffLogin: React.FC = () => {
 
       if (response.ok) {
         localStorage.setItem('staffUser', username); // Guardamos como STAFF
-        // Registrar acceso en el servidor
-        await fetch(`${API_BASE_URL}/staff/register_access`, {
+        
+        // Registrar acceso en el servidor (SIN await para no bloquear la entrada)
+        fetch(`${API_BASE_URL}/staff/register_access`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username }),
-        });
+        }).catch(err => console.error("Error silencioso al registrar acceso:", err));
+
         navigate('/staff/dashboard');
       } else {
         setError('Clave incorrecta.');
