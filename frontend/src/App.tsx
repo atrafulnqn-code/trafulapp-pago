@@ -18,6 +18,8 @@ import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
 import PatenteForm from './pages/PatenteForm';
 import LinkMPModule from './pages/LinkMPModule';
+import StatsLogin from './pages/StatsLogin';
+import StatsDashboard from './pages/StatsDashboard';
 import { useLocation } from 'react-router-dom';
 
 const AppContent: React.FC = () => {
@@ -39,6 +41,8 @@ const AppContent: React.FC = () => {
           <Route path="/admin/access_logs" element={<AdminAccessLogs />} />
           <Route path="/admin/recaudacion" element={<AdminRecaudacion />} />
           <Route path="/admin/patentes" element={<AdminPatentes />} />
+          <Route path="/admin/stats-login" element={<StatsLogin />} />
+          <Route path="/admin/stats" element={<StatsDashboard />} />
           <Route path="/staff/login" element={<StaffLogin />} />
           <Route path="/staff/dashboard" element={<StaffDashboard />} />
           <Route path="/staff/recaudacion" element={<RecaudacionForm />} />

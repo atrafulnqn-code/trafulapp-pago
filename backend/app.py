@@ -1305,6 +1305,104 @@ def admin_get_logs():
         log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
 
+from pyairtable.formulas import match, AND
+# ... (código existente) ...
+
+@app.route('/api/admin/stats-login', methods=['POST'])
+def stats_login():
+    data = request.json
+    password = data.get('password')
+    if password == "traful2026":
+        return jsonify({"success": True}), 200
+    return jsonify({"success": False, "message": "Clave incorrecta"}), 401
+
+@app.route('/api/admin/stats', methods=['GET'])
+def get_stats():
+    if not api: return jsonify({"error": "Airtable no conectado"}), 500
+    
+    try:
+        # 1. Obtener datos de las 3 tablas principales
+        historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
+        recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+        patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+
+        # Filtros: Solo pagos exitosos/aprobados
+        pagos_web = historial_table.all(formula="Estado='Exitoso'")
+        pagos_recaudacion = recaudacion_table.all(formula="OR({Estado Pago}='Pagado', {Estado Pago}='Exitoso')")
+        pagos_patente = patente_table.all(formula="OR({Estado Pago}='Pagado', {Estado Pago}='Exitoso')")
+
+        # Estructura de agregación
+        stats = {
+            "total_2026": 0,
+            "counts": {"total": 0, "deudas": 0, "contributivos": 0, "recaudacion": 0, "patente": 0},
+            "totals_by_cat": {"deudas": 0, "contributivos": 0, "recaudacion": 0, "patente": 0},
+            "by_day": {}, # { "2026-01-14": { "total": 100, "count": 2 } }
+            "by_month": {}, # { "2026-01": 5000 }
+        }
+
+        def process_record(amount, date_str, category):
+            try:
+                # Normalizar fecha (Airtable puede devolver '2026-01-14' o ISO)
+                date_obj = datetime.strptime(date_str[:10], '%Y-%m-%d')
+                day_key = date_obj.strftime('%Y-%m-%d')
+                month_key = date_obj.strftime('%Y-%m')
+                
+                amount = float(amount or 0)
+                
+                stats["total_2026"] += amount
+                stats["counts"]["total"] += 1
+                stats["counts"][category] += 1
+                stats["totals_by_cat"][category] += amount
+                
+                # Agrupar por día
+                if day_key not in stats["by_day"]: stats["by_day"][day_key] = {"total": 0, "count": 0}
+                stats["by_day"][day_key]["total"] += amount
+                stats["by_day"][day_key]["count"] += 1
+                
+                # Agrupar por mes
+                if month_key not in stats["by_month"]: stats["by_month"][month_key] = 0
+                stats["by_month"][month_key] += amount
+            except: pass
+
+        # Procesar Pagos Web (Determinar si es deuda o contributivo por el detalle)
+        for r in pagos_web:
+            f = r['fields']
+            cat = "deudas"
+            if "lote" in f.get('Detalle', '').lower() or "Contributivo" in f.get('Detalle', ''): cat = "contributivos"
+            # Usar Timestamp de creación si no hay fecha de transacción
+            date = f.get('Fecha de Transacción') or r.get('createdTime')
+            process_record(f.get('Monto'), date, cat)
+
+        # Procesar Recaudación Manual
+        for r in pagos_recaudacion:
+            f = r['fields']
+            process_record(f.get('Total'), f.get('Fecha'), "recaudacion")
+
+        # Procesar Patente Manual
+        for r in pagos_patente:
+            f = r['fields']
+            process_record(f.get('Total'), f.get('Fecha'), "patente")
+
+        # Formatear para Recharts (de Diccionario a Lista ordenada)
+        sorted_days = sorted(stats["by_day"].items())
+        recharts_day = [{"date": k, "total": v["total"], "cantidad": v["count"]} for k, v in sorted_days]
+        
+        sorted_months = sorted(stats["by_month"].items())
+        recharts_month = [{"month": k, "total": v} for k, v in sorted_months]
+
+        return jsonify({
+            "summary": {
+                "total_anual": stats["total_2026"],
+                "cantidad_operaciones": stats["counts"],
+                "totales_categoria": stats["totals_by_cat"]
+            },
+            "daily_chart": recharts_day,
+            "monthly_chart": recharts_month
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/test_cors', methods=['GET', 'POST', 'OPTIONS'])
 def test_cors():
     return jsonify({"message": "CORS OK", "method": request.method}), 200

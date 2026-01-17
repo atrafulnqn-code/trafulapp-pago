@@ -27,8 +27,11 @@ const Header: React.FC = () => {
             <LinkContainer to="/">
               <Nav.Link className="fw-medium text-secondary">Inicio</Nav.Link>
             </LinkContainer>
+            <LinkContainer to="/admin/stats-login">
+              <Button variant="outline-primary" size="sm" className="rounded-pill px-4 fw-semibold border-2">Dashboard</Button>
+            </LinkContainer>
             <LinkContainer to="/staff/login">
-              <Button variant="outline-primary" size="sm" className="rounded-pill px-4 fw-semibold border-2">Acceso Personal</Button>
+              <Button variant="outline-success" size="sm" className="rounded-pill px-4 fw-semibold border-2">Acceso Personal</Button>
             </LinkContainer>
           </Nav>
         </Navbar.Collapse>
