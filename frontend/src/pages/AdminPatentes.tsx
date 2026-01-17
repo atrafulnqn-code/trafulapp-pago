@@ -64,6 +64,7 @@ const AdminPatentes: React.FC = () => {
               <tr>
                 <th>Fecha</th>
                 <th>Dominio</th>
+                <th>Estado</th>
                 <th>Vehículo</th>
                 <th>Contribuyente</th>
                 <th>Operador</th>
@@ -73,14 +74,19 @@ const AdminPatentes: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-5"><Spinner animation="border" /></td></tr>
+                <tr><td colSpan={8} className="text-center py-5"><Spinner animation="border" /></td></tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-5">No hay registros encontrados.</td></tr>
+                <tr><td colSpan={8} className="text-center py-5">No hay registros encontrados.</td></tr>
               ) : (
                 records.map((rec) => (
                   <tr key={rec.id}>
                     <td>{rec.fecha}</td>
                     <td className="fw-bold">{rec.dominio}</td>
+                    <td>
+                        <span className={`badge bg-${rec.estado === 'Pagado' ? 'success' : 'warning'}`}>
+                            {rec.estado || 'Pendiente'}
+                        </span>
+                    </td>
                     <td>{rec.vehiculo} ({rec.anio})</td>
                     <td>{rec.contribuyente}</td>
                     <td>{rec.operador}</td>

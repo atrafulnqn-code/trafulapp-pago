@@ -64,6 +64,7 @@ const AdminRecaudacion: React.FC = () => {
               <tr>
                 <th>Fecha</th>
                 <th>Contribuyente</th>
+                <th>Estado</th>
                 <th>Administrativa</th>
                 <th>Email</th>
                 <th>Subtotal</th>
@@ -75,14 +76,19 @@ const AdminRecaudacion: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="text-center py-5"><Spinner animation="border" /></td></tr>
+                <tr><td colSpan={10} className="text-center py-5"><Spinner animation="border" /></td></tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-5">No hay registros encontrados.</td></tr>
+                <tr><td colSpan={10} className="text-center py-5">No hay registros encontrados.</td></tr>
               ) : (
                 records.map((rec) => (
                   <tr key={rec.id}>
                     <td>{rec.fecha}</td>
                     <td>{rec.contribuyente}</td>
+                    <td>
+                        <span className={`badge bg-${rec.estado === 'Pagado' ? 'success' : 'warning'}`}>
+                            {rec.estado || 'Pendiente'}
+                        </span>
+                    </td>
                     <td>{rec.operador}</td>
                     <td>{rec.email}</td>
                     <td>${parseFloat(rec.subtotal || rec.total).toFixed(2)}</td>

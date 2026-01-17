@@ -3,7 +3,18 @@ import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstr
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
 
-const API_BASE_URL = (window as any)._env_?.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+// Configuración de URL de API robusta
+// @ts-ignore
+const getApiBaseUrl = () => {
+    // @ts-ignore
+    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+        return runtimeUrl;
+    }
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 

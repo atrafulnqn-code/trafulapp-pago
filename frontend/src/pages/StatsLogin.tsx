@@ -2,7 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 
-const API_BASE_URL = (window as any)._env_?.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+// Configuración de URL de API robusta
+// @ts-ignore
+const getApiBaseUrl = () => {
+    // @ts-ignore
+    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+        return runtimeUrl;
+    }
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const StatsLogin: React.FC = () => {
   const [password, setPassword] = useState('');
