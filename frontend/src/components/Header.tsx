@@ -9,9 +9,12 @@ const Header: React.FC = () => {
       <Container>
         <LinkContainer to="/">
           <Navbar.Brand className="d-flex align-items-center">
-            <div className="bg-primary text-white rounded-circle p-2 me-3 d-flex align-items-center justify-content-center shadow-sm" style={{ width: '40px', height: '40px', fontSize: '1rem', background: 'var(--primary-color)' }}>
-                <span className="fw-bold">VT</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Villa Traful" 
+              style={{ height: '60px', width: 'auto' }} 
+              className="me-3"
+            />
             <div>
                 <h6 className="fw-bold text-dark mb-0 ls-tight">COMUNA DE VILLA TRAFUL</h6>
                 <small className="text-muted text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.1em' }}>Portal de Pagos Oficial</small>
