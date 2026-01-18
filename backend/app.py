@@ -1004,6 +1004,8 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "ESTADO_PAGO": pago_estado,
             "ID_PAGO_MP": payment_id,
+            "NOMBRE_PAGADOR": items_context.get('nombre_contribuyente') or items_context.get('email', 'Contribuyente'),
+            "IDENTIFICADOR_PAGADOR": items_context.get('dni') or items_context.get('email', 'N/A'),
             "items": items_for_pdf,
             "MONTO_TOTAL": monto_pagado
         }
