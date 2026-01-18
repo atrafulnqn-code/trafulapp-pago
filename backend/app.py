@@ -1019,30 +1019,37 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         historial_table.update(historial_record['id'], {"Link Comprobante": receipt_url})
         log_to_airtable('INFO', 'Payment Process', f'Link de comprobante guardado para historial ID: {historial_record["id"]}', related_id=payment_id)
 
-        pdf_details = {
-            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-            "ESTADO_PAGO": pago_estado,
-            "ID_PAGO_MP": payment_id,
-            "NOMBRE_PAGADOR": items_context.get('nombre_contribuyente') or items_context.get('email', 'Contribuyente'),
-            "IDENTIFICADOR_PAGADOR": items_context.get('dni') or items_context.get('email', 'N/A'),
-            "items": items_for_pdf,
-            "MONTO_TOTAL": monto_pagado
-        }
-        pdf_file = create_receipt_pdf(pdf_details)
-        if pdf_file and items_context.get("email"):
-            params = {
-                "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"), "to": items_context.get("email"),
-                "subject": "Comprobante de Pago - Municipalidad de Villa Traful",
-                "html": f"<p>Hola, adjuntamos tu comprobante de pago con ID: {payment_id}.</p>",
-                "attachments": [{"filename": f"comprobante_{payment_id}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+        # Intentar generar y enviar PDF - si falla, no afecta el proceso de pago
+        try:
+            pdf_details = {
+                "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "ESTADO_PAGO": pago_estado,
+                "ID_PAGO_MP": payment_id,
+                "NOMBRE_PAGADOR": items_context.get('nombre_contribuyente') or items_context.get('email', 'Contribuyente'),
+                "IDENTIFICADOR_PAGADOR": items_context.get('dni') or items_context.get('email', 'N/A'),
+                "items": items_for_pdf,
+                "MONTO_TOTAL": monto_pagado
             }
-            resend.Emails.send(params)
-            log_to_airtable('INFO', 'Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
-            historial_table.update(historial_record['id'], {"Comprobante_Status": f"Enviado a {items_context.get('email')}"})
-        elif not items_context.get("email"):
-            log_to_airtable('WARNING', 'Email Service', f'No se envió email de comprobante porque no se proporcionó dirección de correo.', related_id=payment_id)
-        else: # pdf_file is None
-            log_to_airtable('ERROR', 'Email Service', f'No se pudo generar el PDF para el email del comprobante.', related_id=payment_id)
+            pdf_file = create_receipt_pdf(pdf_details)
+            if pdf_file and items_context.get("email"):
+                params = {
+                    "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"), "to": items_context.get("email"),
+                    "subject": "Comprobante de Pago - Municipalidad de Villa Traful",
+                    "html": f"<p>Hola, adjuntamos tu comprobante de pago con ID: {payment_id}.</p>",
+                    "attachments": [{"filename": f"comprobante_{payment_id}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+                }
+                resend.Emails.send(params)
+                log_to_airtable('INFO', 'Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
+                historial_table.update(historial_record['id'], {"Comprobante_Status": f"Enviado a {items_context.get('email')}"})
+            elif not items_context.get("email"):
+                log_to_airtable('WARNING', 'Email Service', f'No se envió email de comprobante porque no se proporcionó dirección de correo.', related_id=payment_id)
+            else: # pdf_file is None
+                log_to_airtable('ERROR', 'Email Service', f'No se pudo generar el PDF para el email del comprobante.', related_id=payment_id)
+        except Exception as pdf_error:
+            # Si falla el PDF, logueamos pero NO fallamos el pago
+            print(f"ERROR generando/enviando PDF (no crítico): {pdf_error}")
+            log_to_airtable('ERROR', 'PDF Generation', f'Error generando/enviando PDF (pago procesado exitosamente): {pdf_error}', related_id=payment_id)
+            historial_table.update(historial_record['id'], {"Comprobante_Status": f"Error PDF: {str(pdf_error)[:100]}"})
 
         return {"status": "ok", "historialRecordId": historial_record['id']}
     except Exception as e:
