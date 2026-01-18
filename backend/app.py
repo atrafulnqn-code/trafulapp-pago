@@ -406,16 +406,27 @@ except Exception as e:
 # --- Funciones Auxiliares de PDF y Email ---
 def create_receipt_pdf(payment_details):
     try:
+        print(f"DEBUG PDF: Iniciando generación de PDF con datos: {payment_details}")
+
         # Usar ruta absoluta para encontrar el template
         base_dir = os.path.dirname(os.path.abspath(__file__))
         template_path = os.path.join(base_dir, 'comprobante_template.html')
-        
+        print(f"DEBUG PDF: Buscando template en: {template_path}")
+
+        # Verificar si el archivo existe
+        if not os.path.exists(template_path):
+            print(f"ERROR PDF: El archivo template NO existe en {template_path}")
+            print(f"DEBUG PDF: Archivos en directorio: {os.listdir(base_dir)}")
+            return None
+
         with open(template_path, 'r', encoding='utf-8') as f:
             html_template = f.read()
+        print(f"DEBUG PDF: Template HTML leído correctamente, longitud: {len(html_template)}")
 
         items_html = ""
         for item in payment_details.get("items", []):
             items_html += f"<tr><td>{item.get('description', '')}</td><td style='text-align: right;'>${item.get('amount', 0)}</td></tr>"
+        print(f"DEBUG PDF: Items HTML generados: {items_html}")
 
         html_filled = html_template.replace("{{FECHA_PAGO}}", payment_details.get("FECHA_PAGO", datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
         html_filled = html_filled.replace("{{ESTADO_PAGO}}", payment_details.get("ESTADO_PAGO", "N/A"))
@@ -424,13 +435,19 @@ def create_receipt_pdf(payment_details):
         html_filled = html_filled.replace("{{IDENTIFICADOR_PAGADOR}}", str(payment_details.get("IDENTIFICADOR_PAGADOR", "N/A")))
         html_filled = html_filled.replace("{{ITEMS_PAGADOS}}", items_html)
         html_filled = html_filled.replace("{{MONTO_TOTAL}}", str(payment_details.get("MONTO_TOTAL", 0)))
-        
+        print(f"DEBUG PDF: HTML completado, longitud: {len(html_filled)}")
+
+        print(f"DEBUG PDF: Iniciando generación con WeasyPrint...")
         pdf_file = io.BytesIO()
-        HTML(string=html_filled, base_url=".").write_pdf(pdf_file)
+        HTML(string=html_filled).write_pdf(pdf_file)
         pdf_file.seek(0)
+        print(f"DEBUG PDF: PDF generado exitosamente, tamaño: {len(pdf_file.getvalue())} bytes")
         return pdf_file
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"ERROR generando PDF: {e}")
+        print(f"ERROR PDF Traceback: {error_trace}")
         return None
 
 def log_to_airtable(level, source, message, related_id=None, details=None):
