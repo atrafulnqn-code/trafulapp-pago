@@ -1028,10 +1028,16 @@ def payment_webhook():
         try:
             payment_info = sdk.payment().get(payment_id)["response"]
             items_context = json.loads(payment_info.get("external_reference", "{}"))
+            
+            # process_payment hará un raise si hay error, que será capturado aquí
             result = process_payment(payment_id, payment_info, items_context)
-            return jsonify(result), 200
+            
+            return jsonify({"status": "success", "message": "Webhook processed successfully"}), 200 
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            error_traceback = traceback.format_exc()
+            log_to_airtable('ERROR', 'Mercado Pago Webhook', f'ERROR procesando webhook para payment_id {payment_id}: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payment_id': payment_id, 'traceback': error_traceback})
+            # Importante: devolver 200 a MP para evitar reintentos, aunque internamente haya fallado.
+            return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
     return jsonify({"status": "not a payment"}), 200
 
 @app.route('/api/debug/simulate_payment', methods=['POST'])
