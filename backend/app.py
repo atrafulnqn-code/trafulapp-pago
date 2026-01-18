@@ -439,7 +439,9 @@ def create_receipt_pdf(payment_details):
 
         print(f"DEBUG PDF: Iniciando generación con WeasyPrint...")
         pdf_file = io.BytesIO()
-        HTML(string=html_filled).write_pdf(pdf_file)
+        # Usar método write_pdf sin argumentos adicionales para evitar conflictos
+        html_doc = HTML(string=html_filled)
+        html_doc.write_pdf(target=pdf_file)
         pdf_file.seek(0)
         print(f"DEBUG PDF: PDF generado exitosamente, tamaño: {len(pdf_file.getvalue())} bytes")
         return pdf_file
