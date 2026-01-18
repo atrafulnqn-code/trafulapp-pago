@@ -889,16 +889,22 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         detalle_pago_historial = f"Pago para {items_context.get('item_type')}, DNI/Nombre: {items_context.get('dni') or items_context.get('nombre_contribuyente')}"
 
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        historial_record = historial_table.create({
+
+        # Preparar datos del historial
+        historial_data = {
             'Estado': pago_estado,
             'Monto': monto_pagado,
             'Detalle': detalle_pago_historial,
             'MP_Payment_ID': payment_id,
-            'ItemsPagadosJSON': json.dumps([])
-            # Temporalmente comentados - causan error "Value is not an array of record IDs"
-            # 'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
-            # 'Contribuyente DNI': items_context.get('dni', 'N/A')
-        })
+            'ItemsPagadosJSON': json.dumps([]),
+            'Contribuyente DNI': items_context.get('dni', 'N/A')
+        }
+
+        # Si hay record_id, agregar link a Contribuyente (es un campo "Link to another record")
+        if items_context.get('record_id'):
+            historial_data['Contribuyente'] = [items_context.get('record_id')]
+
+        historial_record = historial_table.create(historial_data)
         log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
 
         if payment_status == "approved":
