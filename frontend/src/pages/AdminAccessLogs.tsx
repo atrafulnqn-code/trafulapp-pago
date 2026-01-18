@@ -15,9 +15,17 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+interface StaffAccessLogRecord {
+    id: string;
+    fecha: string;
+    hora: string;
+    usuario: string;
+    ip: string;
+}
+
 const AdminAccessLogs: React.FC = () => {
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<StaffAccessLogRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,7 +34,7 @@ const AdminAccessLogs: React.FC = () => {
   const fetchLogs = async (page: number) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/access_logs?page=${page}`);
+      const response = await fetch(`${API_BASE_URL}/admin/staff_access_logs?page=${page}`);
       const data = await response.json();
       if (response.ok) {
         setLogs(data.logs);

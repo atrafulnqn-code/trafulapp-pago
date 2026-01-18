@@ -884,15 +884,16 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         detalle_pago_historial = f"Pago para {items_context.get('item_type')}, DNI/Nombre: {items_context.get('dni') or items_context.get('nombre_contribuyente')}"
         
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-                historial_record = historial_table.create({
-                    'Estado': pago_estado,
-                    'Monto': monto_pagado,
-                    'Detalle': detalle_pago_historial,
-                    'MP_Payment_ID': payment_id,
-                    'ItemsPagadosJSON': json.dumps([]),
-                    'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
-                    'Contribuyente DNI': items_context.get('dni', 'N/A')
-                })        log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
+        historial_record = historial_table.create({
+            'Estado': pago_estado,
+            'Monto': monto_pagado,
+            'Detalle': detalle_pago_historial,
+            'MP_Payment_ID': payment_id,
+            'ItemsPagadosJSON': json.dumps([]),
+            'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
+            'Contribuyente DNI': items_context.get('dni', 'N/A')
+        })
+        log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
 
         if payment_status == "approved":
             pago_estado = "Exitoso"
@@ -1240,6 +1241,40 @@ def admin_get_access_logs():
         return jsonify({"logs": logs, "total_records": total_records, "per_page": per_page}) # CORRECTED: "per_page"
     except Exception as e:
         log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/staff_access_logs', methods=['GET'])
+def admin_get_staff_access_logs():
+    log_to_airtable('INFO', 'Admin API', 'Recuperando logs de acceso de personal para administrador.')
+    if not api: return jsonify({"error": "Airtable no inicializada"}), 500
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10)) # Asumo 10 registros por página
+
+        access_table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
+        all_records = access_table.all(sort=['-Fecha', '-Hora']) # Ordenar por fecha y hora descendente
+        total_records = len(all_records)
+
+        # Implementar paginación manual
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paginated = all_records[start_index:end_index]
+        
+        staff_access_logs = []
+        for record in paginated:
+            fields = record.get('fields', {})
+            staff_access_logs.append({
+                'id': record.get('id'),
+                'fecha': fields.get('Fecha', 'N/A'),
+                'hora': fields.get('Hora', 'N/A'),
+                'usuario': fields.get('Usuario', 'N/A'),
+                'ip': fields.get('IP', 'N/A'),
+            })
+        
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(staff_access_logs)} logs de acceso de personal (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+        return jsonify({"logs": staff_access_logs, "total_records": total_records, "per_page": per_page})
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_staff_access_logs: {e}', details={'error_message': str(e), 'query_params': request.args})
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/stats-login', methods=['POST'])
