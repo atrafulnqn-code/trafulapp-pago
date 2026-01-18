@@ -317,6 +317,7 @@ def registrar_recaudacion():
                 "notas": notas
             }
             recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+
             record = recaudacion_table.create({
                 "Fecha": data.get('fecha'),
                 "Contribuyente": data.get('nombre'),
@@ -324,8 +325,7 @@ def registrar_recaudacion():
                 "Total": data.get('total_final'),
                 "Detalle JSON": json.dumps(detalle_completo),
                 "Operador": data.get('administrativa'),
-                "Estado Pago": "Pendiente", # Nuevo campo
-                "MP Preference ID": mp_id # Nuevo campo para vincular
+                "Estado Pago": "Pendiente"
             })
             
             # Actualizar external_reference con el ID de airtable para el webhook
@@ -965,12 +965,13 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 # Búsqueda en Airtable
                 recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
                 records = recaudacion_table.all(formula=match({"Email": items_context.get('email'), "Estado Pago": "Pendiente"}))
-                
+
                 for r in records:
                     if abs(float(r['fields'].get('Total', 0)) - float(monto_pagado)) < 1.0:
-                        recaudacion_table.update(r['id'], {"Estado Pago": "Pagado", "MP Payment ID": str(payment_id)})
+                        # Actualizar Estado Pago a Pagado
+                        recaudacion_table.update(r['id'], {"Estado Pago": "Pagado"})
                         items_for_pdf.append({"description": "Pago Recaudación Manual", "amount": monto_pagado})
-                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro recaudación {r["id"]}')
+                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro recaudación {r["id"]} a Pagado (MP Payment ID: {payment_id})')
                         break
 
             # Caso Especial: Patente Manual
@@ -978,12 +979,13 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
                 # Buscamos por email y dominio
                 records = patente_table.all(formula=match({"Email": items_context.get('email'), "Dominio": items_context.get('dominio'), "Estado Pago": "Pendiente"}))
-                
+
                 for r in records:
                     if abs(float(r['fields'].get('Total', 0)) - float(monto_pagado)) < 1.0:
-                        patente_table.update(r['id'], {"Estado Pago": "Pagado", "MP Payment ID": str(payment_id)})
+                        # Actualizar Estado Pago a Pagado
+                        patente_table.update(r['id'], {"Estado Pago": "Pagado"})
                         items_for_pdf.append({"description": f"Pago Patente {items_context.get('dominio')}", "amount": monto_pagado})
-                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro patente {r["id"]}')
+                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro patente {r["id"]} a Pagado (MP Payment ID: {payment_id})')
                         break
             
             # Caso Estándar (Deudas previas)
