@@ -16,7 +16,7 @@ const AdminLogin: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/login`, {
+      const response = await fetch(`${API_BASE_URL}/admin/stats-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -32,7 +32,7 @@ const StaffLogin: React.FC = () => {
 
     try {
       // Usamos el mismo endpoint de validación de clave por ahora
-      const response = await fetch(`${API_BASE_URL}/admin/login`, {
+      const response = await fetch(`${API_BASE_URL}/admin/stats-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
