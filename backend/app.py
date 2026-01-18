@@ -884,7 +884,7 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         items_for_pdf = []
 
         detalle_pago_historial = f"Pago para {items_context.get('item_type')}, DNI/Nombre: {items_context.get('dni') or items_context.get('nombre_contribuyente')}"
-        
+
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
         historial_record = historial_table.create({
             'Estado': pago_estado,
@@ -1022,22 +1022,40 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
 def payment_webhook():
     print("--- Webhook Recibido ---")
     data = request.json
-    if data.get("type") == "payment":
+    print(f"DEBUG WEBHOOK: Data recibida: {json.dumps(data, indent=2)}")
+    print(f"DEBUG WEBHOOK: Type: {data.get('type') if data else 'NO DATA'}")
+
+    if data and data.get("type") == "payment":
         payment_id = data.get("data", {}).get("id")
-        if not payment_id: return jsonify({"error": "No payment ID"}), 400
+        print(f"DEBUG WEBHOOK: Payment ID extraído: {payment_id}")
+
+        if not payment_id:
+            print("ERROR WEBHOOK: No payment ID en el webhook")
+            return jsonify({"error": "No payment ID"}), 400
+
         try:
+            print(f"DEBUG WEBHOOK: Consultando pago a Mercado Pago con ID: {payment_id}")
             payment_info = sdk.payment().get(payment_id)["response"]
+            print(f"DEBUG WEBHOOK: Info del pago obtenida: Status={payment_info.get('status')}")
+
             items_context = json.loads(payment_info.get("external_reference", "{}"))
-            
+            print(f"DEBUG WEBHOOK: Items context: {items_context}")
+
             # process_payment hará un raise si hay error, que será capturado aquí
+            print(f"DEBUG WEBHOOK: Iniciando process_payment...")
             result = process_payment(payment_id, payment_info, items_context)
-            
-            return jsonify({"status": "success", "message": "Webhook processed successfully"}), 200 
+            print(f"DEBUG WEBHOOK: process_payment completado exitosamente")
+
+            return jsonify({"status": "success", "message": "Webhook processed successfully"}), 200
         except Exception as e:
             error_traceback = traceback.format_exc()
+            print(f"ERROR WEBHOOK: Exception procesando webhook: {e}")
+            print(f"ERROR WEBHOOK: Traceback: {error_traceback}")
             log_to_airtable('ERROR', 'Mercado Pago Webhook', f'ERROR procesando webhook para payment_id {payment_id}: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payment_id': payment_id, 'traceback': error_traceback})
             # Importante: devolver 200 a MP para evitar reintentos, aunque internamente haya fallado.
             return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
+
+    print(f"DEBUG WEBHOOK: No es un webhook de payment. Ignorando.")
     return jsonify({"status": "not a payment"}), 200
 
 @app.route('/api/debug/simulate_payment', methods=['POST'])

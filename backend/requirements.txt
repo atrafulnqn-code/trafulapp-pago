@@ -1,9 +1,8 @@
-Flask
-pyairtable
-flask-cors
-mercadopago
-python-dotenv
-gunicorn
-resend
-weasyprint
-resend
+Flask==3.0.0
+pyairtable==2.3.3
+flask-cors==4.0.0
+mercadopago==2.2.1
+python-dotenv==1.0.0
+gunicorn==21.2.0
+resend==0.8.0
+weasyprint==60.2
