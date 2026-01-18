@@ -6,3 +6,4 @@ python-dotenv==1.0.0
 gunicorn==21.2.0
 resend==0.8.0
 weasyprint==59.0
+pydyf==0.8.0
