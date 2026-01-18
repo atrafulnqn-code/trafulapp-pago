@@ -629,10 +629,13 @@ def create_preference():
         preference_data = {
             "items": [{"title": title, "quantity": 1, "unit_price": float(unit_price)}],
             "back_urls": {"success": FRONTEND_URL, "failure": FRONTEND_URL, "pending": FRONTEND_URL},
-            "auto_return": "approved", # Vuelve a "approved" para Render
             "notification_url": f"{BACKEND_URL}/api/payment_webhook",
             "external_reference": external_reference
         }
+
+        # Solo agregar auto_return si NO es localhost (Mercado Pago no acepta localhost con auto_return)
+        if "localhost" not in FRONTEND_URL and "127.0.0.1" not in FRONTEND_URL:
+            preference_data["auto_return"] = "approved"
         print(f"DEBUG MP: Notification URL sent to MP: {preference_data['notification_url']}")
         print(f"DEBUG MP: Preference data sent to MP: {preference_data}")
         preference_response = sdk.preference().create(preference_data)
@@ -891,9 +894,10 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             'Monto': monto_pagado,
             'Detalle': detalle_pago_historial,
             'MP_Payment_ID': payment_id,
-            'ItemsPagadosJSON': json.dumps([]),
-            'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
-            'Contribuyente DNI': items_context.get('dni', 'N/A')
+            'ItemsPagadosJSON': json.dumps([])
+            # Temporalmente comentados - causan error "Value is not an array of record IDs"
+            # 'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
+            # 'Contribuyente DNI': items_context.get('dni', 'N/A')
         })
         log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
 
