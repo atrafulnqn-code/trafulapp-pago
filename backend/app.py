@@ -633,6 +633,8 @@ def create_preference():
             "notification_url": f"{BACKEND_URL}/api/payment_webhook",
             "external_reference": external_reference
         }
+        print(f"DEBUG MP: Notification URL sent to MP: {preference_data['notification_url']}")
+        print(f"DEBUG MP: Preference data sent to MP: {preference_data}")
         preference_response = sdk.preference().create(preference_data)
         print(f"DEBUG MP Response: {preference_response}") # AÑADIDO PARA DEPURACIÓN
         preference = preference_response["response"]
