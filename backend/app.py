@@ -884,14 +884,15 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         detalle_pago_historial = f"Pago para {items_context.get('item_type')}, DNI/Nombre: {items_context.get('dni') or items_context.get('nombre_contribuyente')}"
         
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        historial_record = historial_table.create({
-            'Estado': pago_estado, 
-            'Monto': monto_pagado,
-            'Detalle': detalle_pago_historial,
-            'MP_Payment_ID': payment_id,
-            'ItemsPagadosJSON': json.dumps([])
-        })
-        log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
+                historial_record = historial_table.create({
+                    'Estado': pago_estado,
+                    'Monto': monto_pagado,
+                    'Detalle': detalle_pago_historial,
+                    'MP_Payment_ID': payment_id,
+                    'ItemsPagadosJSON': json.dumps([]),
+                    'Contribuyente': items_context.get('nombre_contribuyente') or items_context.get('email', 'Desconocido'),
+                    'Contribuyente DNI': items_context.get('dni', 'N/A')
+                })        log_to_airtable('INFO', 'Payment Process', f'Registro de historial creado con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'mp_payment_id': payment_id})
 
         if payment_status == "approved":
             pago_estado = "Exitoso"
@@ -1196,7 +1197,9 @@ def admin_get_payments_history():
                 "mp_payment_id": fields.get('MP_Payment_ID', 'N/A'),
                 "timestamp": fields.get('Timestamp', None), # Usar 'Timestamp' de Airtable
                 "items_pagados_json": fields.get('ItemsPagadosJSON', '[]'),
-                "payment_type": fields.get('Payment_Type', 'N/A'), # Asumo que tienes un campo Payment_Type en Airtable
+                "payment_type": fields.get('Payment_Type', 'N/A'),
+                "contribuyente": fields.get('Contribuyente', 'N/A'), # Nuevo campo
+                "contribuyente_dni": fields.get('Contribuyente DNI', 'N/A'), # Nuevo campo
             })
         
         log_to_airtable('INFO', 'Admin API', f'Recuperados {len(payments)} registros de pago (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})

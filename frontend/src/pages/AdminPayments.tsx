@@ -13,6 +13,8 @@ interface PaymentRecord {
     timestamp: string;
     items_pagados_json: string;
     payment_type: string;
+    contribuyente?: string; // Nuevo campo opcional
+    contribuyente_dni?: string; // Nuevo campo opcional
 }
 
 const AdminPayments: React.FC = () => {
@@ -101,13 +103,13 @@ const AdminPayments: React.FC = () => {
                                 <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
                                     <thead className="bg-light">
                                         <tr>
-                                            <th>Fecha</th><th>Estado</th><th>Tipo</th><th>Detalle</th><th>Conceptos</th><th>ID MP</th><th className="text-end">Monto</th><th>Acción</th>
+                                            <th>Fecha</th><th>Estado</th><th>Tipo</th><th>Contribuyente</th><th>DNI</th><th>Detalle</th><th>Conceptos</th><th>ID MP</th><th className="text-end">Monto</th><th>Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {payments.length === 0 ? (
                                             <tr>
-                                                <td colSpan={8} className="text-center py-3">No se encontraron registros.</td>
+                                                <td colSpan={10} className="text-center py-3">No se encontraron registros.</td>
                                             </tr>
                                         ) : (
                                             payments.map((payment) => (
@@ -117,6 +119,8 @@ const AdminPayments: React.FC = () => {
                                                     </td>
                                                     <td><span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : 'secondary'}`}>{payment.estado}</span></td>
                                                     <td>{payment.payment_type}</td>
+                                                    <td>{payment.contribuyente || '-'}</td>
+                                                    <td>{payment.contribuyente_dni || '-'}</td>
                                                     <td className="text-truncate" style={{maxWidth: '200px'}} title={payment.detalle}>{payment.detalle}</td>
                                                     <td className="text-truncate" style={{maxWidth: '200px'}} title={parseItemsPagados(payment.items_pagados_json)}>{parseItemsPagados(payment.items_pagados_json)}</td>
                                                     <td className="font-monospace">{payment.mp_payment_id}</td>
