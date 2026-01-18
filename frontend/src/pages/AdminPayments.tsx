@@ -29,7 +29,7 @@ const AdminPayments: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/payments?page=${currentPage}&per_page=${perPage}`);
+                const response = await fetch(`${API_BASE_URL}/admin/payments_history?page=${currentPage}&per_page=${perPage}`);
                 const result = await response.json(); // La respuesta es un objeto con 'payments', 'total_records', etc.
 
                 if (response.ok) {

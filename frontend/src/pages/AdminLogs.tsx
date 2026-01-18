@@ -28,7 +28,7 @@ const AdminLogs: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/logs?page=${currentPage}&per_page=${perPage}`);
+                const response = await fetch(`${API_BASE_URL}/admin/access_logs?page=${currentPage}&per_page=${perPage}`);
                 const result = await response.json(); // La respuesta es un objeto con 'logs', 'total_records', etc.
 
                 if (response.ok) {

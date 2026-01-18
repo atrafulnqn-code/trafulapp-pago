@@ -18,8 +18,15 @@ import hashlib
 load_dotenv()
 
 app = Flask(__name__)
-# Configuración CORS global permisiva
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# Configuración CORS
+# Para producción, configurar CORS_ORIGINS en variables de entorno
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+if cors_origins != "*":
+    # Si se especifican orígenes específicos, parsear la lista separada por comas
+    cors_origins = [origin.strip() for origin in cors_origins.split(",")]
+
+CORS(app, resources={r"/*": {"origins": cors_origins}}, supports_credentials=True)
 
 # --- Verificación de Variables de Entorno ---
 print("--- Iniciando Verificación de Variables de Entorno ---")
@@ -508,12 +515,8 @@ def search_contributivo():
             )
         
         formula_str = str(formula_obj) # Convertir el objeto Formula a string
-        # print(f"DEBUG: Fórmula Airtable para contributivo: {formula_str}") # Debugging REMOVED
         records = table.all(formula=formula_str)
-        # print(f"DEBUG: Registros encontrados para contributivo: {len(records)}") # Debugging REMOVED
-        # for i, rec in enumerate(records[:3]): # Imprimir los primeros 3 registros REMOVED
-        # print(f"DEBUG: Contributivo Record {i}: ID={rec.get('id')}, Fields={rec.get('fields')}") # Debugging REMOVED
-        
+
         log_to_airtable('INFO', 'API Search', f'Búsqueda de contributivo exitosa para "{query}". Encontrados {len(records)} registros.', related_id=query, details={'records_found': len(records)})
         return jsonify(records)
     except Exception as e:
@@ -558,11 +561,7 @@ def search_agua():
             )
         
         formula_str = str(formula_obj) # Convertir el objeto Formula a string
-        # print(f"DEBUG: Fórmula Airtable para agua: {formula_str}") # Debugging REMOVED
         records = table.all(formula=formula_str)
-        # print(f"DEBUG: Registros encontrados para agua: {len(records)}") # Debugging REMOVED
-        # for i, rec in enumerate(records[:3]): # Imprimir los primeros 3 registros REMOVED
-        # print(f"DEBUG: Agua Record {i}: ID={rec.get('id')}, Fields={rec.get('fields')}") # Debugging REMOVED
 
         log_to_airtable('INFO', 'API Search', f'Búsqueda de agua exitosa para "{query}". Encontrados {len(records)} registros.', related_id=query, details={'records_found': len(records)})
         return jsonify(records)
@@ -1169,6 +1168,43 @@ def admin_get_patentes():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/admin/payments_history', methods=['GET'])
+def admin_get_payments_history():
+    log_to_airtable('INFO', 'Admin API', 'Recuperando historial de pagos para administrador.')
+    if not api: return jsonify({"error": "Airtable no inicializada"}), 500
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
+        all_records = historial_table.all(sort=['-Timestamp']) # Ordenar por fecha de creación descendente
+        total_records = len(all_records)
+
+        # Implementar paginación manual
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paginated = all_records[start_index:end_index]
+        
+        payments = []
+        for record in paginated:
+            fields = record.get('fields', {})
+            payments.append({
+                "id": record.get('id'),
+                "estado": fields.get('Estado', 'Desconocido'),
+                "monto": fields.get('Monto', 0),
+                "detalle": fields.get('Detalle', 'N/A'),
+                "mp_payment_id": fields.get('MP_Payment_ID', 'N/A'),
+                "timestamp": fields.get('Timestamp', None), # Usar 'Timestamp' de Airtable
+                "items_pagados_json": fields.get('ItemsPagadosJSON', '[]'),
+                "payment_type": fields.get('Payment_Type', 'N/A'), # Asumo que tienes un campo Payment_Type en Airtable
+            })
+        
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(payments)} registros de pago (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+        return jsonify({"payments": payments, "total_records": total_records})
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_payments_history: {e}', details={'error_message': str(e), 'query_params': request.args})
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/admin/access_logs', methods=['GET'])
 def admin_get_access_logs():
     if not api: return jsonify({"error": "Airtable no inicializada"}), 500
@@ -1207,7 +1243,13 @@ def admin_get_access_logs():
 def stats_login():
     data = request.json
     password = data.get('password')
-    if password == "traful2026":
+    if not ADMIN_PASSWORD_FROM_ENV:
+        print("ADVERTENCIA: Usando contraseña de administrador por defecto 'admin123'. Configure ADMIN_PASSWORD en .env para producción.")
+        expected_password = "admin123"
+    else:
+        expected_password = ADMIN_PASSWORD_FROM_ENV
+
+    if password == expected_password:
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "message": "Clave incorrecta"}), 401
 
