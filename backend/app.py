@@ -919,8 +919,9 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             'Contribuyente DNI': items_context.get('dni', 'N/A')
         }
 
-        # Si hay record_id, agregar link a Contribuyente (es un campo "Link to another record")
-        if items_context.get('record_id'):
+        # SOLO agregar link a Contribuyente si es un pago de retributivos (lote)
+        # El campo "Contribuyente" está linkeado solo a la tabla de Retributivos
+        if items_context.get('record_id') and items_context.get('item_type') == 'lote':
             historial_data['Contribuyente'] = [items_context.get('record_id')]
 
         historial_record = historial_table.create(historial_data)
