@@ -283,8 +283,14 @@ def registrar_recaudacion():
             "items": items_pdf,
             "MONTO_TOTAL": data.get('total_final')
         }
-        
-        pdf_file = create_receipt_pdf(pdf_details)
+
+        # Intentar generar PDF - si falla, no bloquea el flujo
+        pdf_file = None
+        try:
+            pdf_file = create_receipt_pdf(pdf_details)
+        except Exception as pdf_error:
+            print(f"ERROR generando PDF en recaudación: {pdf_error}")
+            log_to_airtable('ERROR', 'Recaudacion', f'Error generando PDF: {pdf_error}')
         
         # 1.5 Generar Preferencia de Pago MP
         mp_link = None
@@ -335,34 +341,57 @@ def registrar_recaudacion():
             log_to_airtable('WARNING', 'Recaudacion', f'Fallo al guardar en tabla Recaudacion: {airtable_err}')
 
         # 3. Enviar Email
-        if pdf_file and data.get('email') and resend.api_key:
-            from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
-            
-            html_content = f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el detalle de tasas y derechos generados el {data.get('fecha')}.</p>"
-            
-            if mp_link:
-                html_content += f"""
-                <br>
-                <p><strong>Total a Pagar: ${data.get('total_final')}</strong></p>
-                <a href="{mp_link}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar Ahora con Mercado Pago</a>
-                <br><br>
-                """
-            
-            html_content += "<p>Gracias por su contribución.</p>"
+        email_sent = False
+        if data.get('email') and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
 
-            params = {
-                "from": from_email,
-                "to": data.get('email'),
-                "subject": "Solicitud de Pago - Comuna de Villa Traful",
-                "html": html_content,
-                "attachments": [{"filename": "detalle_tasas.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
-            }
-            resend.Emails.send(params)
-            log_to_airtable('INFO', 'Recaudacion', f'Email enviado a {data.get("email")}')
+                html_content = f"<p>Estimado/a {data.get('nombre')},</p><p>Adjuntamos el detalle de tasas y derechos generados el {data.get('fecha')}.</p>"
+
+                if mp_link:
+                    html_content += f"""
+                    <br>
+                    <p><strong>Total a Pagar: ${data.get('total_final')}</strong></p>
+                    <a href="{mp_link}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar Ahora con Mercado Pago</a>
+                    <br><br>
+                    """
+
+                html_content += "<p>Gracias por su contribución.</p>"
+
+                params = {
+                    "from": from_email,
+                    "to": data.get('email'),
+                    "subject": "Solicitud de Pago - Comuna de Villa Traful",
+                    "html": html_content
+                }
+
+                # Solo agregar PDF si se generó exitosamente
+                if pdf_file:
+                    params["attachments"] = [{"filename": "detalle_tasas.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+
+                resend.Emails.send(params)
+                email_sent = True
+                log_to_airtable('INFO', 'Recaudacion', f'Email enviado a {data.get("email")}')
+            except Exception as email_error:
+                print(f"ERROR enviando email: {email_error}")
+                log_to_airtable('ERROR', 'Recaudacion', f'Error enviando email a {data.get("email")}: {email_error}')
+
+        # Mensaje de respuesta según lo que funcionó
+        message = "Recaudación registrada"
+        if email_sent:
+            message += " y email enviado exitosamente"
+        elif data.get('email'):
+            message += " pero hubo un error al enviar el email"
+
+        if mp_link:
+            message += " (link de pago generado)"
 
         return jsonify({
-            "success": True, 
-            "message": "Recaudación registrada y link enviado",
+            "success": True,
+            "message": message,
+            "email_sent": email_sent,
+            "pdf_generated": pdf_file is not None,
+            "mp_link": mp_link,
             "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
         })
 
