@@ -51,7 +51,21 @@ const RecaudacionForm: React.FC = () => {
   const [status, setStatus] = useState<{ type: 'success' | 'danger', msg: string } | null>(null);
   const [pdfDownloadUrl, setPdfDownloadUrl] = useState<string | null>(null);
 
-  // ... (useEffect sigue igual) ...
+  // Calcular totales cuando cambian importes, descuento o selección
+  useEffect(() => {
+    const suma = Object.entries(importes).reduce((acc: number, [key, val]: [string, any]) => {
+      // Solo sumar si está seleccionado
+      if (seleccionados.includes(key)) {
+        return acc + (parseFloat(val) || 0);
+      }
+      return acc;
+    }, 0);
+    setTotal(suma);
+
+    const desc = parseFloat(formData.descuento) || 0;
+    const final = suma - (suma * (desc / 100));
+    setTotalFinal(final);
+  }, [importes, formData.descuento, seleccionados]);
 
   const handleCheckboxChange = (id: string) => {
     if (seleccionados.includes(id)) {
@@ -109,7 +123,8 @@ const RecaudacionForm: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setStatus({ type: 'success', msg: 'Recaudación registrada, PDF generado y email enviado con éxito.' });
+        // Usar el mensaje dinámico del backend que indica qué funcionó
+        setStatus({ type: 'success', msg: data.message || 'Recaudación registrada exitosamente.' });
         // Crear URL para descargar PDF
         if (data.pdf_base64) {
             const byteCharacters = atob(data.pdf_base64);
