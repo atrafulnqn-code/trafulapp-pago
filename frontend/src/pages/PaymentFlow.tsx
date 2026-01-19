@@ -19,6 +19,15 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+};
+
 function validateEmail(email: string) {
   const re = /\S+@\S+\.\S+/;
   return re.test(String(email).toLowerCase());
@@ -481,7 +490,7 @@ const PaymentFlow: React.FC = () => {
                                       <td><Form.Check type="checkbox" checked={selectedDebts.includes(debt.id)} onChange={() => toggleDebt(debt.id)} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></td>
                                       <td>{debt.period}</td>
                                       <td>{debt.description}</td>
-                                      <td className="text-end fw-semibold">${debt.amount.toFixed(2)}</td>
+                                      <td className="text-end fw-semibold">{formatCurrency(debt.amount)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -489,7 +498,7 @@ const PaymentFlow: React.FC = () => {
                               <div className="mt-4 d-flex justify-content-end align-items-center">
                                 <div className="text-end me-4">
                                   <p className="text-muted mb-0">Total a Pagar</p>
-                                  <p className="h2 fw-bold">${totalAmount.toFixed(2)}</p>
+                                  <p className="h2 fw-bold">{formatCurrency(totalAmount)}</p>
                                 </div>
                                 <Button size="lg" variant="primary" onClick={() => setCurrentStep(3)} disabled={totalAmount === 0}>Continuar al Pago</Button>
                               </div>
@@ -506,10 +515,10 @@ const PaymentFlow: React.FC = () => {
                             <Card.Header as="h5">Resumen de Pago</Card.Header>
                             <Card.Body>
                                 {result?.debts.filter(d => selectedDebts.includes(d.id)).map(debt => (
-                                   <div key={debt.id} className="d-flex justify-content-between mb-1"><span className="text-muted">{debt.period}</span><span>${debt.amount.toFixed(2)}</span></div>
+                                   <div key={debt.id} className="d-flex justify-content-between mb-1"><span className="text-muted">{debt.period}</span><span>{formatCurrency(debt.amount)}</span></div>
                                 ))}
                                 <hr/>
-                                <div className="d-flex justify-content-between h5 fw-bold"><span>Total</span><span>${totalAmount.toFixed(2)}</span></div>
+                                <div className="d-flex justify-content-between h5 fw-bold"><span>Total</span><span>{formatCurrency(totalAmount)}</span></div>
                             </Card.Body>
                         </Card>
                         <Form>
