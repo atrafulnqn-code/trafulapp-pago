@@ -313,7 +313,7 @@ def registrar_plan_pago():
         # 2. Generar Preferencia MP
         mp_link = None
         mp_id = None
-        if sdk and data.get('monto_total') > 0:
+        if sdk and float(data.get('monto_total', 0)) > 0:
             try:
                 preference_data = {
                     "items": [{"title": f"Plan de Pago - Cuota #{data.get('cuota_plan')}", "quantity": 1, "unit_price": float(data.get('monto_total'))}],
@@ -339,7 +339,7 @@ def registrar_plan_pago():
             plan_pago_table = api.table(BASE_ID, PLAN_PAGO_TABLE_ID)
             plan_pago_table.create({
                 "Nombre Contribuyente": data.get('nombre'),
-                "Cuota del Plan": int(data.get('cuota_plan')) if data.get('cuota_plan') else None,
+                "Cuota del Plan": data.get('cuota_plan'),  # Guardar como texto (ej: "1/6")
                 "Email": data.get('email'),
                 "Monto Total": float(data.get('monto_total')),
                 "Estado": "No Pagado"
