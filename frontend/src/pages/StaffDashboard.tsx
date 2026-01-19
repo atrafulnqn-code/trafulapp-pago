@@ -144,17 +144,55 @@ const StaffDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Espacio para futuros módulos */}
+        {/* Módulo Plan de Pago */}
         <Col>
-          <Card className="h-100 border-2 border-dashed border-light bg-light d-flex align-items-center justify-content-center" style={{ minHeight: '200px' }}>
-            <Card.Body className="text-center p-4 text-muted opacity-50">
-              <div className="mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-plus-circle" viewBox="0 0 16 16">
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+          <Card
+            className="h-100 shadow-sm border-0 hover-shadow transition-all"
+            style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/staff/plan-pago')}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Card.Body className="text-center p-4">
+              <div className="text-warning mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-calendar-check" viewBox="0 0 16 16">
+                  <path d="M10.854 7.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 9.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
+                  <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
                 </svg>
               </div>
-              <span className="small">Módulo adicional</span>
+              <Card.Title className="fw-bold">Plan de Pago</Card.Title>
+              <Card.Text className="text-muted small">
+                Registro y gestión de planes de pago personalizados.
+              </Card.Text>
+              <div className="mt-3">
+                <Button variant="warning" size="sm" className="text-white">Nuevo Registro</Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        {/* Módulo Datos Personales */}
+        <Col>
+          <Card
+            className="h-100 shadow-sm border-0 hover-shadow transition-all"
+            style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+            onClick={() => window.open('https://docs.google.com/spreadsheets/d/1B1e-PD0lKrU4K2pJfQ2lu8S_X2seF1EnDyrAChTC_-M/edit?usp=sharing', '_blank')}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Card.Body className="text-center p-4">
+              <div className="text-secondary mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-table" viewBox="0 0 16 16">
+                  <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm15 2h-4v3h4V4zm0 4h-4v3h4V8zm0 4h-4v3h3a1 1 0 0 0 1-1v-2zm-5 3v-3H6v3h4zm-5 0v-3H1v2a1 1 0 0 0 1 1h3zm-4-4h4V8H1v3zm0-4h4V4H1v3zm5-3v3h4V4H6zm4 4H6v3h4V8z"/>
+                </svg>
+              </div>
+              <Card.Title className="fw-bold">Datos Personales</Card.Title>
+              <Card.Text className="text-muted small">
+                Acceso a la planilla de datos personales de contribuyentes.
+              </Card.Text>
+              <div className="mt-3">
+                <Button variant="secondary" size="sm">Planilla</Button>
+              </div>
             </Card.Body>
           </Card>
         </Col>

@@ -19,9 +19,48 @@ const AdminLogs: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState<number>(1);
-    const [perPage] = useState<number>(10); // Registros por página
+    const [perPage] = useState<number>(20); // Registros por página
     const [totalPages, setTotalPages] = useState<number>(0);
     const navigate = useNavigate();
+
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        const maxVisible = 7; // Máximo de números de página visibles
+
+        if (totalPages <= maxVisible) {
+            // Mostrar todas las páginas si son pocas
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            // Mostrar páginas alrededor de la actual
+            const leftSide = currentPage - 2;
+            const rightSide = currentPage + 2;
+
+            // Siempre mostrar primera página
+            pages.push(1);
+
+            if (leftSide > 2) {
+                pages.push('...');
+            }
+
+            // Páginas alrededor de la actual
+            for (let i = Math.max(2, leftSide); i <= Math.min(totalPages - 1, rightSide); i++) {
+                pages.push(i);
+            }
+
+            if (rightSide < totalPages - 1) {
+                pages.push('...');
+            }
+
+            // Siempre mostrar última página
+            if (totalPages > 1) {
+                pages.push(totalPages);
+            }
+        }
+
+        return pages;
+    };
 
     useEffect(() => {
         const fetchLogs = async () => {
@@ -109,14 +148,18 @@ const AdminLogs: React.FC = () => {
                                         <Pagination>
                                             <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
                                             <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                                            {[...Array(totalPages)].map((_, index) => (
-                                                <Pagination.Item 
-                                                    key={index + 1} 
-                                                    active={index + 1 === currentPage} 
-                                                    onClick={() => handlePageChange(index + 1)}
-                                                >
-                                                    {index + 1}
-                                                </Pagination.Item>
+                                            {getPageNumbers().map((page, index) => (
+                                                page === '...' ? (
+                                                    <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                                ) : (
+                                                    <Pagination.Item
+                                                        key={page}
+                                                        active={page === currentPage}
+                                                        onClick={() => handlePageChange(page as number)}
+                                                    >
+                                                        {page}
+                                                    </Pagination.Item>
+                                                )
                                             ))}
                                             <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
                                             <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />

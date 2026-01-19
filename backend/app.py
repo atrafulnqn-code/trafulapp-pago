@@ -77,7 +77,9 @@ PATENTE_TABLE_ID = "tbl3CMMwccWeo8XSG"
 HISTORIAL_TABLE_ID = "tbl5p19Hv4cMk9NUS"
 LOGS_TABLE_ID = "tblLihQ9FmU6JD7NR"
 RECAUDACION_TABLE_ID = os.getenv("RECAUDACION_TABLE_ID", "tblzRhxpeqbuhrf78")
-PATENTE_MANUAL_TABLE_ID = os.getenv("PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF") 
+PATENTE_MANUAL_TABLE_ID = os.getenv("PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF")
+PLAN_PAGO_TABLE_ID = os.getenv("PLAN_PAGO_TABLE_ID", "tblMNNvOBuqQiCFqC")
+CONTACTOS_TABLE_ID = os.getenv("CONTACTOS_TABLE_ID", "tbl1ZcfxyaJtXPdPl")
 ACCESOS_PERSONAL_TABLE_ID = os.getenv("ACCESOS_PERSONAL_TABLE_ID", "tblAILbaYmnWkkPiV")
 WATER_TABLE_ID = "tblTgcF3XczjkpK3H" # ID de la tabla de Agua
 
@@ -121,11 +123,14 @@ def send_payment_link():
         # print(f"DEBUG: Intentando enviar email a {email} desde {from_email}...") # REMOVED DEBUG LOG
         res_email = resend.Emails.send(params)
         # print(f"DEBUG: Respuesta Resend: {res_email}") # REMOVED DEBUG LOG
-        
+
         # Verificar si Resend devolvió un ID (éxito) o si lanzó excepción
         if not res_email.get('id'):
              # print(f"ERROR: Resend no devolvió ID. Respuesta: {res_email}") # REMOVED DEBUG LOG
              return jsonify({"error": "No se pudo enviar el email (Error proveedor)"}), 500
+
+        # Guardar contacto en tabla Contactos
+        save_contacto(email=email, origen='Link MP')
 
         return jsonify({"success": True})
     except Exception as e:
@@ -239,6 +244,9 @@ def registrar_patente_manual():
                 resend.Emails.send(params)
                 email_sent = True
                 log_to_airtable('INFO', 'Patente Manual', f'Email enviado a {data.get("email")}')
+
+                # Guardar contacto en tabla Contactos
+                save_contacto(email=data.get('email'), nombre=data.get('nombre'), origen='Patente')
             except Exception as email_error:
                 print(f"ERROR enviando email patente: {email_error}")
                 log_to_airtable('ERROR', 'Patente Manual', f'Error enviando email a {data.get("email")}: {email_error}')
@@ -264,6 +272,143 @@ def registrar_patente_manual():
 
     except Exception as e:
         log_to_airtable('ERROR', 'Patente Manual', f'Error procesando patente: {e}')
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/plan_pago', methods=['POST'])
+@cross_origin()
+def registrar_plan_pago():
+    log_to_airtable('INFO', 'Plan de Pago', 'Recibido nuevo plan de pago', details={'ip': request.remote_addr})
+
+    if not api:
+        return jsonify({"error": "Error de configuración: Airtable no conectado"}), 500
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Sin datos"}), 400
+
+        # 1. Generar PDF del recibo
+        items_pdf = [
+            {"description": f"Plan de Pago - Cuota #{data.get('cuota_plan')}", "amount": float(data.get('monto_total') or 0)}
+        ]
+
+        pdf_details = {
+            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "ESTADO_PAGO": "Pendiente",
+            "ID_PAGO_MP": f"PLAN-{int(datetime.now().timestamp())}",
+            "NOMBRE_PAGADOR": data.get('nombre'),
+            "IDENTIFICADOR_PAGADOR": data.get('email'),
+            "items": items_pdf,
+            "MONTO_TOTAL": data.get('monto_total')
+        }
+
+        # Intentar generar PDF - si falla, no bloquea el flujo
+        pdf_file = None
+        try:
+            pdf_file = create_receipt_pdf(pdf_details)
+        except Exception as pdf_error:
+            print(f"ERROR generando PDF en plan de pago: {pdf_error}")
+            log_to_airtable('ERROR', 'Plan de Pago', f'Error generando PDF: {pdf_error}')
+
+        # 2. Generar Preferencia MP
+        mp_link = None
+        mp_id = None
+        if sdk and data.get('monto_total') > 0:
+            try:
+                preference_data = {
+                    "items": [{"title": f"Plan de Pago - Cuota #{data.get('cuota_plan')}", "quantity": 1, "unit_price": float(data.get('monto_total'))}],
+                    "back_urls": {"success": f"{FRONTEND_URL}/exito", "failure": FRONTEND_URL, "pending": FRONTEND_URL},
+                    "auto_return": "approved",
+                    "notification_url": f"{BACKEND_URL}/api/payment_webhook",
+                    "external_reference": json.dumps({
+                        "type": "plan_pago",
+                        "email": data.get('email'),
+                        "nombre": data.get('nombre'),
+                        "cuota": data.get('cuota_plan')
+                    })
+                }
+                preference_response = sdk.preference().create(preference_data)
+                mp_link = preference_response["response"]["init_point"]
+                mp_id = preference_response["response"]["id"]
+            except Exception as mp_err:
+                print(f"Error generando link MP Plan de Pago: {mp_err}")
+                log_to_airtable('ERROR', 'Plan de Pago', f'Error generando link MP: {mp_err}')
+
+        # 3. Guardar en Airtable
+        try:
+            plan_pago_table = api.table(BASE_ID, PLAN_PAGO_TABLE_ID)
+            plan_pago_table.create({
+                "Nombre Contribuyente": data.get('nombre'),
+                "Cuota del Plan": int(data.get('cuota_plan')) if data.get('cuota_plan') else None,
+                "Email": data.get('email'),
+                "Monto Total": float(data.get('monto_total')),
+                "Estado": "No Pagado"
+            })
+            log_to_airtable('INFO', 'Plan de Pago', f'Guardado en Airtable para {data.get("nombre")}')
+        except Exception as airtable_err:
+            log_to_airtable('WARNING', 'Plan de Pago', f'Fallo Airtable: {airtable_err}')
+
+        # 4. Enviar Email
+        email_sent = False
+        if data.get('email') and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
+
+                html_content = f"<p>Estimado/a {data.get('nombre')},</p>"
+                html_content += f"<p>Le enviamos el comprobante para el pago de la <strong>Cuota #{data.get('cuota_plan')}</strong> de su Plan de Pago.</p>"
+
+                if mp_link:
+                    html_content += f"""
+                    <br>
+                    <p><strong>Monto a Pagar: ${data.get('monto_total')}</strong></p>
+                    <a href="{mp_link}" style="background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pagar Cuota con Mercado Pago</a>
+                    <br><br>
+                    """
+
+                html_content += "<p>Gracias por su pago.</p>"
+
+                params = {
+                    "from": from_email,
+                    "to": data.get('email'),
+                    "subject": f"Plan de Pago - Cuota #{data.get('cuota_plan')} - Comuna de Villa Traful",
+                    "html": html_content
+                }
+
+                # Solo agregar PDF si se generó exitosamente
+                if pdf_file:
+                    params["attachments"] = [{"filename": f"plan_pago_cuota_{data.get('cuota_plan')}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+
+                resend.Emails.send(params)
+                email_sent = True
+                log_to_airtable('INFO', 'Plan de Pago', f'Email enviado a {data.get("email")}')
+
+                # Guardar contacto en tabla Contactos
+                save_contacto(email=data.get('email'), nombre=data.get('nombre'), origen='Plan de Pago')
+            except Exception as email_error:
+                print(f"ERROR enviando email plan de pago: {email_error}")
+                log_to_airtable('ERROR', 'Plan de Pago', f'Error enviando email a {data.get("email")}: {email_error}')
+
+        # Mensaje de respuesta según lo que funcionó
+        message = "Plan de Pago registrado"
+        if email_sent:
+            message += " y email enviado exitosamente"
+        elif data.get('email'):
+            message += " pero hubo un error al enviar el email"
+
+        if mp_link:
+            message += " (link de pago generado)"
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "email_sent": email_sent,
+            "pdf_generated": pdf_file is not None,
+            "mp_link": mp_link,
+            "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+        })
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Plan de Pago', f'Error procesando plan de pago: {e}')
         return jsonify({"error": str(e)}), 500
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -403,6 +548,9 @@ def registrar_recaudacion():
                 resend.Emails.send(params)
                 email_sent = True
                 log_to_airtable('INFO', 'Recaudacion', f'Email enviado a {data.get("email")}')
+
+                # Guardar contacto en tabla Contactos
+                save_contacto(email=data.get('email'), nombre=data.get('nombre'), origen='Recaudación')
             except Exception as email_error:
                 print(f"ERROR enviando email: {email_error}")
                 log_to_airtable('ERROR', 'Recaudacion', f'Error enviando email a {data.get("email")}: {email_error}')
@@ -533,6 +681,58 @@ def log_to_airtable(level, source, message, related_id=None, details=None):
         # print(f"Log exitoso en Airtable: [{level}] {source}: {message}")
     except Exception as e:
         print(f"ERROR: Falló la escritura de log en Airtable: {e} - Mensaje original: {message}")
+
+def save_contacto(email, nombre=None, origen=None):
+    """
+    Guarda o actualiza un contacto en la tabla Contactos de Airtable
+    - Si el email ya existe: actualiza Ultima Actividad y Origen
+    - Si no existe: crea un nuevo registro
+    """
+    if not api or not email:
+        return
+
+    try:
+        contactos_table = api.table(BASE_ID, CONTACTOS_TABLE_ID)
+        from pyairtable.formulas import match
+
+        # Buscar si el contacto ya existe
+        existing = contactos_table.all(formula=match({"Email": email}))
+
+        now = datetime.now().isoformat()
+
+        if existing:
+            # Actualizar contacto existente
+            record = existing[0]
+            update_fields = {"Ultima Actividad": now}
+
+            # Actualizar nombre si se proporciona y está vacío
+            if nombre and not record['fields'].get('Nombre'):
+                update_fields['Nombre'] = nombre
+
+            # Actualizar origen si se proporciona y es diferente
+            if origen and record['fields'].get('Origen') != origen:
+                update_fields['Origen'] = origen
+
+            contactos_table.update(record['id'], update_fields)
+            log_to_airtable('INFO', 'Contactos', f'Actualizado contacto: {email}')
+        else:
+            # Crear nuevo contacto
+            new_contact = {
+                "Email": email,
+                "Fecha Registro": now,
+                "Ultima Actividad": now
+            }
+            if nombre:
+                new_contact['Nombre'] = nombre
+            if origen:
+                new_contact['Origen'] = origen
+
+            contactos_table.create(new_contact)
+            log_to_airtable('INFO', 'Contactos', f'Nuevo contacto registrado: {email}')
+
+    except Exception as e:
+        print(f"ERROR guardando contacto {email}: {e}")
+        log_to_airtable('ERROR', 'Contactos', f'Error guardando contacto {email}: {e}')
 
 # --- Endpoints ---
 @app.route('/api/search/patente', methods=['GET'])
@@ -1018,7 +1218,25 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                         items_for_pdf.append({"description": f"Pago Patente {items_context.get('dominio')}", "amount": monto_pagado})
                         log_to_airtable('INFO', 'Payment Process', f'Actualizado registro patente {r["id"]} a Pagado (MP Payment ID: {payment_id})')
                         break
-            
+
+            # Caso Especial: Plan de Pago
+            elif items_context.get('type') == 'plan_pago':
+                plan_pago_table = api.table(BASE_ID, PLAN_PAGO_TABLE_ID)
+                # Buscamos por email y cuota del plan
+                records = plan_pago_table.all(formula=match({
+                    "Email": items_context.get('email'),
+                    "Cuota del Plan": items_context.get('cuota_plan'),
+                    "Estado": "No Pagado"
+                }))
+
+                for r in records:
+                    if abs(float(r['fields'].get('Monto Total', 0)) - float(monto_pagado)) < 1.0:
+                        # Actualizar Estado a Pagado
+                        plan_pago_table.update(r['id'], {"Estado": "Pagado"})
+                        items_for_pdf.append({"description": f"Plan de Pago - Cuota {items_context.get('cuota_plan')}", "amount": monto_pagado})
+                        log_to_airtable('INFO', 'Payment Process', f'Actualizado registro plan de pago {r["id"]} a Pagado (MP Payment ID: {payment_id})')
+                        break
+
             # Caso Estándar (Deudas previas)
             elif "record_id" in items_context:
                 record_id_to_update = items_context["record_id"]
@@ -1103,6 +1321,14 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 }
                 resend.Emails.send(params)
                 log_to_airtable('INFO', 'Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
+
+                # Guardar contacto en tabla Contactos
+                save_contacto(
+                    email=items_context.get('email'),
+                    nombre=items_context.get('nombre_contribuyente') or items_context.get('nombre'),
+                    origen='Pago Online'
+                )
+
                 historial_table.update(historial_record['id'], {"Comprobante_Status": f"Enviado a {items_context.get('email')}"})
             elif not items_context.get("email"):
                 log_to_airtable('WARNING', 'Email Service', f'No se envió email de comprobante porque no se proporcionó dirección de correo.', related_id=payment_id)
@@ -1303,34 +1529,43 @@ def admin_get_payments_history():
     if not api: return jsonify({"error": "Airtable no inicializada"}), 500
     try:
         page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
+        per_page = int(request.args.get('per_page', 20))  # Cambiado a 20 registros por página
 
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
-        all_records = historial_table.all(sort=['-Timestamp']) # Ordenar por fecha de creación descendente
+        # Ordenar por Fecha de Transacción descendente (más reciente primero), fallback a Timestamp
+        all_records = historial_table.all(sort=['-Fecha de Transacción', '-Timestamp'])
         total_records = len(all_records)
 
         # Implementar paginación manual
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
         paginated = all_records[start_index:end_index]
-        
+
         payments = []
         for record in paginated:
             fields = record.get('fields', {})
+
+            # El campo Contribuyente es un link, puede ser una lista de IDs o nombres
+            contribuyente = fields.get('Contribuyente', [])
+            contribuyente_str = contribuyente[0] if isinstance(contribuyente, list) and len(contribuyente) > 0 else 'N/A'
+
             payments.append({
                 "id": record.get('id'),
+                "fecha_transaccion": fields.get('Fecha de Transacción', None),
+                "timestamp": fields.get('Timestamp', None),
                 "estado": fields.get('Estado', 'Desconocido'),
+                "mp_payment_id": fields.get('MP_Payment_ID', 'N/A'),
+                "items_pagados_json": fields.get('ItemsPagadosJSON', '[]'),
+                "comprobante_status": fields.get('Comprobante_Status', 'N/A'),
+                "link_comprobante": fields.get('Link Comprobante', 'N/A'),
+                "contribuyente": contribuyente_str,
+                "contribuyente_dni": fields.get('Contribuyente DNI', 'N/A'),
                 "monto": fields.get('Monto', 0),
                 "detalle": fields.get('Detalle', 'N/A'),
-                "mp_payment_id": fields.get('MP_Payment_ID', 'N/A'),
-                "timestamp": fields.get('Timestamp', None), # Usar 'Timestamp' de Airtable
-                "items_pagados_json": fields.get('ItemsPagadosJSON', '[]'),
                 "payment_type": fields.get('Payment_Type', 'N/A'),
-                "contribuyente": fields.get('Contribuyente', 'N/A'), # Nuevo campo
-                "contribuyente_dni": fields.get('Contribuyente DNI', 'N/A'), # Nuevo campo
             })
-        
-        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(payments)} registros de pago (pág {page}/{per_page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
+
+        log_to_airtable('INFO', 'Admin API', f'Recuperados {len(payments)} registros de pago (pág {page}) para administrador.', details={'total_records': total_records, 'current_page': page, 'per_page': per_page})
         return jsonify({"payments": payments, "total_records": total_records})
     except Exception as e:
         log_to_airtable('ERROR', 'Admin API', f'ERROR en admin_get_payments_history: {e}', details={'error_message': str(e), 'query_params': request.args})
@@ -1341,7 +1576,7 @@ def admin_get_access_logs():
     if not api: return jsonify({"error": "Airtable no inicializada"}), 500
     try:
         page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
+        per_page = int(request.args.get('per_page', 20))  # Cambiado a 20
 
         logs_table = api.table(BASE_ID, LOGS_TABLE_ID)
         all_records = logs_table.all(sort=['-Timestamp']) # Obtener todos los registros, ordenados por Timestamp descendente

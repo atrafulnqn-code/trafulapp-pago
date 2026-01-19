@@ -18,8 +18,10 @@ import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
 import PatenteForm from './pages/PatenteForm';
 import LinkMPModule from './pages/LinkMPModule';
+import PlanPagoForm from './pages/PlanPagoForm';
 import StatsLogin from './pages/StatsLogin';
 import StatsDashboard from './pages/StatsDashboard';
+import PlanDePago from './pages/PlanDePago';
 import { useLocation } from 'react-router-dom';
 
 const AppContent: React.FC = () => {
@@ -33,6 +35,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/pagar/:system" element={<PaymentFlow />} />
+          <Route path="/plan-de-pago" element={<PlanDePago />} />
           <Route path="/exito" element={<Success />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -48,6 +51,7 @@ const AppContent: React.FC = () => {
           <Route path="/staff/recaudacion" element={<RecaudacionForm />} />
           <Route path="/staff/patente" element={<PatenteForm />} />
           <Route path="/staff/link-mp" element={<LinkMPModule />} />
+          <Route path="/staff/plan-pago" element={<PlanPagoForm />} />
         </Routes>
       </main>
       {!isAdminPath && <Footer />}

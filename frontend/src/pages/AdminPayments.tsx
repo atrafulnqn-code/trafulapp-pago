@@ -6,15 +6,18 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1000
 
 interface PaymentRecord {
     id: string;
+    fecha_transaccion: string;
+    timestamp: string;
     estado: string;
+    mp_payment_id: string;
+    items_pagados_json: string;
+    comprobante_status: string;
+    link_comprobante: string;
+    contribuyente: string;
+    contribuyente_dni: string;
     monto: number;
     detalle: string;
-    mp_payment_id: string;
-    timestamp: string;
-    items_pagados_json: string;
     payment_type: string;
-    contribuyente?: string; // Nuevo campo opcional
-    contribuyente_dni?: string; // Nuevo campo opcional
 }
 
 const AdminPayments: React.FC = () => {
@@ -22,9 +25,48 @@ const AdminPayments: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState<number>(1);
-    const [perPage] = useState<number>(10); // Registros por página
+    const [perPage] = useState<number>(20); // Registros por página
     const [totalPages, setTotalPages] = useState<number>(0);
     const navigate = useNavigate();
+
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = [];
+        const maxVisible = 7; // Máximo de números de página visibles
+
+        if (totalPages <= maxVisible) {
+            // Mostrar todas las páginas si son pocas
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            // Mostrar páginas alrededor de la actual
+            const leftSide = currentPage - 2;
+            const rightSide = currentPage + 2;
+
+            // Siempre mostrar primera página
+            pages.push(1);
+
+            if (leftSide > 2) {
+                pages.push('...');
+            }
+
+            // Páginas alrededor de la actual
+            for (let i = Math.max(2, leftSide); i <= Math.min(totalPages - 1, rightSide); i++) {
+                pages.push(i);
+            }
+
+            if (rightSide < totalPages - 1) {
+                pages.push('...');
+            }
+
+            // Siempre mostrar última página
+            if (totalPages > 1) {
+                pages.push(totalPages);
+            }
+        }
+
+        return pages;
+    };
 
     useEffect(() => {
         const fetchPayments = async () => {
@@ -103,32 +145,63 @@ const AdminPayments: React.FC = () => {
                                 <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
                                     <thead className="bg-light">
                                         <tr>
-                                            <th>Fecha</th><th>Estado</th><th>Tipo</th><th>Contribuyente</th><th>DNI</th><th>Detalle</th><th>Conceptos</th><th>ID MP</th><th className="text-end">Monto</th><th>Acción</th>
+                                            <th>Fecha de Transacción</th>
+                                            <th>Estado</th>
+                                            <th>MP Payment ID</th>
+                                            <th>Contribuyente</th>
+                                            <th>DNI</th>
+                                            <th>Conceptos Pagados</th>
+                                            <th>Comprobante Status</th>
+                                            <th className="text-end">Monto</th>
+                                            <th>Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {payments.length === 0 ? (
                                             <tr>
-                                                <td colSpan={10} className="text-center py-3">No se encontraron registros.</td>
+                                                <td colSpan={9} className="text-center py-3">No se encontraron registros.</td>
                                             </tr>
                                         ) : (
                                             payments.map((payment) => (
                                                 <tr key={payment.id}>
                                                     <td>
-                                                        {payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR') : '-'}
+                                                        {payment.fecha_transaccion ? new Date(payment.fecha_transaccion).toLocaleString('es-AR', {
+                                                            year: 'numeric',
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        }) : (payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
+                                                            year: 'numeric',
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        }) : '-')}
                                                     </td>
-                                                    <td><span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : 'secondary'}`}>{payment.estado}</span></td>
-                                                    <td>{payment.payment_type}</td>
-                                                    <td>{payment.contribuyente || '-'}</td>
-                                                    <td>{payment.contribuyente_dni || '-'}</td>
-                                                    <td className="text-truncate" style={{maxWidth: '200px'}} title={payment.detalle}>{payment.detalle}</td>
-                                                    <td className="text-truncate" style={{maxWidth: '200px'}} title={parseItemsPagados(payment.items_pagados_json)}>{parseItemsPagados(payment.items_pagados_json)}</td>
-                                                    <td className="font-monospace">{payment.mp_payment_id}</td>
+                                                    <td>
+                                                        <span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : payment.estado.includes('Fallido') ? 'danger' : 'secondary'}`}>
+                                                            {payment.estado}
+                                                        </span>
+                                                    </td>
+                                                    <td className="font-monospace small">{payment.mp_payment_id}</td>
+                                                    <td>{payment.contribuyente !== 'N/A' ? payment.contribuyente : '-'}</td>
+                                                    <td>{payment.contribuyente_dni !== 'N/A' ? payment.contribuyente_dni : '-'}</td>
+                                                    <td className="text-truncate" style={{maxWidth: '250px'}} title={parseItemsPagados(payment.items_pagados_json)}>
+                                                        {parseItemsPagados(payment.items_pagados_json) || '-'}
+                                                    </td>
+                                                    <td className="small">{payment.comprobante_status !== 'N/A' ? payment.comprobante_status : '-'}</td>
                                                     <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                     <td>
-                                                        {payment.mp_payment_id && payment.mp_payment_id.startsWith('SIM_') && (
-                                                            <Button variant="outline-info" size="sm" className="py-0" onClick={() => navigate(`/exito`, { state: { paymentId: payment.mp_payment_id }})}>
-                                                                Ver
+                                                        {payment.link_comprobante && payment.link_comprobante !== 'N/A' && (
+                                                            <Button
+                                                                variant="outline-primary"
+                                                                size="sm"
+                                                                className="py-0"
+                                                                href={payment.link_comprobante}
+                                                                target="_blank"
+                                                            >
+                                                                Ver Comprobante
                                                             </Button>
                                                         )}
                                                     </td>
@@ -143,14 +216,18 @@ const AdminPayments: React.FC = () => {
                                         <Pagination>
                                             <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
                                             <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                                            {[...Array(totalPages)].map((_, index) => (
-                                                <Pagination.Item 
-                                                    key={index + 1} 
-                                                    active={index + 1 === currentPage} 
-                                                    onClick={() => handlePageChange(index + 1)}
-                                                >
-                                                    {index + 1}
-                                                </Pagination.Item>
+                                            {getPageNumbers().map((page, index) => (
+                                                page === '...' ? (
+                                                    <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                                ) : (
+                                                    <Pagination.Item
+                                                        key={page}
+                                                        active={page === currentPage}
+                                                        onClick={() => handlePageChange(page as number)}
+                                                    >
+                                                        {page}
+                                                    </Pagination.Item>
+                                                )
                                             ))}
                                             <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
                                             <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
