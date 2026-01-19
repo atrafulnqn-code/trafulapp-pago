@@ -1225,7 +1225,7 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 # Buscamos por email y cuota del plan
                 records = plan_pago_table.all(formula=match({
                     "Email": items_context.get('email'),
-                    "Cuota del Plan": items_context.get('cuota_plan'),
+                    "Cuota del Plan": items_context.get('cuota'),  # Corregido: usar 'cuota' en vez de 'cuota_plan'
                     "Estado": "No Pagado"
                 }))
 
@@ -1233,7 +1233,7 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                     if abs(float(r['fields'].get('Monto Total', 0)) - float(monto_pagado)) < 1.0:
                         # Actualizar Estado a Pagado
                         plan_pago_table.update(r['id'], {"Estado": "Pagado"})
-                        items_for_pdf.append({"description": f"Plan de Pago - Cuota {items_context.get('cuota_plan')}", "amount": monto_pagado})
+                        items_for_pdf.append({"description": f"Plan de Pago - Cuota {items_context.get('cuota')}", "amount": monto_pagado})
                         log_to_airtable('INFO', 'Payment Process', f'Actualizado registro plan de pago {r["id"]} a Pagado (MP Payment ID: {payment_id})')
                         break
 
