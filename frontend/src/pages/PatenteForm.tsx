@@ -30,6 +30,7 @@ const PatenteForm: React.FC = () => {
     marca: '',
     modelo: '',
     anio: '',
+    comentarios: '',
     monto: '',
     descuento: 0,
     email: '',
@@ -91,7 +92,7 @@ const PatenteForm: React.FC = () => {
         }
         
         // Reset form parcial
-        setFormData({ ...formData, nombre: '', patente: '', marca: '', modelo: '', anio: '', monto: '', descuento: 0, email: '', transferencia: '' });
+        setFormData({ ...formData, nombre: '', patente: '', marca: '', modelo: '', anio: '', comentarios: '', monto: '', descuento: 0, email: '', transferencia: '' });
       } else {
         setStatus({ type: 'danger', msg: `Error: ${data.error || 'No se pudo registrar.'}` });
       }
@@ -152,11 +153,19 @@ const PatenteForm: React.FC = () => {
                 </Form.Group>
               </Col>
             </Row>
-            <Row className="mb-4">
+            <Row className="mb-3">
                <Col md={4}>
                 <Form.Group controlId="anio">
                   <Form.Label>Año</Form.Label>
                   <Form.Control type="number" name="anio" value={formData.anio} onChange={handleChange} required min="1900" max="2100" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row className="mb-4">
+              <Col md={12}>
+                <Form.Group controlId="comentarios">
+                  <Form.Label>Comentarios</Form.Label>
+                  <Form.Control as="textarea" rows={3} name="comentarios" value={formData.comentarios} onChange={handleChange} placeholder="Agregue comentarios adicionales (opcional)" />
                 </Form.Group>
               </Col>
             </Row>

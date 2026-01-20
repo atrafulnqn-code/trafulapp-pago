@@ -158,9 +158,12 @@ def registrar_patente_manual():
             {"description": f"Vehículo: {data.get('marca')} {data.get('modelo')} ({data.get('anio')})", "amount": 0}, # Informativo
             {"description": "Pago de Patente Automotor", "amount": float(data.get('monto') or 0)}
         ]
-        
+
         if data.get('descuento') and float(data.get('descuento')) > 0:
              items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (float(data.get('monto')) - float(data.get('total_final')))})
+
+        if data.get('comentarios'):
+            items_pdf.append({"description": f"Comentarios: {data.get('comentarios')}", "amount": 0})
 
         pdf_details = {
             "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
@@ -216,6 +219,8 @@ def registrar_patente_manual():
             }
             if pdf_id:
                 record_data["PDF_ID"] = pdf_id
+            if data.get('comentarios'):
+                record_data["Comentarios"] = data.get('comentarios')
             patente_table.create(record_data)
         except Exception as airtable_err:
             log_to_airtable('WARNING', 'Patente Manual', f'Fallo Airtable: {airtable_err}')
@@ -733,6 +738,9 @@ def registrar_patente_efectivo():
             descuento_monto = float(data.get('monto', 0)) * (float(data.get('descuento')) / 100)
             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * descuento_monto})
 
+        if data.get('comentarios'):
+            items_pdf.append({"description": f"Comentarios: {data.get('comentarios')}", "amount": 0})
+
         pdf_details = {
             "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "ESTADO_PAGO": "Pagado en Efectivo",
@@ -765,6 +773,8 @@ def registrar_patente_efectivo():
                 "Patente": data.get('patente', '').upper(),
                 "Operador": data.get('administrativo')
             }
+            if data.get('comentarios'):
+                record_data["Comentarios"] = data.get('comentarios')
             efectivo_table.create(record_data)
             log_to_airtable('INFO', 'Patente Efectivo', f'Guardado en tabla Efectivo para patente {data.get("patente")}')
         except Exception as airtable_err:
