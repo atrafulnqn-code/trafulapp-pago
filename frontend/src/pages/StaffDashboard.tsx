@@ -196,6 +196,33 @@ const StaffDashboard: React.FC = () => {
             </Card.Body>
           </Card>
         </Col>
+
+        {/* Módulo Pagos Efectivo */}
+        <Col>
+          <Card
+            className="h-100 shadow-sm border-0 hover-shadow transition-all"
+            style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+            onClick={() => navigate('/staff/pagos-efectivo')}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Card.Body className="text-center p-4">
+              <div className="text-success mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-cash-stack" viewBox="0 0 16 16">
+                  <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+                  <path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z"/>
+                </svg>
+              </div>
+              <Card.Title className="fw-bold">Pagos Efectivo</Card.Title>
+              <Card.Text className="text-muted small">
+                Registro de pagos presenciales en efectivo ya realizados.
+              </Card.Text>
+              <div className="mt-3">
+                <Button variant="success" size="sm">Registrar</Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
       </Row>
     </Container>
   );

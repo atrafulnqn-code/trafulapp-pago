@@ -13,6 +13,7 @@ import resend
 from datetime import datetime
 import base64
 import hashlib
+import uuid
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
@@ -82,6 +83,7 @@ PLAN_PAGO_TABLE_ID = os.getenv("PLAN_PAGO_TABLE_ID", "tblMNNvOBuqQiCFqC")
 CONTACTOS_TABLE_ID = os.getenv("CONTACTOS_TABLE_ID", "tbl1ZcfxyaJtXPdPl")
 ACCESOS_PERSONAL_TABLE_ID = os.getenv("ACCESOS_PERSONAL_TABLE_ID", "tblAILbaYmnWkkPiV")
 WATER_TABLE_ID = "tblTgcF3XczjkpK3H" # ID de la tabla de Agua
+EFECTIVO_TABLE_ID = os.getenv("EFECTIVO_TABLE_ID", "tblXqPkaVnF9GHGdI") # ID de la tabla de Pagos Efectivo
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("BACKEND_URL", "http://localhost:10000")
@@ -172,8 +174,9 @@ def registrar_patente_manual():
 
         # Intentar generar PDF - si falla, no bloquea el flujo
         pdf_file = None
+        pdf_id = None
         try:
-            pdf_file = create_receipt_pdf(pdf_details)
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
         except Exception as pdf_error:
             print(f"ERROR generando PDF en patente: {pdf_error}")
             log_to_airtable('ERROR', 'Patente Manual', f'Error generando PDF: {pdf_error}')
@@ -199,7 +202,7 @@ def registrar_patente_manual():
         # 2. Guardar en Airtable
         try:
             patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
-            patente_table.create({
+            record_data = {
                 "Fecha": data.get('fecha'),
                 "Contribuyente": data.get('nombre'),
                 "Dominio": data.get('patente', '').upper(),
@@ -210,7 +213,10 @@ def registrar_patente_manual():
                 "Operador": data.get('administrativo'),
                 "Estado Pago": "Pendiente",
                 "MP Preference ID": mp_id
-            })
+            }
+            if pdf_id:
+                record_data["PDF_ID"] = pdf_id
+            patente_table.create(record_data)
         except Exception as airtable_err:
             log_to_airtable('WARNING', 'Patente Manual', f'Fallo Airtable: {airtable_err}')
 
@@ -304,8 +310,9 @@ def registrar_plan_pago():
 
         # Intentar generar PDF - si falla, no bloquea el flujo
         pdf_file = None
+        pdf_id = None
         try:
-            pdf_file = create_receipt_pdf(pdf_details)
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
         except Exception as pdf_error:
             print(f"ERROR generando PDF en plan de pago: {pdf_error}")
             log_to_airtable('ERROR', 'Plan de Pago', f'Error generando PDF: {pdf_error}')
@@ -337,13 +344,16 @@ def registrar_plan_pago():
         # 3. Guardar en Airtable
         try:
             plan_pago_table = api.table(BASE_ID, PLAN_PAGO_TABLE_ID)
-            plan_pago_table.create({
+            record_data = {
                 "Nombre Contribuyente": data.get('nombre'),
                 "Cuota del Plan": data.get('cuota_plan'),  # Guardar como texto (ej: "1/6")
                 "Email": data.get('email'),
                 "Monto Total": float(data.get('monto_total')),
                 "Estado": "No Pagado"
-            })
+            }
+            if pdf_id:
+                record_data["PDF_ID"] = pdf_id
+            plan_pago_table.create(record_data)
             log_to_airtable('INFO', 'Plan de Pago', f'Guardado en Airtable para {data.get("nombre")}')
         except Exception as airtable_err:
             log_to_airtable('WARNING', 'Plan de Pago', f'Fallo Airtable: {airtable_err}')
@@ -462,8 +472,9 @@ def registrar_recaudacion():
 
         # Intentar generar PDF - si falla, no bloquea el flujo
         pdf_file = None
+        pdf_id = None
         try:
-            pdf_file = create_receipt_pdf(pdf_details)
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
         except Exception as pdf_error:
             print(f"ERROR generando PDF en recaudación: {pdf_error}")
             log_to_airtable('ERROR', 'Recaudacion', f'Error generando PDF: {pdf_error}')
@@ -494,7 +505,7 @@ def registrar_recaudacion():
             }
             recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
 
-            record = recaudacion_table.create({
+            record_data = {
                 "Fecha": data.get('fecha'),
                 "Contribuyente": data.get('nombre'),
                 "Email": data.get('email'),
@@ -502,7 +513,10 @@ def registrar_recaudacion():
                 "Detalle JSON": json.dumps(detalle_completo),
                 "Operador": data.get('administrativa'),
                 "Estado Pago": "Pendiente"
-            })
+            }
+            if pdf_id:
+                record_data["PDF_ID"] = pdf_id
+            record = recaudacion_table.create(record_data)
             
             # Actualizar external_reference con el ID de airtable para el webhook
             if mp_id:
@@ -578,6 +592,240 @@ def registrar_recaudacion():
         log_to_airtable('ERROR', 'Recaudacion', f'Error procesando recaudación: {e}')
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/recaudacion_efectivo', methods=['POST'])
+@cross_origin()
+def registrar_recaudacion_efectivo():
+    log_to_airtable('INFO', 'Recaudacion Efectivo', 'Recibida nueva recaudación en efectivo', details={'ip': request.remote_addr})
+
+    if not api:
+        return jsonify({"error": "Error de configuración: Airtable no conectado"}), 500
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Sin datos"}), 400
+
+        # 1. Generar PDF del recibo
+        items_pdf = []
+        notas = data.get('notas', {})
+        for key, val in data.get('importes', {}).items():
+            monto = float(val)
+            if monto > 0:
+                label = key.replace('_', ' ').capitalize()
+                if notas.get(key):
+                    label += f" ({notas.get(key)})"
+                items_pdf.append({"description": label, "amount": monto})
+
+        if data.get('descuento') and float(data.get('descuento')) > 0:
+             items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * (float(data.get('total')) - float(data.get('total_final')))})
+
+        pdf_details = {
+            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "ESTADO_PAGO": "Pagado en Efectivo",
+            "ID_PAGO_MP": f"EFEC-{int(datetime.now().timestamp())}",
+            "NOMBRE_PAGADOR": data.get('nombre'),
+            "IDENTIFICADOR_PAGADOR": data.get('email'),
+            "items": items_pdf,
+            "MONTO_TOTAL": data.get('total_final')
+        }
+
+        # Generar PDF
+        pdf_file = None
+        pdf_id = None
+        try:
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
+        except Exception as pdf_error:
+            print(f"ERROR generando PDF en recaudación efectivo: {pdf_error}")
+            log_to_airtable('ERROR', 'Recaudacion Efectivo', f'Error generando PDF: {pdf_error}')
+
+        # 2. Guardar en tabla Efectivo
+        try:
+            efectivo_table = api.table(BASE_ID, EFECTIVO_TABLE_ID)
+            record_data = {
+                "PDF_ID": pdf_id if pdf_id else f"EFEC-{int(datetime.now().timestamp())}",
+                "Fecha y Hora": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                "Total": float(data.get('total_final')),
+                "Tipo": "Recaudación",
+                "Contribuyente": data.get('nombre'),
+                "Email": data.get('email'),
+                "Operador": data.get('administrativa')
+            }
+            efectivo_table.create(record_data)
+            log_to_airtable('INFO', 'Recaudacion Efectivo', f'Guardado en tabla Efectivo para {data.get("nombre")}')
+        except Exception as airtable_err:
+            print(f"Advertencia: No se pudo guardar en tabla Efectivo ({airtable_err}).")
+            log_to_airtable('WARNING', 'Recaudacion Efectivo', f'Fallo al guardar en tabla Efectivo: {airtable_err}')
+
+        # 3. Enviar Email (solo PDF, sin link de pago)
+        email_sent = False
+        if data.get('email') and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
+
+                html_content = f"""
+                <p>Estimado/a {data.get('nombre')},</p>
+                <p>Adjuntamos el comprobante de pago en efectivo realizado el {data.get('fecha')}.</p>
+                <p><strong>Total Pagado: ${data.get('total_final')}</strong></p>
+                <p>Gracias por su contribución.</p>
+                <p style="color: #666; font-size: 12px; margin-top: 20px;">
+                    Comuna de Villa Traful - Provincia de Neuquén<br>
+                    CUIT: 30-67297005-5. Laffitte 0 . Villa Traful
+                </p>
+                """
+
+                params = {
+                    "from": from_email,
+                    "to": data.get('email'),
+                    "subject": "Comprobante de Pago en Efectivo - Comuna de Villa Traful",
+                    "html": html_content
+                }
+
+                if pdf_file:
+                    params["attachments"] = [{"filename": "comprobante_pago_efectivo.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+
+                resend.Emails.send(params)
+                email_sent = True
+                log_to_airtable('INFO', 'Recaudacion Efectivo', f'Email enviado a {data.get("email")}')
+
+                save_contacto(email=data.get('email'), nombre=data.get('nombre'), origen='Pago Efectivo - Recaudación')
+            except Exception as email_error:
+                print(f"ERROR enviando email: {email_error}")
+                log_to_airtable('ERROR', 'Recaudacion Efectivo', f'Error enviando email: {email_error}')
+
+        message = "Pago en efectivo registrado"
+        if email_sent:
+            message += " y comprobante enviado por email exitosamente"
+        elif data.get('email'):
+            message += " pero hubo un error al enviar el email"
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "email_sent": email_sent,
+            "pdf_generated": pdf_file is not None,
+            "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+        })
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Recaudacion Efectivo', f'Error procesando recaudación efectivo: {e}')
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/patente_efectivo', methods=['POST'])
+@cross_origin()
+def registrar_patente_efectivo():
+    log_to_airtable('INFO', 'Patente Efectivo', 'Recibido nuevo pago de patente en efectivo', details={'ip': request.remote_addr})
+
+    if not api:
+        return jsonify({"error": "Error de configuración: Airtable no conectado"}), 500
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "Sin datos"}), 400
+
+        # 1. Generar PDF del recibo
+        items_pdf = [
+            {"description": f"Patente {data.get('patente', '').upper()}", "amount": float(data.get('monto', 0))},
+            {"description": f"{data.get('marca')} {data.get('modelo')} ({data.get('anio')})", "amount": 0}
+        ]
+
+        if data.get('descuento') and float(data.get('descuento')) > 0:
+            descuento_monto = float(data.get('monto', 0)) * (float(data.get('descuento')) / 100)
+            items_pdf.append({"description": f"Descuento ({data.get('descuento')}%)", "amount": -1 * descuento_monto})
+
+        pdf_details = {
+            "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "ESTADO_PAGO": "Pagado en Efectivo",
+            "ID_PAGO_MP": f"EFEC-PAT-{int(datetime.now().timestamp())}",
+            "NOMBRE_PAGADOR": data.get('nombre'),
+            "IDENTIFICADOR_PAGADOR": data.get('email'),
+            "items": items_pdf,
+            "MONTO_TOTAL": data.get('total_final')
+        }
+
+        # Generar PDF
+        pdf_file = None
+        pdf_id = None
+        try:
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
+        except Exception as pdf_error:
+            print(f"ERROR generando PDF en patente efectivo: {pdf_error}")
+            log_to_airtable('ERROR', 'Patente Efectivo', f'Error generando PDF: {pdf_error}')
+
+        # 2. Guardar en tabla Efectivo
+        try:
+            efectivo_table = api.table(BASE_ID, EFECTIVO_TABLE_ID)
+            record_data = {
+                "PDF_ID": pdf_id if pdf_id else f"EFEC-PAT-{int(datetime.now().timestamp())}",
+                "Fecha y Hora": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                "Total": float(data.get('total_final')),
+                "Tipo": "Patente",
+                "Contribuyente": data.get('nombre'),
+                "Email": data.get('email'),
+                "Patente": data.get('patente', '').upper(),
+                "Operador": data.get('administrativo')
+            }
+            efectivo_table.create(record_data)
+            log_to_airtable('INFO', 'Patente Efectivo', f'Guardado en tabla Efectivo para patente {data.get("patente")}')
+        except Exception as airtable_err:
+            print(f"Advertencia: No se pudo guardar en tabla Efectivo ({airtable_err}).")
+            log_to_airtable('WARNING', 'Patente Efectivo', f'Fallo al guardar en tabla Efectivo: {airtable_err}')
+
+        # 3. Enviar Email (solo PDF, sin link de pago)
+        email_sent = False
+        if data.get('email') and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com")
+
+                html_content = f"""
+                <p>Estimado/a {data.get('nombre')},</p>
+                <p>Adjuntamos el comprobante de pago en efectivo de la patente <strong>{data.get('patente', '').upper()}</strong> realizado el {data.get('fecha')}.</p>
+                <p><strong>Vehículo:</strong> {data.get('marca')} {data.get('modelo')} ({data.get('anio')})</p>
+                <p><strong>Total Pagado: ${data.get('total_final')}</strong></p>
+                <p>Gracias por su contribución.</p>
+                <p style="color: #666; font-size: 12px; margin-top: 20px;">
+                    Comuna de Villa Traful - Provincia de Neuquén<br>
+                    CUIT: 30-67297005-5. Laffitte 0 . Villa Traful
+                </p>
+                """
+
+                params = {
+                    "from": from_email,
+                    "to": data.get('email'),
+                    "subject": f"Comprobante de Pago Patente {data.get('patente', '').upper()} - Comuna de Villa Traful",
+                    "html": html_content
+                }
+
+                if pdf_file:
+                    params["attachments"] = [{"filename": f"comprobante_patente_{data.get('patente')}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+
+                resend.Emails.send(params)
+                email_sent = True
+                log_to_airtable('INFO', 'Patente Efectivo', f'Email enviado a {data.get("email")}')
+
+                save_contacto(email=data.get('email'), nombre=data.get('nombre'), origen='Pago Efectivo - Patente')
+            except Exception as email_error:
+                print(f"ERROR enviando email: {email_error}")
+                log_to_airtable('ERROR', 'Patente Efectivo', f'Error enviando email: {email_error}')
+
+        message = "Pago en efectivo de patente registrado"
+        if email_sent:
+            message += " y comprobante enviado por email exitosamente"
+        elif data.get('email'):
+            message += " pero hubo un error al enviar el email"
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "email_sent": email_sent,
+            "pdf_generated": pdf_file is not None,
+            "pdf_base64": base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+        })
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Patente Efectivo', f'Error procesando patente efectivo: {e}')
+        return jsonify({"error": str(e)}), 500
+
 # Inicializar las SDKs de forma segura
 api = None
 try:
@@ -612,8 +860,12 @@ except Exception as e:
 
 
 # --- Funciones Auxiliares de PDF y Email ---
-def create_receipt_pdf(payment_details):
+def create_receipt_pdf(payment_details, pdf_id=None):
     try:
+        # Generar ID único para este PDF si no se proporciona uno
+        if not pdf_id:
+            pdf_id = str(uuid.uuid4())
+        print(f"DEBUG PDF: Generado ID único para PDF: {pdf_id}")
         print(f"DEBUG PDF: Iniciando generación de PDF con datos: {payment_details}")
 
         # Usar ruta absoluta para encontrar el template
@@ -636,7 +888,8 @@ def create_receipt_pdf(payment_details):
             items_html += f"<tr><td>{item.get('description', '')}</td><td style='text-align: right;'>${item.get('amount', 0)}</td></tr>"
         print(f"DEBUG PDF: Items HTML generados: {items_html}")
 
-        html_filled = html_template.replace("{{FECHA_PAGO}}", payment_details.get("FECHA_PAGO", datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+        html_filled = html_template.replace("{{PDF_ID}}", pdf_id)
+        html_filled = html_filled.replace("{{FECHA_PAGO}}", payment_details.get("FECHA_PAGO", datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
         html_filled = html_filled.replace("{{ESTADO_PAGO}}", payment_details.get("ESTADO_PAGO", "N/A"))
         html_filled = html_filled.replace("{{ID_PAGO_MP}}", str(payment_details.get("ID_PAGO_MP", "N/A")))
         html_filled = html_filled.replace("{{NOMBRE_PAGADOR}}", str(payment_details.get("NOMBRE_PAGADOR", "N/A")))
@@ -652,13 +905,13 @@ def create_receipt_pdf(payment_details):
         html_doc.write_pdf(target=pdf_file)
         pdf_file.seek(0)
         print(f"DEBUG PDF: PDF generado exitosamente, tamaño: {len(pdf_file.getvalue())} bytes")
-        return pdf_file
+        return pdf_file, pdf_id
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         print(f"ERROR generando PDF: {e}")
         print(f"ERROR PDF Traceback: {error_trace}")
-        return None
+        return None, None
 
 def log_to_airtable(level, source, message, related_id=None, details=None):
     if not api:
@@ -1311,7 +1564,12 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
                 "items": items_for_pdf,
                 "MONTO_TOTAL": monto_pagado
             }
-            pdf_file = create_receipt_pdf(pdf_details)
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details)
+
+            # Guardar PDF_ID en historial si se generó exitosamente
+            if pdf_id:
+                historial_table.update(historial_record['id'], {"PDF_ID": pdf_id})
+
             if pdf_file and items_context.get("email"):
                 params = {
                     "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"), "to": items_context.get("email"),
@@ -1420,6 +1678,10 @@ def get_receipt(historial_record_id):
         historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
         record = historial_table.get(historial_record_id)
         items_for_pdf = json.loads(record['fields'].get('ItemsPagadosJSON', '[]'))
+
+        # Obtener PDF_ID existente si hay uno guardado
+        existing_pdf_id = record['fields'].get('PDF_ID')
+
         payment_details = {
             "FECHA_PAGO": record['fields'].get('Timestamp', datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
             "ESTADO_PAGO": record['fields'].get('Estado', 'Desconocido'),
@@ -1427,7 +1689,14 @@ def get_receipt(historial_record_id):
             "items": items_for_pdf,
             "MONTO_TOTAL": record['fields'].get('Monto', 0)
         }
-        pdf_file = create_receipt_pdf(pdf_details)
+
+        # Reutilizar PDF_ID existente o generar uno nuevo
+        pdf_file, pdf_id = create_receipt_pdf(payment_details, pdf_id=existing_pdf_id)
+
+        # Si se generó un nuevo PDF_ID, guardarlo en Airtable
+        if pdf_file and pdf_id and not existing_pdf_id:
+            historial_table.update(historial_record_id, {"PDF_ID": pdf_id})
+
         if pdf_file:
             return send_file(pdf_file, mimetype='application/pdf', as_attachment=True, download_name=f"comprobante_{historial_record_id}.pdf")
         return "Error al generar el PDF.", 500

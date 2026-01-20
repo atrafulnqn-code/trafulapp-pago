@@ -19,6 +19,9 @@ import RecaudacionForm from './pages/RecaudacionForm';
 import PatenteForm from './pages/PatenteForm';
 import LinkMPModule from './pages/LinkMPModule';
 import PlanPagoForm from './pages/PlanPagoForm';
+import PagosEfectivoDashboard from './pages/PagosEfectivoDashboard';
+import RecaudacionEfectivo from './pages/RecaudacionEfectivo';
+import PatenteEfectivo from './pages/PatenteEfectivo';
 import StatsLogin from './pages/StatsLogin';
 import StatsDashboard from './pages/StatsDashboard';
 import PlanDePago from './pages/PlanDePago';
@@ -52,6 +55,9 @@ const AppContent: React.FC = () => {
           <Route path="/staff/patente" element={<PatenteForm />} />
           <Route path="/staff/link-mp" element={<LinkMPModule />} />
           <Route path="/staff/plan-pago" element={<PlanPagoForm />} />
+          <Route path="/staff/pagos-efectivo" element={<PagosEfectivoDashboard />} />
+          <Route path="/staff/pagos-efectivo/recaudacion" element={<RecaudacionEfectivo />} />
+          <Route path="/staff/pagos-efectivo/patente" element={<PatenteEfectivo />} />
         </Routes>
       </main>
       {!isAdminPath && <Footer />}
