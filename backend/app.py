@@ -194,7 +194,11 @@ def registrar_patente_manual():
                     "back_urls": {"success": f"{FRONTEND_URL}/exito", "failure": FRONTEND_URL, "pending": FRONTEND_URL},
                     "auto_return": "approved",
                     "notification_url": f"{BACKEND_URL}/api/payment_webhook",
-                    "external_reference": json.dumps({"type": "patente_manual", "email": data.get('email'), "dominio": data.get('patente').upper()})
+                    "external_reference": json.dumps({"type": "patente_manual", "email": data.get('email'), "dominio": data.get('patente').upper()}),
+                    "payer": {
+                        "name": data.get('nombre'),
+                        "email": data.get('email')
+                    }
                 }
                 preference_response = sdk.preference().create(preference_data)
                 mp_link = preference_response["response"]["init_point"]
@@ -337,7 +341,11 @@ def registrar_plan_pago():
                         "email": data.get('email'),
                         "nombre": data.get('nombre'),
                         "cuota": data.get('cuota_plan')
-                    })
+                    }),
+                    "payer": {
+                        "name": data.get('nombre'),
+                        "email": data.get('email')
+                    }
                 }
                 preference_response = sdk.preference().create(preference_data)
                 mp_link = preference_response["response"]["init_point"]
@@ -494,7 +502,11 @@ def registrar_recaudacion():
                     "back_urls": {"success": f"{FRONTEND_URL}/exito", "failure": FRONTEND_URL, "pending": FRONTEND_URL},
                     "auto_return": "approved",
                     "notification_url": f"{BACKEND_URL}/api/payment_webhook",
-                    "external_reference": json.dumps({"type": "recaudacion_manual", "email": data.get('email')}) 
+                    "external_reference": json.dumps({"type": "recaudacion_manual", "email": data.get('email')}),
+                    "payer": {
+                        "name": data.get('nombre'),
+                        "email": data.get('email')
+                    }
                 }
                 preference_response = sdk.preference().create(preference_data)
                 mp_link = preference_response["response"]["init_point"]
@@ -1172,7 +1184,11 @@ def create_preference():
             "items": [{"title": title, "quantity": 1, "unit_price": float(unit_price)}],
             "back_urls": {"success": FRONTEND_URL, "failure": FRONTEND_URL, "pending": FRONTEND_URL},
             "notification_url": f"{BACKEND_URL}/api/payment_webhook",
-            "external_reference": external_reference
+            "external_reference": external_reference,
+            "payer": {
+                "name": items_to_pay.get('nombre_contribuyente'),
+                "email": items_to_pay.get('email')
+            }
         }
 
         # Solo agregar auto_return si NO es localhost (Mercado Pago no acepta localhost con auto_return)
