@@ -59,11 +59,15 @@ const RecaudacionEfectivo: React.FC = () => {
       }
       return acc;
     }, 0);
-    setTotal(suma);
+    // Redondear correctamente a 2 decimales para evitar errores de precisión
+    const sumaRedondeada = Math.round(suma * 100) / 100;
+    setTotal(sumaRedondeada);
 
     const desc = parseFloat(formData.descuento) || 0;
-    const final = suma - (suma * (desc / 100));
-    setTotalFinal(final);
+    const final = sumaRedondeada - (sumaRedondeada * (desc / 100));
+    // Redondear el total final también
+    const finalRedondeado = Math.round(final * 100) / 100;
+    setTotalFinal(finalRedondeado);
   }, [importes, formData.descuento, seleccionados]);
 
   const handleCheckboxChange = (id: string) => {
