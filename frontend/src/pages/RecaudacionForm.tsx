@@ -53,22 +53,25 @@ const RecaudacionForm: React.FC = () => {
 
   // Calcular totales cuando cambian importes, descuento o selección
   useEffect(() => {
-    const suma = Object.entries(importes).reduce((acc: number, [key, val]: [string, any]) => {
+    // Convertir a centavos (enteros) para evitar errores de punto flotante
+    const sumaCentavos = Object.entries(importes).reduce((acc: number, [key, val]: [string, any]) => {
       // Solo sumar si está seleccionado
       if (seleccionados.includes(key)) {
-        return acc + (parseFloat(val) || 0);
+        const centavos = Math.round((parseFloat(val) || 0) * 100);
+        return acc + centavos;
       }
       return acc;
     }, 0);
-    // Redondear correctamente a 2 decimales para evitar errores de precisión
-    const sumaRedondeada = Math.round(suma * 100) / 100;
-    setTotal(sumaRedondeada);
+    // Convertir centavos de vuelta a pesos
+    const suma = sumaCentavos / 100;
+    setTotal(suma);
 
     const desc = parseFloat(formData.descuento) || 0;
-    const final = sumaRedondeada - (sumaRedondeada * (desc / 100));
-    // Redondear el total final también
-    const finalRedondeado = Math.round(final * 100) / 100;
-    setTotalFinal(finalRedondeado);
+    // Calcular descuento en centavos también
+    const descuentoCentavos = Math.round(sumaCentavos * (desc / 100));
+    const finalCentavos = sumaCentavos - descuentoCentavos;
+    const final = finalCentavos / 100;
+    setTotalFinal(final);
   }, [importes, formData.descuento, seleccionados]);
 
   const handleCheckboxChange = (id: string) => {
