@@ -1455,7 +1455,8 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
             'Detalle': detalle_pago_historial,
             'MP_Payment_ID': payment_id,
             'ItemsPagadosJSON': json.dumps([]),
-            'Contribuyente DNI': items_context.get('dni', 'N/A')
+            'Contribuyente DNI': items_context.get('dni', 'N/A'),
+            'Nombre Pagador': items_context.get('nombre_contribuyente') or items_context.get('nombre') or items_context.get('email', 'N/A') # Añadido
         }
 
         # SOLO agregar link a Contribuyente si es un pago de retributivos (lote)
@@ -1709,9 +1710,11 @@ def get_receipt(historial_record_id):
         existing_pdf_id = record['fields'].get('PDF_ID')
 
         payment_details = {
-            "FECHA_PAGO": record['fields'].get('Timestamp', datetime.now().strftime("%d/%m/%Y %H:%M:%S")),
+            "FECHA_PAGO": record['fields'].get('Fecha de Transacción', record['fields'].get('Timestamp', datetime.now().strftime("%d/%m/%Y %H:%M:%S"))),
             "ESTADO_PAGO": record['fields'].get('Estado', 'Desconocido'),
             "ID_PAGO_MP": record['fields'].get('MP_Payment_ID', 'N/A'),
+            "NOMBRE_PAGADOR": record['fields'].get('Nombre Pagador', 'N/A'),
+            "IDENTIFICADOR_PAGADOR": record['fields'].get('Contribuyente DNI', record['fields'].get('MP_Payment_ID', 'N/A')),
             "items": items_for_pdf,
             "MONTO_TOTAL": record['fields'].get('Monto', 0)
         }
