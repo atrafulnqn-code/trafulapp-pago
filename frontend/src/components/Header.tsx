@@ -33,6 +33,9 @@ const Header: React.FC = () => {
             <LinkContainer to="/staff/login">
               <Button variant="outline-success" size="sm" className="rounded-pill px-4 fw-semibold border-2">Acceso Personal</Button>
             </LinkContainer>
+            <LinkContainer to="/recursos-humanos">
+              <Button variant="outline-info" size="sm" className="rounded-pill px-4 fw-semibold border-2">Recursos Humanos</Button>
+            </LinkContainer>
           </Nav>
         </Navbar.Collapse>
       </Container>

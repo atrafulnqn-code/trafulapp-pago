@@ -25,6 +25,7 @@ import PatenteEfectivo from './pages/PatenteEfectivo';
 import StatsLogin from './pages/StatsLogin';
 import StatsDashboard from './pages/StatsDashboard';
 import PlanDePago from './pages/PlanDePago';
+import RecursosHumanos from './pages/RecursosHumanos'; // Importación de la nueva página
 import { useLocation } from 'react-router-dom';
 
 const AppContent: React.FC = () => {
@@ -58,6 +59,7 @@ const AppContent: React.FC = () => {
           <Route path="/staff/pagos-efectivo" element={<PagosEfectivoDashboard />} />
           <Route path="/staff/pagos-efectivo/recaudacion" element={<RecaudacionEfectivo />} />
           <Route path="/staff/pagos-efectivo/patente" element={<PatenteEfectivo />} />
+          <Route path="/recursos-humanos" element={<RecursosHumanos />} /> {/* Nueva ruta */}
         </Routes>
       </main>
       {!isAdminPath && <Footer />}
