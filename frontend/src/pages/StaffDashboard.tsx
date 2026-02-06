@@ -224,31 +224,34 @@ const StaffDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        {/* Módulo Recursos Humanos */}
+
+
+        {/* Módulo Plataforma de Gestión Personal */}
         <Col>
-                      <Card
-                      className="h-100 shadow-sm border-0 hover-shadow transition-all"
-                      style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-                      onClick={() => console.log('Enlace de Recursos Humanos pendiente')} // Placeholder temporal
-                      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                    >
-                      <Card.Body className="text-center p-4">
-                        <div className="text-dark mb-3">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-people-fill" viewBox="0 0 16 16">
-                            <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-                            <path fillRule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.377-2.744 1.338-4.045C5.972 8.942 5.484 8 4 8c-1.566 0-2.5 1-3 2h0a.5.5 0 0 0 .095.803C.607 14.216 0 14.945 0 16H9.953c-.457-1.22-.91-2.006-1.536-2.618A2.238 2.238 0 0 1 5.216 14z"/>
-                          </svg>
-                        </div>
-                        <Card.Title className="fw-bold">Recursos Humanos</Card.Title>
-                        <Card.Text className="text-muted small">
-                          Acceso a herramientas y formularios para la gestión del personal.
-                        </Card.Text>
-                        <div className="mt-3">
-                          <a href="#" className="btn btn-dark btn-sm" role="button">Acceder</a>
-                        </div>
-                      </Card.Body>
-                    </Card>        </Col>
+          <Card 
+            className="h-100 shadow-sm border-0 hover-shadow transition-all" 
+            style={{ cursor: 'pointer', transition: 'transform 0.2s' }} 
+            onClick={() => window.open('https://frontend-hxrk.onrender.com', '_blank')}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Card.Body className="text-center p-4">
+              <div className="text-primary mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-person-workspace" viewBox="0 0 16 16">
+                  <path d="M4 16s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H4Zm4-5.95a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+                  <path d="M2 1a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h5v-2H2V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2h2V3a2 2 0 0 0-2-2H2Z"/>
+                </svg>
+              </div>
+              <Card.Title className="fw-bold">Plataforma de Gestión Personal</Card.Title>
+              <Card.Text className="text-muted small">
+                Acceder a la plataforma externa de gestión de personal.
+              </Card.Text>
+              <div className="mt-3">
+                <Button variant="primary" size="sm">Acceder</Button>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
       </Row>
     </Container>
   );
