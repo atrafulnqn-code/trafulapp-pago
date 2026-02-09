@@ -255,9 +255,39 @@ def save_contacto(email, nombre=None, origen=None):
                 new_contact['Origen'] = origen
             contactos_table.create(new_contact)
     except Exception as e:
-        log_to_airtable(
-            'ERROR', 'Contactos',
-            f'Error guardando contacto {email}: {e}')
+        error_str = str(e)
+        # Si el error es por opciones de select inválidas, intentar guardar
+        # sin el campo origen
+        if 'INVALID_MULTIPLE_CHOICE_OPTIONS' in error_str:
+            try:
+                log_to_airtable(
+                    'WARNING', 'Contactos',
+                    f'Valor de origen "{origen}" no válido para {email}. '
+                    f'Guardando sin origen.')
+                if existing:
+                    update_fields_no_origen = {"Ultima Actividad": now}
+                    if nombre and not record['fields'].get('Nombre'):
+                        update_fields_no_origen['Nombre'] = nombre
+                    contactos_table.update(record['id'],
+                                           update_fields_no_origen)
+                else:
+                    new_contact_no_origen = {
+                        "Email": email,
+                        "Fecha Registro": now,
+                        "Ultima Actividad": now
+                    }
+                    if nombre:
+                        new_contact_no_origen['Nombre'] = nombre
+                    contactos_table.create(new_contact_no_origen)
+            except Exception as retry_error:
+                log_to_airtable(
+                    'ERROR', 'Contactos',
+                    f'Error en reintento guardando contacto {email}: '
+                    f'{retry_error}')
+        else:
+            log_to_airtable(
+                'ERROR', 'Contactos',
+                f'Error guardando contacto {email}: {e}')
 
 
 def create_receipt_pdf(payment_details, pdf_id=None):
