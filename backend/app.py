@@ -682,5 +682,105 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
             conn.close()
 
 
+@app.route('/api/create_pagotic_payment', methods=['POST', 'OPTIONS'])
+def create_pagotic_payment():
+    """Crea un pago con Pago TIC / Payway"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        data = request.get_json()
+        items_to_pay = data.get('items_to_pay', {})
+        title = data.get('title', 'Pago Municipal')
+        unit_price = data.get('unit_price', 0)
+
+        log_to_airtable(
+            'INFO', 'Pago TIC Create',
+            f'Creando pago: {title} - Monto: ${unit_price}',
+            details={'items': items_to_pay})
+
+        # Generar ID único para el pago
+        payment_id = f"PAY-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+
+        # Guardar en PostgreSQL si está disponible
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO payments
+                        (payment_id, status, amount, currency,
+                         payer_email, items_paid)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (payment_id, 'pending', unit_price, 'ARS',
+                         items_to_pay.get('email'), json.dumps(items_to_pay))
+                    )
+                    conn.commit()
+                log_to_airtable(
+                    'INFO', 'Pago TIC Create',
+                    f'Pago {payment_id} guardado en PostgreSQL')
+            except Exception as db_error:
+                log_to_airtable(
+                    'ERROR', 'Pago TIC Create',
+                    f'Error guardando en PostgreSQL: {db_error}')
+                conn.rollback()
+            finally:
+                conn.close()
+
+        # Crear checkout con Payway
+        if not all([PAYWAY_SITE_ID, PAYWAY_PRIVATE_KEY]):
+            return jsonify({
+                "error": "Configuración de Payway incompleta"
+            }), 500
+
+        # Construir URL de checkout de Payway
+        import hashlib
+        import hmac
+
+        # Parámetros para Payway
+        amount_cents = int(unit_price * 100)  # Convertir a centavos
+
+        # Construir firma HMAC
+        string_to_sign = (
+            f"{PAYWAY_SITE_ID}{payment_id}"
+            f"{amount_cents}ARS{PAYWAY_TEMPLATE_ID}"
+        )
+        signature = hmac.new(
+            PAYWAY_PRIVATE_KEY.encode('utf-8'),
+            string_to_sign.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+
+        # URL del checkout de Payway
+        init_point = (
+            f"https://checkout.paypertic.com/?siteId={PAYWAY_SITE_ID}"
+            f"&transactionId={payment_id}"
+            f"&amount={amount_cents}"
+            f"&currency=ARS"
+            f"&templateId={PAYWAY_TEMPLATE_ID}"
+            f"&hash={signature}"
+        )
+
+        log_to_airtable(
+            'INFO', 'Pago TIC Create',
+            f'Checkout creado para pago {payment_id}',
+            related_id=payment_id)
+
+        return jsonify({
+            "payment_id": payment_id,
+            "init_point": init_point,
+            "status": "pending"
+        })
+
+    except Exception as e:
+        log_to_airtable(
+            'ERROR', 'Pago TIC Create',
+            f'Error creando pago: {e}',
+            details={'error': str(e), 'traceback': traceback.format_exc()})
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
