@@ -284,7 +284,7 @@ const PaymentFlow: React.FC = () => {
             setError(null);
             try {
                 const itemsToPay = getItemsToPay();
-                const response = await fetch(`${API_BASE_URL}/api/create_pagotic_payment`, {
+                const response = await fetch(`${API_BASE_URL}/create_pagotic_payment`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount })
