@@ -8,5 +8,5 @@ resend==0.8.0
 weasyprint==59.0
 pydyf==0.8.0
 psycopg2-binary==2.9.9
-requests==2.32.3
+requests==2.31.0
 
