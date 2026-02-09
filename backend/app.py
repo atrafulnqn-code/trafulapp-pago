@@ -14,11 +14,77 @@ from datetime import datetime
 import base64
 import hashlib
 import uuid
+import psycopg2
+from psycopg2 import sql
 
 # Cargar variables de entorno desde el archivo .env
 load_dotenv()
 
 app = Flask(__name__)
+
+# --- CONFIGURACIÓN POStGRESQL ---
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("ADVERTENCIA: La variable de entorno DATABASE_URL no está configurada. La funcionalidad de la nueva billetera no funcionará.")
+
+def get_db_connection():
+    """Crea y retorna una nueva conexión a la base de datos."""
+    if not DATABASE_URL:
+        return None
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except psycopg2.OperationalError as e:
+        print(f"ERROR: No se pudo conectar a la base de datos PostgreSQL: {e}")
+        return None
+
+def init_db():
+    """Inicializa la base de datos creando la tabla de pagos si no existe."""
+    conn = get_db_connection()
+    if conn is None:
+        print("ERROR: No se puede inicializar la DB porque no hay conexión.")
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS payments (
+                    id SERIAL PRIMARY KEY,
+                    payment_id VARCHAR(255) UNIQUE NOT NULL,
+                    payment_id_external VARCHAR(255) UNIQUE, -- Nuevo campo para el ID externo de la billetera (Pago TIC)
+                    status VARCHAR(50) NOT NULL,
+                    amount NUMERIC(10, 2) NOT NULL,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'ARS',
+                    payer_email VARCHAR(255),
+                    items_paid JSONB,
+                    wallet_response JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            # Crear un trigger para actualizar automáticamente updated_at
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION update_updated_at_column()
+                RETURNS TRIGGER AS $$
+                BEGIN
+                   NEW.updated_at = NOW(); 
+                   RETURN NEW;
+                END;
+                $$ language 'plpgsql';
+            """)
+            cur.execute("""
+                DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
+                CREATE TRIGGER update_payments_updated_at
+                BEFORE UPDATE ON payments
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+            """)
+            conn.commit()
+            print("Tabla 'payments' en PostgreSQL inicializada/verificada correctamente.")
+    except Exception as e:
+        print(f"ERROR al inicializar la tabla 'payments': {e}")
+    finally:
+        if conn:
+            conn.close()
 
 # Configuración CORS
 # Para producción, configurar CORS_ORIGINS en variables de entorno
@@ -29,15 +95,27 @@ if cors_origins != "*":
 
 CORS(app, resources={r"/*": {"origins": cors_origins}}, supports_credentials=True)
 
+# Inicializar la base de datos al arrancar
+init_db()
+
 # --- Verificación de Variables de Entorno ---
 print("--- Iniciando Verificación de Variables de Entorno ---")
 AIRTABLE_PAT_FROM_ENV = os.getenv("AIRTABLE_PAT")
 MERCADOPAGO_ACCESS_TOKEN_FROM_ENV = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 RESEND_API_KEY_FROM_ENV = os.getenv("RESEND_API_KEY")
 
+# --- CONFIGURACIÓN PAGO TIC ---
+PAGOTIC_AUTH_URL = os.getenv("PAGOTIC_AUTH_URL", "https://a.paypertic.com/auth/realms/entidades/protocol/openid-connect/token")
+PAGOTIC_USERNAME = os.getenv("PAGOTIC_USERNAME")
+PAGOTIC_PASSWORD = os.getenv("PAGOTIC_PASSWORD")
+PAGOTIC_CLIENT_ID = os.getenv("PAGOTIC_CLIENT_ID")
+PAGOTIC_CLIENT_SECRET = os.getenv("PAGOTIC_CLIENT_SECRET")
+
 if not AIRTABLE_PAT_FROM_ENV: print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.")
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV: print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no está configurada.")
 if not RESEND_API_KEY_FROM_ENV: print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está configurada. El envío de emails no funcionará.")
+if not PAGOTIC_USERNAME or not PAGOTIC_PASSWORD or not PAGOTIC_CLIENT_ID or not PAGOTIC_CLIENT_SECRET:
+    print("ADVERTENCIA: Credenciales de Pago TIC incompletas. La integración de Pago TIC no funcionará.")
 
 # --- CONFIGURACIÓN PAYWAY PRODUCCIÓN ---
 PAYWAY_SITE_ID = os.getenv("PAYWAY_SITE_ID", "93011187")
@@ -880,6 +958,53 @@ try:
 except Exception as e:
     print(f"ERROR: Falló la configuración de Resend: {e}")
 
+# --- Autenticación y Gestión de Token Pago TIC ---
+import requests
+import time
+
+PAGOTIC_ACCESS_TOKEN = None
+PAGOTIC_TOKEN_EXPIRATION = 0 # Unix timestamp
+
+def get_pagotic_token():
+    global PAGOTIC_ACCESS_TOKEN, PAGOTIC_TOKEN_EXPIRATION
+
+    # Verificar si el token existe y sigue siendo válido (con un buffer de seguridad)
+    if PAGOTIC_ACCESS_TOKEN and PAGOTIC_TOKEN_EXPIRATION > time.time() + 60: # 60 segundos de buffer
+        return PAGOTIC_ACCESS_TOKEN
+
+    # Si no, solicitar un nuevo token
+    if not PAGOTIC_USERNAME or not PAGOTIC_PASSWORD or not PAGOTIC_CLIENT_ID or not PAGOTIC_CLIENT_SECRET:
+        log_to_airtable('ERROR', 'Pago TIC Auth', 'Faltan credenciales de Pago TIC para solicitar token.')
+        return None
+
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    data = {
+        'username': PAGOTIC_USERNAME,
+        'password': PAGOTIC_PASSWORD,
+        'grant_type': 'password',
+        'client_id': PAGOTIC_CLIENT_ID,
+        'client_secret': PAGOTIC_CLIENT_SECRET
+    }
+
+    try:
+        response = requests.post(PAGOTIC_AUTH_URL, headers=headers, data=data, timeout=10)
+        response.raise_for_status() # Lanza una excepción para errores HTTP
+        token_data = response.json()
+
+        PAGOTIC_ACCESS_TOKEN = token_data['access_token']
+        # El tiempo de expiración viene en segundos, lo convertimos a timestamp absoluto
+        PAGOTIC_TOKEN_EXPIRATION = time.time() + token_data['expires_in']
+
+        log_to_airtable('INFO', 'Pago TIC Auth', 'Token de Pago TIC obtenido y cacheado exitosamente.')
+        return PAGOTIC_ACCESS_TOKEN
+
+    except requests.exceptions.RequestException as e:
+        log_to_airtable('ERROR', 'Pago TIC Auth', f'Error al obtener token de Pago TIC: {e}', details={'error_message': str(e)})
+        return None
+    except Exception as e:
+        log_to_airtable('ERROR', 'Pago TIC Auth', f'Error inesperado al procesar token de Pago TIC: {e}', details={'error_message': str(e)})
+        return None
+
 
 # --- Funciones Auxiliares de PDF y Email ---
 def create_receipt_pdf(payment_details, pdf_id=None):
@@ -1164,6 +1289,169 @@ def search_deuda_suggestions():
     except Exception as e:
         log_to_airtable('ERROR', 'API Search', f'ERROR en search_deuda_suggestions: {e}', related_id=query, details={'error_message': str(e)})
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/create_pagotic_payment', methods=['POST'])
+def create_pagotic_payment():
+    log_to_airtable('INFO', 'Pago TIC', 'Recibida petición en /api/create_pagotic_payment', details={'ip_address': request.remote_addr, 'payload': request.json})
+    
+    data = request.json
+    title = data.get('title')
+    unit_price = data.get('unit_price')
+    items_to_pay = data.get('items_to_pay')
+
+    if not all([title, unit_price, items_to_pay]):
+        log_to_airtable('WARNING', 'Pago TIC', 'Faltan parámetros para crear pago.', details={'ip_address': request.remote_addr, 'payload': data})
+        return jsonify({"error": "Faltan parámetros"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        log_to_airtable('ERROR', 'Pago TIC', 'No se pudo conectar a la base de datos PostgreSQL.')
+        return jsonify({"error": "Error de conexión en el servidor."}), 500
+
+    payment_id = f"PTIC_{str(uuid.uuid4())}" # Nuestro ID único para esta operación
+    pagotic_external_transaction_id = payment_id # Usamos nuestro ID interno como el externo para Pago TIC
+
+    try:
+        # Obtener token de Pago TIC
+        access_token = get_pagotic_token()
+        if not access_token:
+            raise Exception("No se pudo obtener el token de Pago TIC.")
+
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Construir el objeto Payer con información del contribuyente
+        payer_name = items_to_pay.get('nombre_contribuyente') or items_to_pay.get('nombre') or items_to_pay.get('email', 'Contribuyente')
+        payer_email = items_to_pay.get('email')
+        payer_dni = items_to_pay.get('dni')
+        
+        payer_data = {
+            "name": payer_name,
+            "email": payer_email,
+        }
+        if payer_dni:
+            payer_data["identification"] = {
+                "type": "DNI_ARG", # Asumimos DNI_ARG, podría ser configurable
+                "number": str(payer_dni),
+                "country": "ARG"
+            }
+            payer_data["external_reference"] = str(payer_dni) # Usamos DNI como referencia externa del pagador
+        elif payer_email:
+            payer_data["external_reference"] = payer_email # Si no hay DNI, usamos email como ref externa
+
+        # Construir el array de detalles del pago
+        payment_details_array = []
+        # La lógica de items_to_pay contiene 'meses' y 'deuda'. Los transformamos.
+        
+        # Primero la "deuda acumulada" si existe
+        if items_to_pay.get('deuda'):
+            payment_details_array.append({
+                "external_reference": f"{pagotic_external_transaction_id}-deuda",
+                "concept_id": items_to_pay.get('item_type'),
+                "concept_description": f"Deuda Acumulada {items_to_pay.get('item_type')}",
+                "amount": float(items_to_pay.get('deuda_monto', 0))
+            })
+        
+        # Luego los meses seleccionados
+        meses_montos = items_to_pay.get('meses_montos', {})
+        for mes, monto in meses_montos.items():
+            if monto > 0: # Solo añadir si el monto es mayor que cero
+                concept_desc = ""
+                if items_to_pay.get('item_type') == 'agua':
+                    concept_desc = f"Cuota Agua/Comercial {mes.capitalize()}"
+                elif items_to_pay.get('item_type') == 'lote':
+                    concept_desc = f"Cuota Tasas {mes.capitalize()}"
+                else:
+                    concept_desc = f"Cuota {mes.capitalize()}"
+
+                payment_details_array.append({
+                    "external_reference": f"{pagotic_external_transaction_id}-{mes}",
+                    "concept_id": items_to_pay.get('item_type'), # 'lote', 'agua', 'vehiculo'
+                    "concept_description": concept_desc,
+                    "amount": float(monto)
+                })
+
+        # Si no hay detalles específicos, añadir un detalle genérico
+        if not payment_details_array:
+             payment_details_array.append({
+                 "external_reference": pagotic_external_transaction_id,
+                 "concept_id": items_to_pay.get('item_type', 'desconocido'),
+                 "concept_description": title,
+                 "amount": float(unit_price)
+             })
+
+        # Formatear due_date y last_due_date (opcional, pero recomendado)
+        now = datetime.now()
+        due_date_str = (now + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S%z") # Ejemplo: 7 días de vencimiento
+        last_due_date_str = (now + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S%z") # Ejemplo: 30 días para último vencimiento
+
+        pagotic_payload = {
+            "external_transaction_id": pagotic_external_transaction_id,
+            "currency_id": "ARS", # Moneda fija para Argentina
+            "details": payment_details_array,
+            "payer": payer_data,
+            "return_url": f"{FRONTEND_URL}/#/exito?payment_id={payment_id}&wallet=pagotic",
+            "back_url": f"{FRONTEND_URL}/#/pagar/{items_to_pay.get('item_type', '').lower()}", # Volver a la pantalla de selección de deudas
+            "notification_url": f"{BACKEND_URL}/api/pagotic_webhook",
+            "due_date": due_date_str,
+            "last_due_date": last_due_date_str,
+            "type": "online", # Para pagos con tarjeta directo en el checkout
+        }
+
+        # Realizar la solicitud a Pago TIC
+        pagotic_api_url = "https://api.paypertic.com/pagos"
+        response = requests.post(pagotic_api_url, headers=headers, json=pagotic_payload, timeout=15)
+        response.raise_for_status() # Lanza una excepción para errores HTTP (4xx o 5xx)
+        
+        pagotic_response_data = response.json()
+        
+        pagotic_transaction_id = pagotic_response_data.get('id')
+        pagotic_form_url = pagotic_response_data.get('form_url')
+        pagotic_status = pagotic_response_data.get('status')
+
+        if not pagotic_form_url:
+            raise Exception("No se recibió 'form_url' de Pago TIC para redirigir.")
+
+        # Actualizar el registro en nuestra DB con el ID de transacción de Pago TIC
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE payments
+                SET status = %s, wallet_response = %s, payment_id_external = %s
+                WHERE payment_id = %s
+                """,
+                (pagotic_status, json.dumps(pagotic_response_data), pagotic_transaction_id, payment_id)
+            )
+            conn.commit()
+        
+        log_to_airtable('INFO', 'Pago TIC', 'Pago creado en Pago TIC. Redirigiendo a formulario.', related_id=payment_id, details={'pagotic_id': pagotic_transaction_id, 'form_url': pagotic_form_url})
+
+        return jsonify({
+            "preference_id": payment_id, # Nuestro ID interno
+            "init_point": pagotic_form_url,
+            "message": "Redirigiendo a Pago TIC..."
+        })
+
+    except requests.exceptions.RequestException as e:
+        error_traceback = traceback.format_exc()
+        error_msg = f"Error de conexión o HTTP con Pago TIC: {e}"
+        if e.response is not None:
+            error_msg += f"\nRespuesta de Pago TIC: {e.response.text}"
+        log_to_airtable('ERROR', 'Pago TIC', f'ERROR en create_pagotic_payment: {error_msg}\nTraceback: {error_traceback}', details={'error_message': error_msg, 'payload': data, 'traceback': error_traceback})
+        if conn:
+            conn.rollback()
+        return jsonify({"error": error_msg}), e.response.status_code if e.response is not None else 500
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        log_to_airtable('ERROR', 'Pago TIC', f'ERROR en create_pagotic_payment: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payload': data, 'traceback': error_traceback})
+        if conn:
+            conn.rollback() # Revertir la transacción si algo falla
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/create_preference', methods=['POST'])
 def create_preference():
@@ -1630,6 +1918,389 @@ def process_payment(payment_id, payment_info, items_context, is_simulation=False
         log_to_airtable('ERROR', 'Payment Process', f'Error procesando pago {payment_id}: {e}', related_id=payment_id, details={'error_message': str(e)})
         raise
 
+def process_pagotic_payment(payment_id, new_status, wallet_response=None):
+    log_to_airtable('INFO', 'Pago TIC Process', f'Inicio del procesamiento de pago para ID interno: {payment_id}', related_id=payment_id)
+    
+    conn = get_db_connection()
+    if not conn:
+        log_to_airtable('ERROR', 'Pago TIC Process', 'No se pudo conectar a la base de datos PostgreSQL.')
+        raise Exception("Error de conexión a la base de datos.")
+
+    try:
+        items_context = {}
+        monto_pagado = 0
+
+        # 1. Actualizar el registro en la base de datos PostgreSQL
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE payments
+                SET status = %s, wallet_response = %s
+                WHERE payment_id = %s
+                RETURNING items_paid, amount;
+                """,
+                (new_status, json.dumps(wallet_response), payment_id)
+            )
+            updated_record = cur.fetchone()
+            
+            if not updated_record:
+                raise Exception(f"No se encontró el pago con ID {payment_id} para actualizar.")
+            
+            items_context = updated_record[0]
+            monto_pagado = float(updated_record[1]) # Asegurarnos que es un float
+            conn.commit()
+
+        log_to_airtable('INFO', 'Pago TIC Process', f'Registro de pago {payment_id} actualizado en PostgreSQL a {new_status}.')
+
+        # 2. Si el pago fue aprobado, ejecutar la lógica de negocio (actualizar Airtable, enviar email)
+        if new_status == 'approved':
+            log_to_airtable('INFO', 'Pago TIC Process', f'Pago APROBADO. Procesando actualizaciones de deuda en Airtable para ID: {payment_id}')
+            
+            items_for_pdf = []
+            
+            # --- INICIO DE LÓGICA EXTRAÍDA DE process_payment ---
+            
+            # Caso Estándar (Deudas previas del portal)
+            if "record_id" in items_context:
+                record_id_to_update = items_context["record_id"]
+                table_id_to_update = ""
+                fields_to_update_origin = {}
+                item_type = items_context.get("item_type")
+
+                if item_type == "deuda_general":
+                    table_id_to_update = DEUDAS_TABLE_ID
+                    fields_to_update_origin["monto total deuda"] = "0"
+                    fields_to_update_origin["deuda en concepto de"] = "Pagado"
+                    items_for_pdf.append({"description": "Deuda General", "amount": items_context.get('total_amount', 0)})
+                else:
+                    if item_type == "lote": table_id_to_update = CONTRIBUTIVOS_TABLE_ID
+                    elif item_type == "vehiculo": table_id_to_update = PATENTE_TABLE_ID
+                    elif item_type == "agua": table_id_to_update = WATER_TABLE_ID
+                    
+                    if items_context.get("deuda"):
+                        deuda_field = "deuda" if item_type != "vehiculo" else "Deuda patente"
+                        fields_to_update_origin[deuda_field] = "0"
+                        items_for_pdf.append({"description": f"Deuda {item_type.capitalize()}", "amount": items_context.get('deuda_monto', 0)})
+                    
+                    meses_a_actualizar = items_context.get("meses", {})
+                    for mes_key, sel in meses_a_actualizar.items():
+                        if sel:
+                            mesCapitalized = mes_key.capitalize()
+                            if item_type == "agua":
+                                fields_to_update_origin[f"{mesCapitalized} agua"] = 0
+                                fields_to_update_origin[f"{mesCapitalized} Comercial"] = 0
+                            elif item_type == "lote":
+                                fields_to_update_origin[mes_key] = 0
+                            
+                            # Agregar al detalle del PDF
+                            desc = f"Cuota {mes_key.capitalize()}"
+                            if item_type == "agua": desc = f"Cuota Agua/Comercial {mes_key.capitalize()}"
+                            elif item_type == "lote": desc = f"Cuota Tasas {mes_key.capitalize()}"
+                            items_for_pdf.append({"description": desc, "amount": items_context.get('meses_montos', {}).get(mes_key, 0)})
+                
+                if fields_to_update_origin and api:
+                    try:
+                        api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
+                        log_to_airtable('INFO', 'Pago TIC Process', f'Airtable de deuda actualizado para ID: {record_id_to_update}', related_id=payment_id, details={'updates': fields_to_update_origin})
+                    except Exception as airtable_update_error:
+                        log_to_airtable('ERROR', 'Pago TIC Process', f'Error al actualizar Airtable para ID: {record_id_to_update}: {airtable_update_error}', related_id=payment_id, details={'error_message': str(airtable_update_error), 'updates_attempted': fields_to_update_origin})
+
+            # Creamos el registro en la tabla de Historial (Airtable)
+            historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
+            
+            historial_data = {
+                'Estado': 'Pendiente', # Estado inicial, se actualizará
+                'Monto': monto_pagado,
+                'Detalle': f"Pago TIC para {items_context.get('item_type')}, DNI/Nombre: {items_context.get('dni') or items_context.get('nombre_contribuyente')}",
+                'MP_Payment_ID': payment_id, # Usamos el ID interno para Pago TIC
+                'ItemsPagadosJSON': json.dumps(items_for_pdf),
+                'Contribuyente DNI': items_context.get('dni', 'N/A'),
+                'Nombre Pagador': items_context.get('nombre_contribuyente') or items_context.get('nombre') or items_context.get('email', 'N/A')
+            }
+
+            if items_context.get('record_id') and items_context.get('item_type') == 'lote':
+                historial_data['Contribuyente'] = [items_context.get('record_id')]
+            
+            historial_record = historial_table.create(historial_data)
+            log_to_airtable('INFO', 'Pago TIC Process', f'Registro de historial creado para Pago TIC con ID: {historial_record["id"]}', related_id=historial_record['id'], details={'pagotic_payment_id': payment_id})
+
+            # Actualizar estado del historial según el resultado del pago
+            pago_estado_final = "Exitoso" if new_status == "approved" else "Fallido"
+            historial_table.update(historial_record['id'], {'Estado': pago_estado_final})
+            log_to_airtable('INFO', 'Pago TIC Process', f'Historial de pago actualizado a "{pago_estado_final}". ID: {historial_record["id"]}', related_id=payment_id)
+
+            receipt_url = f"{BACKEND_URL}/api/receipt/{historial_record['id']}"
+            historial_table.update(historial_record['id'], {"Link Comprobante": receipt_url})
+            log_to_airtable('INFO', 'Pago TIC Process', f'Link de comprobante guardado para historial ID: {historial_record["id"]}', related_id=payment_id)
+
+            # Intentar generar y enviar PDF
+            email_sent_status = "No enviado"
+            try:
+                pdf_details = {
+                    "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "ESTADO_PAGO": pago_estado_final,
+                    "ID_PAGO_MP": payment_id, # Usamos el ID interno para Pago TIC
+                    "NOMBRE_PAGADOR": items_context.get('nombre_contribuyente') or items_context.get('email', 'Contribuyente'),
+                    "IDENTIFICADOR_PAGADOR": items_context.get('dni') or items_context.get('email', 'N/A'),
+                    "items": items_for_pdf,
+                    "MONTO_TOTAL": monto_pagado
+                }
+                pdf_file, pdf_id = create_receipt_pdf(pdf_details)
+
+                if pdf_id:
+                    historial_table.update(historial_record['id'], {"PDF_ID": pdf_id})
+
+                if pdf_file and items_context.get("email") and resend.api_key:
+                    params = {
+                        "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"), "to": items_context.get("email"),
+                        "subject": "Comprobante de Pago - Municipalidad de Villa Traful",
+                        "html": f"<p>Hola, adjuntamos tu comprobante de pago con ID: {payment_id}.</p>",
+                        "attachments": [{"filename": f"comprobante_{payment_id}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+                    }
+                    resend.Emails.send(params)
+                    log_to_airtable('INFO', 'Pago TIC Email Service', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
+
+                    save_contacto(
+                        email=items_context.get('email'),
+                        nombre=items_context.get('nombre_contribuyente') or items_context.get('nombre'),
+                        origen='Pago TIC Online'
+                    )
+                    email_sent_status = f"Enviado a {items_context.get('email')}"
+                elif not items_context.get("email"):
+                    log_to_airtable('WARNING', 'Pago TIC Email Service', f'No se envió email de comprobante porque no se proporcionó dirección de correo.', related_id=payment_id)
+                    email_sent_status = "No enviado (sin email)"
+                else:
+                    log_to_airtable('ERROR', 'Pago TIC Email Service', f'No se pudo generar el PDF para el email del comprobante.', related_id=payment_id)
+                    email_sent_status = "Error al generar PDF"
+            except Exception as pdf_error:
+                print(f"ERROR generando/enviando PDF para Pago TIC (no crítico): {pdf_error}")
+                log_to_airtable('ERROR', 'Pago TIC PDF Generation', f'Error generando/enviando PDF (pago procesado exitosamente): {pdf_error}', related_id=payment_id)
+                email_sent_status = f"Error PDF: {str(pdf_error)[:100]}"
+            
+            historial_table.update(historial_record['id'], {"Comprobante_Status": email_sent_status})
+
+        return {"status": "ok", "historialRecordId": historial_record['id']}                
+                if fields_to_update_origin and api:
+                    try:
+                        api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
+                        log_to_airtable('INFO', 'Pago TIC Process', f'Airtable de deuda actualizado para ID: {record_id_to_update}', related_id=payment_id, details={'updates': fields_to_update_origin})
+                    except Exception as airtable_update_error:
+                        log_to_airtable('ERROR', 'Pago TIC Process', f'Error al actualizar Airtable para ID: {record_id_to_update}: {airtable_update_error}', related_id=payment_id, details={'error_message': str(airtable_update_error), 'updates_attempted': fields_to_update_origin})
+                if fields_to_update_origin:
+                    api.table(BASE_ID, table_id_to_update).update(record_id_to_update, fields_to_update_origin)
+                    log_to_airtable('INFO', 'Pago TIC Process', f'Airtable de deuda actualizado para ID: {record_id_to_update}', related_id=payment_id, details={'updates': fields_to_update_origin})
+            
+            # Generar y enviar el comprobante por email
+            try:
+                pdf_details = {
+                    "FECHA_PAGO": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "ESTADO_PAGO": "Aprobado (Pago TIC)",
+                    "ID_PAGO_MP": payment_id, # Usamos nuestro ID interno
+                    "NOMBRE_PAGADOR": items_context.get('nombre_contribuyente') or items_context.get('email', 'Contribuyente'),
+                    "IDENTIFICADOR_PAGADOR": items_context.get('dni') or items_context.get('email', 'N/A'),
+                    "items": items_for_pdf,
+                    "MONTO_TOTAL": monto_pagado
+                }
+                pdf_file, pdf_id = create_receipt_pdf(pdf_details)
+
+                if pdf_file and items_context.get("email"):
+                    params = {
+                        "from": os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev"),
+                        "to": items_context.get("email"),
+                        "subject": "Comprobante de Pago - Municipalidad de Villa Traful",
+                        "html": f"<p>Hola, adjuntamos tu comprobante de pago con ID: {payment_id}.</p>",
+                        "attachments": [{"filename": f"comprobante_{payment_id}.pdf", "content": base64.b64encode(pdf_file.getvalue()).decode('utf-8')}]
+                    }
+                    resend.Emails.send(params)
+                    log_to_airtable('INFO', 'Pago TIC Process', f'Email de comprobante enviado a {items_context.get("email")}.', related_id=payment_id)
+                elif not items_context.get("email"):
+                    log_to_airtable('WARNING', 'Pago TIC Process', f'No se envió email porque no se proporcionó dirección.', related_id=payment_id)
+                else:
+                    log_to_airtable('ERROR', 'Pago TIC Process', f'No se pudo generar el PDF para el email del comprobante.', related_id=payment_id)
+            except Exception as pdf_error:
+                log_to_airtable('ERROR', 'Pago TIC Process', f'Error generando/enviando PDF: {pdf_error}', related_id=payment_id)
+
+            # --- FIN DE LÓGICA EXTRAÍDA ---
+
+        return {"status": "ok"}
+
+    except Exception as e:
+        if conn: conn.rollback()
+        log_to_airtable('ERROR', 'Pago TIC Process', f'Error procesando pago {payment_id}: {e}', related_id=payment_id, details={'error_message': str(e)})
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/pagotic_webhook', methods=['POST'])
+def pagotic_webhook():
+    print("--- Pago TIC Webhook Recibido ---")
+    data = request.json
+    print(f"DEBUG PAGO TIC WEBHOOK: Data recibida: {json.dumps(data, indent=2)}")
+
+    # El 'id' de la notificación de Pago TIC es nuestro 'external_transaction_id'
+    # que es el mismo que nuestro 'payment_id' interno.
+    payment_id = data.get("external_transaction_id")
+    status_pagotic = data.get("status") # Estado de Pago TIC (ej. "approved", "rejected", "pending")
+
+    if not payment_id or not status_pagotic:
+        print("ERROR PAGO TIC WEBHOOK: Faltan 'external_transaction_id' o 'status' en el webhook de Pago TIC.")
+        return jsonify({"error": "Faltan parámetros de Pago TIC"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        print("ERROR PAGO TIC WEBHOOK: No se pudo conectar a la base de datos PostgreSQL.")
+        return jsonify({"error": "Error de conexión en el servidor."}), 500
+
+    try:
+        # Buscar el pago en la base de datos local usando el ID externo de Pago TIC
+        # Para obtener nuestro payment_id interno y los items_context originales
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT payment_id, items_paid, amount
+                FROM payments
+                WHERE payment_id_external = %s
+                """,
+                (payment_id_external,)
+            )
+            payment_record = cur.fetchone()
+
+            if not payment_record:
+                print(f"ERROR PAGO TIC WEBHOOK: No se encontró el pago interno para payment_id_external: {payment_id_external}")
+                return jsonify({"error": "Pago no encontrado internamente"}), 404
+            
+            internal_payment_id = payment_record[0]
+            items_context_from_db = payment_record[1]
+            amount_from_db = payment_record[2]
+
+            # Mapear el estado de Pago TIC a un estado interno si es necesario
+            # Por simplicidad, asumimos que "approved" de Pago TIC es "approved" interno
+            internal_status = status_pagotic # o mapear si Pago TIC usa otros nombres
+
+
+        # Llamar a la función de procesamiento con el ID interno y el nuevo estado
+        process_pagotic_payment(internal_payment_id, internal_status, wallet_response=data)
+        
+        print(f"DEBUG PAGO TIC WEBHOOK: Proceso completado para payment_id {internal_payment_id}")
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        print(f"ERROR PAGO TIC WEBHOOK: Exception procesando webhook: {e}")
+        print(f"ERROR PAGO TIC WEBHOOK: Traceback: {error_traceback}")
+        log_to_airtable('ERROR', 'Pago TIC Webhook', f'ERROR procesando webhook para payment_id_external {payment_id_external}: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payment_id_external': payment_id_external, 'traceback': error_traceback})
+        if conn:
+            conn.rollback() # Revertir la transacción si algo falla
+        # Devolvemos 200 para que la billetera no reintente, pero logueamos el error.
+        return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
+    finally:
+        if conn:
+            conn.close()
+        return jsonify({"status": "success"}), 200
+        
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        print(f"ERROR PAGO TIC WEBHOOK: Exception procesando webhook: {e}")
+        print(f"ERROR PAGO TIC WEBHOOK: Traceback: {error_traceback}")
+        log_to_airtable('ERROR', 'Pago TIC Webhook', f'ERROR procesando webhook para payment_id {payment_id}: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payment_id': payment_id, 'traceback': error_traceback})
+        # Devolvemos 200 para que la billetera no reintente, pero logueamos el error.
+        return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
+            # Buscar nuestro payment_id interno usando el payment_id_external de Pago TIC
+            cur.execute(
+                "SELECT payment_id FROM payments WHERE payment_id_external = %s",
+                (payment_id_external,)
+            )
+            result = cur.fetchone()
+            if not result:
+                raise Exception(f"No se encontró un pago con payment_id_external {payment_id_external} para procesar.")
+            
+            internal_payment_id = result[0]
+            
+            # Llamar a la función de procesamiento de pagos con nuestro ID interno
+            process_pagotic_payment(internal_payment_id, status_pagotic, wallet_response=data)
+            
+            print(f"DEBUG PAGO TIC WEBHOOK: Proceso completado para payment_id_external {payment_id_external} (interno: {internal_payment_id})")
+            return jsonify({"status": "success"}), 200
+            
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        print(f"ERROR PAGO TIC WEBHOOK: Exception procesando webhook: {e}")
+        print(f"ERROR PAGO TIC WEBHOOK: Traceback: {error_traceback}")
+        log_to_airtable('ERROR', 'Pago TIC Webhook', f'ERROR procesando webhook: {e}', details={'error_message': str(e), 'payload': data, 'traceback': error_traceback})
+        return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
+    finally:
+        if conn:
+            conn.close()
+            # Buscar nuestro registro interno por el ID externo de Pago TIC
+            cur.execute(
+                """
+                SELECT payment_id, items_paid, amount FROM payments
+                WHERE payment_id_external = %s;
+                """,
+                (payment_id_external,)
+            )
+            payment_record = cur.fetchone()
+
+            if not payment_record:
+                print(f"ERROR PAGO TIC WEBHOOK: No se encontró registro de pago interno para ID externo: {payment_id_external}")
+                return jsonify({"error": "Payment record not found"}), 404
+
+            our_payment_id = payment_record[0]
+            items_context = payment_record[1] # JSONB, ya es un dict
+            monto_pagado = payment_record[2]
+
+            # Mapear estado de Pago TIC a nuestros estados internos (si es necesario)
+            internal_status = status_pagotic
+            if status_pagotic == "approved":
+                internal_status = "approved"
+            elif status_pagotic == "rejected":
+                internal_status = "failed"
+            elif status_pagotic == "pending":
+                internal_status = "pending"
+            else:
+                internal_status = "unknown" # Manejar otros estados
+
+            # Actualizar el estado y la respuesta completa de Pago TIC en nuestra DB
+            cur.execute(
+                """
+                UPDATE payments
+                SET status = %s, wallet_response = %s
+                WHERE payment_id_external = %s;
+                """,
+                (internal_status, json.dumps(data), payment_id_external)
+            )
+            conn.commit()
+            print(f"DEBUG PAGO TIC WEBHOOK: Pago interno {our_payment_id} actualizado a estado: {internal_status}")
+
+            # Si el pago fue aprobado, ejecutar la lógica de negocio
+            if internal_status == "approved":
+                print(f"DEBUG PAGO TIC WEBHOOK: Procesando lógica de negocio para pago aprobado: {our_payment_id}")
+                # Reutilizamos la lógica de process_pagotic_payment (o una versión simplificada)
+                # Aquí, ya tenemos los datos del webhook, así que no necesitamos consultar a Pago TIC de nuevo.
+                # simulated_payment_info es para que `process_payment` (llamado dentro de process_pagotic_payment)
+                # tenga los datos que espera de una respuesta de pasarela de pago.
+                simulated_payment_info = {
+                    "status": "approved",
+                    "transaction_amount": monto_pagado
+                }
+                process_payment(our_payment_id, simulated_payment_info, items_context)
+                print(f"DEBUG PAGO TIC WEBHOOK: Lógica de negocio completada para pago {our_payment_id}")
+            elif internal_status == "failed":
+                print(f"DEBUG PAGO TIC WEBHOOK: Pago {our_payment_id} fallido. No se realiza actualización de deudas.")
+            
+        return jsonify({"status": "success", "message": "Webhook processed successfully"}), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        error_traceback = traceback.format_exc()
+        print(f"ERROR PAGO TIC WEBHOOK: Exception procesando webhook: {e}")
+        print(f"ERROR PAGO TIC WEBHOOK: Traceback: {error_traceback}")
+        log_to_airtable('ERROR', 'Pago TIC Webhook', f'ERROR procesando webhook para payment_id {payment_id_external}: {e}\nTraceback: {error_traceback}', details={'error_message': str(e), 'payment_id': payment_id_external, 'traceback': error_traceback, 'webhook_data': data})
+        return jsonify({"status": "error", "message": "Error processing payment internally"}), 200
+    finally:
+        if conn:
+            conn.close()
 @app.route('/api/payment_webhook', methods=['POST'])
 def payment_webhook():
     print("--- Webhook Recibido ---")

@@ -275,6 +275,37 @@ const PaymentFlow: React.FC = () => {
         };
     };
 
+        const handleNewWalletPayment = async () => {
+            if (!isEmailValid) {
+                setError("Por favor, ingrese un email válido para continuar.");
+                return;
+            }
+            setLoading(true);
+            setError(null);
+            try {
+                const itemsToPay = getItemsToPay();
+                const response = await fetch(`${API_BASE_URL}/api/create_pagotic_payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Falló la creación del pago con la nueva billetera.');
+                }
+                if (data.init_point) {
+                    window.location.href = data.init_point;
+                } else {
+                    throw new Error("No se recibió una URL de inicio de pago.");
+                }
+            } catch (err: any) {
+                setError(`Error al procesar el pago: ${err.message}`);
+                setCurrentStep(3);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         const handleFinalPayment = async () => {
 
             if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
@@ -528,26 +559,26 @@ const PaymentFlow: React.FC = () => {
                              <Form.Control.Feedback type="invalid">Por favor, ingrese un email válido.</Form.Control.Feedback>
                            </Form.Group>
 
-                           <div className="d-grid gap-2">
-                                <Button 
+                           <Button 
                                     size="lg" 
-                                    onClick={handleFinalPayment} 
+                                    onClick={handleNewWalletPayment} 
                                     disabled={!isEmailValid || loading || totalAmount === 0}
-                                    style={{ backgroundColor: '#009EE3', borderColor: '#009EE3', color: 'white', fontWeight: 'bold', padding: '15px' }}
+                                    style={{ backgroundColor: '#5a67d8', borderColor: '#5a67d8', color: 'white', fontWeight: 'bold', padding: '15px' }}
                                     className="d-flex align-items-center justify-content-center gap-2 shadow-sm"
                                 >
                                     {loading ? (
                                         <div className="spinner-border spinner-border-sm text-light" role="status"></div>
                                     ) : (
                                         <>
-                                            <span>Pagar con Mercado Pago</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-credit-card-2-back-fill" viewBox="0 0 16 16">
-                                                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5H0V4zm11.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h2a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-2zM0 11v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1H0z"/>
+                                            <span>PAGAR</span>
+                                            {/* Icono genérico de billetera */}
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-wallet2" viewBox="0 0 16 16">
+                                                <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5v-8A1.5 1.5 0 0 1 1.5 3H2V1.78a1.5 1.5 0 0 1 1.864-1.454l8.272 1.379ZM13 13V4.5a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5ZM4 3V2.21a.5.5 0 0 0-.5-.49L2.5 2H4Z"/>
                                             </svg>
                                         </>
                                     )}
                                 </Button>
-                           </div>
+
                            <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100 mt-3">&larr; Volver a seleccionar</Button>
                         </Form>
                     </div>
