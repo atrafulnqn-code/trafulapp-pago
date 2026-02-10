@@ -762,6 +762,45 @@ def create_pagotic_payment():
         # URL del webhook para recibir notificaciones
         webhook_url = f"{BACKEND_URL}/api/pagotic_webhook"
 
+        # Obtener datos del contribuyente desde Airtable
+        record_id = items_to_pay.get('record_id')
+        item_type = items_to_pay.get('item_type')
+        contribuyente_nombre = items_to_pay.get('nombre_contribuyente', 'Sin nombre')
+        contribuyente_dni = items_to_pay.get('dni', '00000000')
+
+        # Consultar Airtable para obtener nombre y DNI completos
+        if record_id and item_type and api:
+            try:
+                # Determinar la tabla según el tipo de item
+                table_id = None
+                if item_type == 'lote':
+                    table_id = CONTRIBUTIVOS_TABLE_ID
+                elif item_type == 'agua':
+                    table_id = WATER_TABLE_ID
+                elif item_type == 'vehiculo':
+                    table_id = PATENTE_TABLE_ID
+
+                if table_id:
+                    # Consultar el registro en Airtable
+                    record = api.table(BASE_ID, table_id).get(record_id)
+                    fields = record.get('fields', {})
+
+                    # Obtener contribuyente y DNI de Airtable
+                    if 'contribuyente' in fields:
+                        contribuyente_nombre = fields['contribuyente']
+                    if 'dni' in fields:
+                        contribuyente_dni = fields['dni']
+
+                    log_to_airtable(
+                        'INFO', 'Pago TIC Create',
+                        f'Datos obtenidos de Airtable: {contribuyente_nombre}, DNI: {contribuyente_dni}',
+                        details={'record_id': record_id, 'table': item_type})
+            except Exception as airtable_error:
+                log_to_airtable(
+                    'WARNING', 'Pago TIC Create',
+                    f'No se pudieron obtener datos de Airtable: {airtable_error}',
+                    details={'record_id': record_id})
+
         # Construir detalles del pago
         # Por ahora creamos un único detalle con el monto total
         payment_details = [{
@@ -771,14 +810,14 @@ def create_pagotic_payment():
             "amount": unit_price
         }]
 
-        # Datos del pagador
+        # Datos del pagador (con datos de Airtable)
         payer_data = {
-            "external_reference": items_to_pay.get('dni', payment_id),
-            "name": items_to_pay.get('nombre', 'Sin nombre'),
+            "external_reference": contribuyente_dni,
+            "name": contribuyente_nombre,
             "email": items_to_pay.get('email', ''),
             "identification": {
                 "type": "DNI_ARG",
-                "number": items_to_pay.get('dni', '00000000'),
+                "number": contribuyente_dni,
                 "country": "ARG"
             }
         }
