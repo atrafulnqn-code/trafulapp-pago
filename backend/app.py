@@ -45,6 +45,28 @@ def get_db_connection():
         return None
 
 
+def validate_admin_auth():
+    """
+    Valida la autenticación del administrador desde el header Authorization.
+    Retorna (is_valid, error_response) donde error_response es None si es válido.
+    """
+    auth_header = request.headers.get('Authorization')
+
+    if not auth_header:
+        print("[DEBUG] No auth header provided")
+        return False, (jsonify({"error": "No autorizado - No se proporcionó token"}), 401)
+
+    if not ADMIN_PASSWORD_FROM_ENV:
+        print("[ERROR] ADMIN_PASSWORD environment variable not set!")
+        return False, (jsonify({"error": "Error de configuración del servidor"}), 500)
+
+    if ADMIN_PASSWORD_FROM_ENV not in auth_header:
+        print(f"[DEBUG] Password mismatch - Auth header: {auth_header[:20]}...")
+        return False, (jsonify({"error": "No autorizado - Credenciales inválidas"}), 401)
+
+    return True, None
+
+
 def init_db():
     """Inicializa la base de datos creando todas las tablas necesarias."""
     conn = get_db_connection()
@@ -377,6 +399,9 @@ if not AIRTABLE_PAT_FROM_ENV:
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
     print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no "
           "está configurada.")
+if not ADMIN_PASSWORD_FROM_ENV:
+    print("FATAL: La variable de entorno ADMIN_PASSWORD no está configurada. "
+          "El panel de administración no funcionará correctamente.")
 if not RESEND_API_KEY_FROM_ENV:
     print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está "
           "configurada. El envío de emails no funcionará.")
@@ -1369,9 +1394,9 @@ def admin_get_payments():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         limit = request.args.get('limit', 100, type=int)
         offset = request.args.get('offset', 0, type=int)
@@ -1419,9 +1444,9 @@ def admin_db_payments():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
@@ -1500,9 +1525,9 @@ def admin_db_payment_history():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
@@ -1583,9 +1608,9 @@ def admin_db_error_logs():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
@@ -1661,9 +1686,9 @@ def admin_db_contacts():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
@@ -1741,9 +1766,9 @@ def admin_db_cash_payments():
 
     try:
         # Verificar autenticación
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
-            return jsonify({"error": "No autorizado"}), 401
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
 
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)

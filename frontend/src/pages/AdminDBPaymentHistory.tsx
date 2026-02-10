@@ -53,20 +53,31 @@ const AdminDBPaymentHistory: React.FC = () => {
     setError(null);
     try {
       const password = localStorage.getItem('adminPassword') || '';
+      console.log('Fetching payment history with password:', password ? 'Password exists' : 'No password found');
+      console.log('API URL:', `${API_BASE_URL}/admin/db/payment-history`);
+
       const response = await axios.get<ApiResponse>(`${API_BASE_URL}/admin/db/payment-history`, {
         params: { page, limit, search: searchTerm },
         headers: { Authorization: `Bearer ${password}` }
       });
 
+      console.log('Response received:', response.data);
       setRecords(response.data.data);
       setTotal(response.data.total);
       setTotalPages(response.data.total_pages);
       setCurrentPage(response.data.page);
     } catch (err: any) {
+      console.error('Error fetching payment history:', err);
+      console.error('Error response:', err.response);
+
       if (err.response?.status === 401) {
-        navigate('/admin');
+        setError('Sesión expirada o no autorizada. Por favor, vuelve a iniciar sesión.');
+        // Esperar 3 segundos antes de redirigir para que el usuario pueda ver el mensaje
+        setTimeout(() => {
+          navigate('/admin');
+        }, 3000);
       } else {
-        setError(err.response?.data?.error || 'Error al cargar los datos');
+        setError(err.response?.data?.error || err.message || 'Error al cargar los datos. Por favor, intenta de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -74,6 +85,16 @@ const AdminDBPaymentHistory: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log('AdminDBPaymentHistory mounted, checking authentication...');
+    const password = localStorage.getItem('adminPassword');
+    if (!password) {
+      console.warn('No admin password found in localStorage');
+      setError('No se encontró sesión activa. Por favor, inicia sesión nuevamente.');
+      setTimeout(() => {
+        navigate('/admin');
+      }, 2000);
+      return;
+    }
     fetchRecords(1, '');
   }, []);
 
@@ -151,7 +172,18 @@ const AdminDBPaymentHistory: React.FC = () => {
       )}
 
       {error && (
-        <Alert variant="danger">{error}</Alert>
+        <Alert variant="danger" className="d-flex justify-content-between align-items-center">
+          <span>{error}</span>
+          {!error.includes('Sesión expirada') && !error.includes('No se encontró sesión') && (
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={() => fetchRecords(currentPage, search)}
+            >
+              Reintentar
+            </Button>
+          )}
+        </Alert>
       )}
 
       {!loading && !error && (
