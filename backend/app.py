@@ -1580,8 +1580,8 @@ def admin_db_payment_history():
                         record['fecha_hora'] = record['fecha_hora'].isoformat()
                     if record.get('created_at'):
                         record['created_at'] = record['created_at'].isoformat()
-                    if record.get('monto'):
-                        record['monto'] = float(record['monto'])
+                    # Asegurar que monto siempre sea un número (incluso si es 0 o NULL)
+                    record['monto'] = float(record.get('monto', 0) or 0)
 
                 return jsonify({
                     "data": records,

@@ -219,7 +219,9 @@ const AdminDBPaymentHistory: React.FC = () => {
                       <td>{record.nombre_apellido}</td>
                       <td>{record.dni}</td>
                       <td>{record.email || '-'}</td>
-                      <td className="text-end">${record.monto.toFixed(2)}</td>
+                      <td className="text-end">
+                        ${record.monto != null && !isNaN(record.monto) ? Number(record.monto).toFixed(2) : '0.00'}
+                      </td>
                       <td>
                         <span className={`badge bg-${getEstadoBadge(record.estado)}`}>
                           {record.estado}
