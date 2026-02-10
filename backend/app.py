@@ -182,6 +182,82 @@ def init_db():
             conn.close()
 
 
+# --- Helper Functions para PostgreSQL ---
+
+def save_payment_history(payment_id, comprobante_numero, nombre_apellido, dni,
+                         email, monto, estado, items_pagados=None, detalles=None):
+    """Guarda un registro en payment_history."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO payment_history
+                (payment_id, comprobante_numero, nombre_apellido, dni, email,
+                 monto, estado, items_pagados, detalles)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (payment_id, comprobante_numero, nombre_apellido, dni, email,
+                  monto, estado, json.dumps(items_pagados) if items_pagados else None,
+                  detalles))
+            conn.commit()
+            print(f"✅ Payment history guardado: {payment_id} - {estado}")
+    except Exception as e:
+        print(f"ERROR al guardar payment_history: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def save_error_log(nivel, tipo, mensaje, payment_id=None, related_id=None,
+                   detalles=None, stack_trace=None):
+    """Guarda un registro en error_logs."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO error_logs
+                (nivel, tipo, mensaje, payment_id, related_id, detalles, stack_trace)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (nivel, tipo, mensaje, payment_id, related_id,
+                  json.dumps(detalles) if detalles else None, stack_trace))
+            conn.commit()
+    except Exception as e:
+        print(f"ERROR al guardar error_log: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def save_contact_db(email, dni=None, nombre_apellido=None, celular=None,
+                    origen=None):
+    """Guarda o actualiza un contacto en la tabla contacts."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO contacts (email, dni, nombre_apellido, celular, origen)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (email) DO UPDATE SET
+                    dni = COALESCE(EXCLUDED.dni, contacts.dni),
+                    nombre_apellido = COALESCE(EXCLUDED.nombre_apellido, contacts.nombre_apellido),
+                    celular = COALESCE(EXCLUDED.celular, contacts.celular),
+                    origen = EXCLUDED.origen,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (email, dni, nombre_apellido, celular, origen))
+            conn.commit()
+            print(f"✅ Contacto guardado: {email}")
+    except Exception as e:
+        print(f"ERROR al guardar contacto: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 # Configuración CORS
 cors_origins = os.getenv("CORS_ORIGINS", "*")
 if cors_origins != "*":
@@ -290,6 +366,17 @@ except Exception as e:
 
 # --- Funciones Auxiliares ---
 def log_to_airtable(level, source, message, related_id=None, details=None):
+    # Guardar en PostgreSQL
+    save_error_log(
+        nivel=level,
+        tipo=source,
+        mensaje=message,
+        payment_id=related_id if related_id and 'PAY-' in str(related_id) else None,
+        related_id=str(related_id) if related_id else None,
+        detalles=details
+    )
+
+    # Guardar en Airtable (legacy)
     if not api:
         print(f"ERROR: Airtable API no inicializada. "
               f"No se pudo escribir log: {message}")
@@ -312,8 +399,21 @@ def log_to_airtable(level, source, message, related_id=None, details=None):
               f"Mensaje original: {message}")
 
 
-def save_contacto(email, nombre=None, origen=None):
-    if not api or not email:
+def save_contacto(email, nombre=None, origen=None, dni=None, celular=None):
+    if not email:
+        return
+
+    # Guardar en PostgreSQL
+    save_contact_db(
+        email=email,
+        dni=dni,
+        nombre_apellido=nombre,
+        celular=celular,
+        origen=origen
+    )
+
+    # Guardar en Airtable (legacy)
+    if not api:
         return
     try:
         contactos_table = api.table(BASE_ID, CONTACTOS_TABLE_ID)
@@ -704,6 +804,19 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                 f'{historial_record_id}',
                 related_id=payment_id)
 
+            # Guardar en payment_history de PostgreSQL
+            save_payment_history(
+                payment_id=payment_id,
+                comprobante_numero=historial_record_id,
+                nombre_apellido=nombre_pagador or items_context.get('nombre_contribuyente', 'N/A'),
+                dni=items_context.get('dni', 'N/A'),
+                email=items_context.get('email'),
+                monto=monto_pagado,
+                estado='exitoso',
+                items_pagados=items_for_pdf,
+                detalles=f"Pago TIC para {items_context.get('item_type')}"
+            )
+
             receipt_url = (f"{BACKEND_URL}/api/receipt/"
                            f"{historial_record_id}")
             historial_table.update(
@@ -757,6 +870,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                     save_contacto(
                         email=items_context.get('email'),
                         nombre=nombre_cont,
+                        dni=items_context.get('dni'),
                         origen='Pago TIC Online')
                 else:
                     email_sent_status = "No enviado (sin email o PDF)"
@@ -770,6 +884,24 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
             historial_table.update(
                 historial_record_id,
                 {"Comprobante_Status": email_sent_status})
+
+        elif new_status == 'rejected':
+            # Guardar pago rechazado en payment_history
+            log_to_airtable(
+                'WARNING', 'Pago TIC Process',
+                f'Pago RECHAZADO para ID: {payment_id}')
+
+            save_payment_history(
+                payment_id=payment_id,
+                comprobante_numero=None,
+                nombre_apellido=items_context.get('nombre_contribuyente', 'N/A'),
+                dni=items_context.get('dni', 'N/A'),
+                email=items_context.get('email'),
+                monto=monto_pagado,
+                estado='fallido',
+                items_pagados=items_context,
+                detalles=wallet_response.get('status_detail') if wallet_response else 'Pago rechazado'
+            )
 
         return {"status": "ok", "historialRecordId": historial_record_id}
     except Exception as e:
