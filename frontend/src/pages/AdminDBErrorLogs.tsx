@@ -24,7 +24,6 @@ interface ErrorLog {
   payment_id: string | null;
   related_id: string | null;
   fecha_hora: string;
-  created_at: string;
 }
 
 interface ApiResponse {

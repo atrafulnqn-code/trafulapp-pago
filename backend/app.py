@@ -1540,7 +1540,7 @@ def admin_db_error_logs():
                 # Obtener datos paginados
                 data_query = f"""
                     SELECT id, nivel, tipo, mensaje, payment_id, related_id,
-                           fecha_hora, created_at
+                           fecha_hora
                     FROM error_logs
                     {search_query}
                     ORDER BY fecha_hora DESC
@@ -1555,8 +1555,6 @@ def admin_db_error_logs():
                 for record in records:
                     if record.get('fecha_hora'):
                         record['fecha_hora'] = record['fecha_hora'].isoformat()
-                    if record.get('created_at'):
-                        record['created_at'] = record['created_at'].isoformat()
 
                 return jsonify({
                     "data": records,
