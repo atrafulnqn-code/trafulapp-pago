@@ -739,8 +739,9 @@ def create_pagotic_payment():
         # Construir el body para la API de Pago TIC
         from datetime import datetime, timedelta
 
-        # Fecha de vencimiento (7 días desde hoy)
+        # Fechas de vencimiento
         due_date = (datetime.now() + timedelta(days=7)).isoformat()
+        last_due_date = (datetime.now() + timedelta(days=30)).isoformat()
 
         # URL del webhook para recibir notificaciones
         webhook_url = f"{BACKEND_URL}/api/pagotic_webhook"
@@ -756,12 +757,13 @@ def create_pagotic_payment():
 
         # Datos del pagador
         payer_data = {
+            "external_reference": items_to_pay.get('dni', payment_id),
             "name": items_to_pay.get('nombre', 'Sin nombre'),
             "email": items_to_pay.get('email', ''),
             "identification": {
-                "type": "DNI",
+                "type": "DNI_ARG",
                 "number": items_to_pay.get('dni', '00000000'),
-                "country": "AR"
+                "country": "ARG"
             }
         }
 
@@ -770,6 +772,7 @@ def create_pagotic_payment():
             "currency_id": "ARS",
             "external_transaction_id": payment_id,
             "due_date": due_date,
+            "last_due_date": last_due_date,
             "notification_url": webhook_url,
             "details": payment_details,
             "payer": payer_data
@@ -859,18 +862,23 @@ def pagotic_webhook():
             return jsonify({"error": "Missing external_transaction_id"}), 400
 
         # Determinar el nuevo estado del pago
+        # Mapeo según documentación oficial de Pago TIC
         status_map = {
-            'APROBADO': 'approved',
-            'APPROVED': 'approved',
-            'RECHAZADO': 'rejected',
-            'REJECTED': 'rejected',
-            'PENDIENTE': 'pending',
             'PENDING': 'pending',
-            'CANCELADO': 'cancelled',
-            'CANCELLED': 'cancelled'
+            'ISSUED': 'issued',
+            'IN_PROCESS': 'in_process',
+            'APPROVED': 'approved',
+            'REJECTED': 'rejected',
+            'CANCELLED': 'cancelled',
+            'REFUNDED': 'refunded',
+            'DEFERRED': 'deferred',
+            'OBJECTED': 'objected',
+            'REVIEW': 'review',
+            'VALIDATE': 'validate',
+            'OVERDUE': 'overdue'
         }
 
-        new_status = status_map.get(status.upper() if status else '', 'pending')
+        new_status = status_map.get(status.upper() if status else '', status)
 
         log_to_airtable(
             'INFO', 'Pago TIC Webhook',
