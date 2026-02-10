@@ -603,6 +603,46 @@ def search_contributivo():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/search/agua', methods=['GET'])
+def search_agua():
+    log_to_airtable('INFO', 'API Search',
+                    'Recibida petición en /api/search/agua')
+    if not api:
+        return jsonify({"error": "Airtable no configurado."}), 500
+
+    query = request.args.get('query')
+    if not query:
+        return jsonify({"error": "El parámetro 'query' es requerido."}), 400
+
+    try:
+        table = api.table(BASE_ID, WATER_TABLE_ID)
+
+        lower_query = query.lower()
+        search_terms = lower_query.split()
+
+        conditions_for_dni = [
+            SEARCH(term, LOWER(Field('dni'))) for term in search_terms]
+        conditions_for_contribuyente = [
+            SEARCH(term, LOWER(Field('contribuyente')))
+            for term in search_terms]
+
+        if len(search_terms) > 1:
+            formula_obj = OR(
+                AND(*conditions_for_dni),
+                AND(*conditions_for_contribuyente))
+        else:
+            formula_obj = OR(
+                SEARCH(lower_query, LOWER(Field('dni'))),
+                SEARCH(lower_query, LOWER(Field('contribuyente'))))
+
+        records = table.all(formula=str(formula_obj))
+        return jsonify(records)
+    except Exception as e:
+        log_to_airtable('ERROR', 'API Search',
+                        f'ERROR en search_agua: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 def process_payment(payment_id, payment_info, items_context,
                     is_simulation=False):
     log_to_airtable('INFO', 'Payment Process',
