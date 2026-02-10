@@ -38,7 +38,8 @@ const AdminLogin: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('adminUser', 'Super Admin'); 
+        localStorage.setItem('adminUser', 'Super Admin');
+        localStorage.setItem('adminPassword', password);
         navigate('/admin/dashboard');
       } else {
         setError(data.message || 'Error al iniciar sesión. Inténtelo de nuevo.');
