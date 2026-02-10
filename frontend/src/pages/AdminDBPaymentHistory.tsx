@@ -3,6 +3,19 @@ import { Container, Table, Form, Button, Pagination, Spinner, Alert } from 'reac
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+// Configuración de URL de API robusta
+// @ts-ignore
+const getApiBaseUrl = () => {
+  // @ts-ignore
+  const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+  if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+    return runtimeUrl;
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
 interface PaymentHistory {
   id: number;
   payment_id: string;
@@ -35,14 +48,12 @@ const AdminDBPaymentHistory: React.FC = () => {
   const [total, setTotal] = useState(0);
   const limit = 10;
 
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000';
-
   const fetchRecords = async (page: number, searchTerm: string) => {
     setLoading(true);
     setError(null);
     try {
       const password = localStorage.getItem('adminPassword') || '';
-      const response = await axios.get<ApiResponse>(`${backendUrl}/api/admin/db/payment-history`, {
+      const response = await axios.get<ApiResponse>(`${API_BASE_URL}/admin/db/payment-history`, {
         params: { page, limit, search: searchTerm },
         headers: { Authorization: `Bearer ${password}` }
       });
