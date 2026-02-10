@@ -140,6 +140,42 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_contacts_origen ON contacts(origen);
             """)
 
+            # Tabla cash_payments - Registro de pagos en efectivo
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cash_payments (
+                    id SERIAL PRIMARY KEY,
+                    comprobante_id VARCHAR(255) UNIQUE NOT NULL,
+                    tipo_pago VARCHAR(50) NOT NULL,
+                    fecha_pago DATE NOT NULL,
+                    nombre VARCHAR(255) NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    monto_original NUMERIC(10, 2),
+                    descuento NUMERIC(5, 2) DEFAULT 0,
+                    monto_total NUMERIC(10, 2) NOT NULL,
+                    administrativo VARCHAR(255),
+                    detalle TEXT,
+                    items_json JSONB,
+                    patente VARCHAR(20),
+                    marca VARCHAR(100),
+                    modelo VARCHAR(100),
+                    anio VARCHAR(10),
+                    comentarios TEXT,
+                    transferencia VARCHAR(255),
+                    pdf_enviado BOOLEAN DEFAULT FALSE,
+                    email_status VARCHAR(255),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_comprobante ON cash_payments(comprobante_id);
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_tipo ON cash_payments(tipo_pago);
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_fecha ON cash_payments(fecha_pago);
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_email ON cash_payments(email);
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_patente ON cash_payments(patente);
+                CREATE INDEX IF NOT EXISTS idx_cash_payments_created ON cash_payments(created_at);
+            """)
+
             # Función para actualizar updated_at
             cur.execute("""
                 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -168,12 +204,22 @@ def init_db():
                 EXECUTE FUNCTION update_updated_at_column();
             """)
 
+            # Trigger para cash_payments
+            cur.execute("""
+                DROP TRIGGER IF EXISTS update_cash_payments_updated_at ON cash_payments;
+                CREATE TRIGGER update_cash_payments_updated_at
+                BEFORE UPDATE ON cash_payments
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+            """)
+
             conn.commit()
             print("✅ Tablas en PostgreSQL inicializadas correctamente:")
             print("   - payments")
             print("   - payment_history")
             print("   - error_logs")
             print("   - contacts")
+            print("   - cash_payments")
     except Exception as e:
         print(f"ERROR al inicializar las tablas: {e}")
         conn.rollback()
@@ -253,6 +299,40 @@ def save_contact_db(email, dni=None, nombre_apellido=None, celular=None,
             print(f"✅ Contacto guardado: {email}")
     except Exception as e:
         print(f"ERROR al guardar contacto: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def save_cash_payment(comprobante_id, tipo_pago, fecha_pago, nombre, email,
+                      monto_total, monto_original=None, descuento=0,
+                      administrativo=None, detalle=None, items_json=None,
+                      patente=None, marca=None, modelo=None, anio=None,
+                      comentarios=None, transferencia=None, pdf_enviado=False,
+                      email_status=None):
+    """Guarda un pago en efectivo en la tabla cash_payments."""
+    conn = get_db_connection()
+    if not conn:
+        print("ADVERTENCIA: No hay conexión DB. Pago en efectivo no guardado en PostgreSQL.")
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO cash_payments
+                (comprobante_id, tipo_pago, fecha_pago, nombre, email,
+                 monto_original, descuento, monto_total, administrativo,
+                 detalle, items_json, patente, marca, modelo, anio,
+                 comentarios, transferencia, pdf_enviado, email_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (comprobante_id, tipo_pago, fecha_pago, nombre, email,
+                  monto_original, descuento, monto_total, administrativo,
+                  detalle, json.dumps(items_json) if items_json else None,
+                  patente, marca, modelo, anio, comentarios, transferencia,
+                  pdf_enviado, email_status))
+            conn.commit()
+            print(f"✅ Pago en efectivo guardado en PostgreSQL: {comprobante_id} - {tipo_pago} - ${monto_total}")
+    except Exception as e:
+        print(f"ERROR al guardar pago en efectivo: {e}")
         conn.rollback()
     finally:
         conn.close()
@@ -1650,6 +1730,589 @@ def admin_db_contacts():
     except Exception as e:
         log_to_airtable('ERROR', 'Admin DB Contacts',
                         f'Error obteniendo contacts: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/cash-payments', methods=['GET', 'OPTIONS'])
+def admin_db_cash_payments():
+    """Obtener tabla cash_payments con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        tipo_filter = request.args.get('tipo', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda y filtros
+                where_clauses = []
+                params = []
+
+                if search:
+                    where_clauses.append("""(
+                        comprobante_id ILIKE %s
+                        OR nombre ILIKE %s
+                        OR email ILIKE %s
+                        OR patente ILIKE %s
+                        OR administrativo ILIKE %s
+                    )""")
+                    search_param = f"%{search}%"
+                    params.extend([search_param] * 5)
+
+                if tipo_filter:
+                    where_clauses.append("tipo_pago = %s")
+                    params.append(tipo_filter)
+
+                where_query = ""
+                if where_clauses:
+                    where_query = "WHERE " + " AND ".join(where_clauses)
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM cash_payments {where_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, comprobante_id, tipo_pago, fecha_pago, nombre, email,
+                           monto_original, descuento, monto_total, administrativo,
+                           patente, marca, modelo, anio, pdf_enviado, email_status,
+                           created_at
+                    FROM cash_payments
+                    {where_query}
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir tipos de datos
+                for record in records:
+                    if record.get('fecha_pago'):
+                        record['fecha_pago'] = record['fecha_pago'].isoformat()
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+                    if record.get('monto_original'):
+                        record['monto_original'] = float(record['monto_original'])
+                    if record.get('descuento'):
+                        record['descuento'] = float(record['descuento'])
+                    if record.get('monto_total'):
+                        record['monto_total'] = float(record['monto_total'])
+
+                # Obtener estadísticas
+                stats_query = f"""
+                    SELECT
+                        COUNT(*) as total_registros,
+                        COALESCE(SUM(monto_total), 0) as monto_total,
+                        COALESCE(SUM(CASE WHEN tipo_pago = 'recaudacion' THEN monto_total ELSE 0 END), 0) as monto_recaudacion,
+                        COALESCE(SUM(CASE WHEN tipo_pago = 'patente' THEN monto_total ELSE 0 END), 0) as monto_patente,
+                        COALESCE(SUM(CASE WHEN pdf_enviado = TRUE THEN 1 ELSE 0 END), 0) as emails_enviados
+                    FROM cash_payments
+                    {where_query}
+                """
+                cur.execute(stats_query, params)
+                stats = cur.fetchone()
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit,
+                    "stats": {
+                        "total_registros": stats[0],
+                        "monto_total": float(stats[1]),
+                        "monto_recaudacion": float(stats[2]),
+                        "monto_patente": float(stats[3]),
+                        "emails_enviados": stats[4]
+                    }
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB Cash Payments',
+                        f'Error obteniendo cash_payments: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/staff/register_access', methods=['POST', 'OPTIONS'])
+def staff_register_access():
+    """Registrar acceso del personal a la plataforma"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        data = request.get_json()
+        username = data.get('username', 'Desconocido')
+
+        # Guardar en Airtable
+        if api:
+            try:
+                accesos_table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
+                accesos_table.create({
+                    'Nombre': username,
+                    'Fecha': datetime.now().isoformat(),
+                    'Tipo': 'Login'
+                })
+                log_to_airtable('INFO', 'Staff Access',
+                                f'Acceso registrado para {username}')
+            except Exception as e:
+                # No fallar si no se puede registrar el acceso
+                log_to_airtable('WARNING', 'Staff Access',
+                                f'No se pudo registrar acceso: {e}')
+
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Staff Access',
+                        f'Error registrando acceso: {e}')
+        # No fallar la autenticación por esto
+        return jsonify({"status": "ok"}), 200
+
+
+@app.route('/api/recaudacion_efectivo', methods=['POST', 'OPTIONS'])
+def recaudacion_efectivo():
+    """Registrar pago en efectivo de tasas municipales"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        data = request.get_json()
+
+        # Extraer datos del request
+        fecha = data.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+        nombre = data.get('nombre', '')
+        email = data.get('email', '')
+        administrativa = data.get('administrativa', '')
+        importes = data.get('importes', {})
+        notas = data.get('notas', {})
+        total = data.get('total', 0)
+        total_final = data.get('total_final', 0)
+        descuento = data.get('descuento', 0)
+
+        if not nombre or not email:
+            return jsonify({"error": "Nombre y email son requeridos"}), 400
+
+        # Generar ID único para el comprobante
+        comprobante_id = f"REC-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+
+        # Construir detalle de items pagados para el PDF y Airtable
+        items_for_pdf = []
+        detalle_texto = []
+        for concepto_id, monto in importes.items():
+            if float(monto) > 0:
+                # Buscar el label del concepto
+                concepto_label = concepto_id  # default
+                nota = notas.get(concepto_id, '')
+
+                items_for_pdf.append({
+                    "description": f"{concepto_label}{(' - ' + nota) if nota else ''}",
+                    "amount": float(monto)
+                })
+
+                detalle_linea = f"{concepto_label}: ${monto}"
+                if nota:
+                    detalle_linea += f" ({nota})"
+                detalle_texto.append(detalle_linea)
+
+        detalle_completo = "\n".join(detalle_texto)
+        if descuento and float(descuento) > 0:
+            detalle_completo += f"\n\nDescuento aplicado: {descuento}%"
+        detalle_completo += f"\n\nRecibido por: {administrativa}"
+
+        # Guardar en PostgreSQL - Tabla específica de pagos en efectivo
+        save_cash_payment(
+            comprobante_id=comprobante_id,
+            tipo_pago='recaudacion',
+            fecha_pago=fecha,
+            nombre=nombre,
+            email=email,
+            monto_original=total,
+            descuento=descuento,
+            monto_total=total_final,
+            administrativo=administrativa,
+            detalle=detalle_completo,
+            items_json=items_for_pdf,
+            transferencia=data.get('transferencia', ''),
+            pdf_enviado=False,  # Se actualizará después
+            email_status='Pendiente'
+        )
+
+        # También guardar en payment_history para consistencia
+        save_payment_history(
+            payment_id=comprobante_id,
+            comprobante_numero=comprobante_id,
+            nombre_apellido=nombre,
+            dni='',
+            email=email,
+            monto=total_final,
+            estado='exitoso',
+            items_pagados=items_for_pdf,
+            detalles=f"Recaudación efectivo - {detalle_completo}"
+        )
+
+        # Guardar en Airtable
+        if api:
+            try:
+                recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+                airtable_record = recaudacion_table.create({
+                    'Comprobante ID': comprobante_id,
+                    'Fecha': fecha,
+                    'Nombre': nombre,
+                    'Email': email,
+                    'Monto Total': total_final,
+                    'Descuento': float(descuento) if descuento else 0,
+                    'Detalle': detalle_completo,
+                    'Administrativa': administrativa,
+                    'Items JSON': json.dumps(items_for_pdf)
+                })
+                log_to_airtable('INFO', 'Recaudacion Efectivo',
+                                f'Registro creado: {comprobante_id} - ${total_final}')
+            except Exception as airtable_error:
+                log_to_airtable('ERROR', 'Recaudacion Efectivo',
+                                f'Error guardando en Airtable: {airtable_error}')
+                # No fallar si Airtable falla, ya está en PostgreSQL
+
+        # Generar PDF
+        pdf_details = {
+            "FECHA_PAGO": datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y"),
+            "ESTADO_PAGO": "Pagado en Efectivo",
+            "ID_PAGO_MP": comprobante_id,
+            "NOMBRE_PAGADOR": nombre,
+            "IDENTIFICADOR_PAGADOR": email,
+            "items": items_for_pdf,
+            "MONTO_TOTAL": total_final
+        }
+
+        pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=comprobante_id)
+
+        if not pdf_file:
+            return jsonify({"error": "Error generando PDF"}), 500
+
+        # Convertir PDF a base64 para enviarlo en la respuesta
+        pdf_content = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
+
+        # Enviar email con el PDF
+        email_status = "No enviado"
+        if email and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+                params = {
+                    "from": from_email,
+                    "to": email,
+                    "subject": "Comprobante de Pago - Municipalidad de Villa Traful",
+                    "html": f"""
+                    <h2>Comprobante de Pago en Efectivo</h2>
+                    <p>Estimado/a {nombre},</p>
+                    <p>Adjuntamos el comprobante de su pago recibido en efectivo.</p>
+                    <p><strong>Número de comprobante:</strong> {comprobante_id}</p>
+                    <p><strong>Fecha:</strong> {datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y")}</p>
+                    <p><strong>Monto total:</strong> ${total_final}</p>
+                    <p>Gracias por su pago.</p>
+                    <p>Municipalidad de Villa Traful</p>
+                    """,
+                    "attachments": [{
+                        "filename": f"comprobante_{comprobante_id}.pdf",
+                        "content": pdf_content
+                    }]
+                }
+                resend.Emails.send(params)
+                email_status = f"Enviado a {email}"
+
+                # Guardar contacto
+                save_contacto(
+                    email=email,
+                    nombre=nombre,
+                    origen='Recaudación Efectivo'
+                )
+
+                log_to_airtable('INFO', 'Recaudacion Efectivo',
+                                f'Email enviado a {email} con comprobante {comprobante_id}')
+
+                # Actualizar estado del email en PostgreSQL
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE cash_payments
+                                SET pdf_enviado = TRUE, email_status = %s
+                                WHERE comprobante_id = %s
+                            """, (email_status, comprobante_id))
+                            conn.commit()
+                    except Exception as update_error:
+                        print(f"Error actualizando estado email: {update_error}")
+                    finally:
+                        conn.close()
+
+            except Exception as email_error:
+                log_to_airtable('ERROR', 'Recaudacion Efectivo',
+                                f'Error enviando email: {email_error}')
+                email_status = f"Error: {str(email_error)[:100]}"
+
+                # Actualizar estado del error en PostgreSQL
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE cash_payments
+                                SET pdf_enviado = FALSE, email_status = %s
+                                WHERE comprobante_id = %s
+                            """, (email_status, comprobante_id))
+                            conn.commit()
+                    except Exception as update_error:
+                        print(f"Error actualizando estado email: {update_error}")
+                    finally:
+                        conn.close()
+
+        return jsonify({
+            "message": f"Pago registrado exitosamente. Comprobante: {comprobante_id}. {email_status}",
+            "comprobante_id": comprobante_id,
+            "pdf_base64": pdf_content,
+            "email_status": email_status
+        }), 200
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Recaudacion Efectivo',
+                        f'Error procesando pago en efectivo: {e}',
+                        details={'error': str(e), 'traceback': traceback.format_exc()})
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/patente_efectivo', methods=['POST', 'OPTIONS'])
+def patente_efectivo():
+    """Registrar pago en efectivo de patente automotor"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        data = request.get_json()
+
+        # Extraer datos del request
+        fecha = data.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+        nombre = data.get('nombre', '')
+        email = data.get('email', '')
+        administrativo = data.get('administrativo', '')
+        patente = data.get('patente', '').upper()
+        marca = data.get('marca', '')
+        modelo = data.get('modelo', '')
+        anio = data.get('anio', '')
+        comentarios = data.get('comentarios', '')
+        monto = float(data.get('monto', 0))
+        descuento = float(data.get('descuento', 0))
+        total_final = data.get('total_final', monto)
+        transferencia = data.get('transferencia', '')
+
+        if not nombre or not email or not patente:
+            return jsonify({"error": "Nombre, email y patente son requeridos"}), 400
+
+        # Generar ID único para el comprobante
+        comprobante_id = f"PAT-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+
+        # Construir detalle
+        detalle_completo = f"Pago de Patente Automotor\n"
+        detalle_completo += f"Patente: {patente}\n"
+        detalle_completo += f"Vehículo: {marca} {modelo} ({anio})\n"
+        if comentarios:
+            detalle_completo += f"Comentarios: {comentarios}\n"
+        if descuento > 0:
+            detalle_completo += f"\nMonto original: ${monto}\n"
+            detalle_completo += f"Descuento aplicado: {descuento}%\n"
+            detalle_completo += f"Total pagado: ${total_final}\n"
+        detalle_completo += f"\nRecibido por: {administrativo}"
+
+        # Items para PDF
+        items_for_pdf = [{
+            "description": f"Patente {patente} - {marca} {modelo} ({anio})",
+            "amount": total_final
+        }]
+
+        # Guardar en PostgreSQL - Tabla específica de pagos en efectivo
+        save_cash_payment(
+            comprobante_id=comprobante_id,
+            tipo_pago='patente',
+            fecha_pago=fecha,
+            nombre=nombre,
+            email=email,
+            monto_original=monto,
+            descuento=descuento,
+            monto_total=total_final,
+            administrativo=administrativo,
+            detalle=detalle_completo,
+            items_json=items_for_pdf,
+            patente=patente,
+            marca=marca,
+            modelo=modelo,
+            anio=anio,
+            comentarios=comentarios,
+            transferencia=transferencia,
+            pdf_enviado=False,
+            email_status='Pendiente'
+        )
+
+        # También guardar en payment_history para consistencia
+        save_payment_history(
+            payment_id=comprobante_id,
+            comprobante_numero=comprobante_id,
+            nombre_apellido=nombre,
+            dni='',
+            email=email,
+            monto=total_final,
+            estado='exitoso',
+            items_pagados=items_for_pdf,
+            detalles=detalle_completo
+        )
+
+        # Guardar en Airtable
+        if api:
+            try:
+                patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+                airtable_record = patente_table.create({
+                    'Comprobante ID': comprobante_id,
+                    'Fecha': fecha,
+                    'Nombre': nombre,
+                    'Email': email,
+                    'Patente': patente,
+                    'Marca': marca,
+                    'Modelo': modelo,
+                    'Año': anio,
+                    'Monto': total_final,
+                    'Descuento': descuento,
+                    'Detalle': detalle_completo,
+                    'Administrativo': administrativo,
+                    'Comentarios': comentarios
+                })
+                log_to_airtable('INFO', 'Patente Efectivo',
+                                f'Registro creado: {comprobante_id} - Patente {patente} - ${total_final}')
+            except Exception as airtable_error:
+                log_to_airtable('ERROR', 'Patente Efectivo',
+                                f'Error guardando en Airtable: {airtable_error}')
+                # No fallar si Airtable falla, ya está en PostgreSQL
+
+        # Generar PDF
+        pdf_details = {
+            "FECHA_PAGO": datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y"),
+            "ESTADO_PAGO": "Pagado en Efectivo",
+            "ID_PAGO_MP": comprobante_id,
+            "NOMBRE_PAGADOR": nombre,
+            "IDENTIFICADOR_PAGADOR": f"Patente: {patente}",
+            "items": items_for_pdf,
+            "MONTO_TOTAL": total_final
+        }
+
+        pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=comprobante_id)
+
+        if not pdf_file:
+            return jsonify({"error": "Error generando PDF"}), 500
+
+        # Convertir PDF a base64 para enviarlo en la respuesta
+        pdf_content = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
+
+        # Enviar email con el PDF
+        email_status = "No enviado"
+        if email and resend.api_key:
+            try:
+                from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+                params = {
+                    "from": from_email,
+                    "to": email,
+                    "subject": "Comprobante de Pago de Patente - Municipalidad de Villa Traful",
+                    "html": f"""
+                    <h2>Comprobante de Pago de Patente</h2>
+                    <p>Estimado/a {nombre},</p>
+                    <p>Adjuntamos el comprobante de su pago de patente recibido en efectivo.</p>
+                    <p><strong>Número de comprobante:</strong> {comprobante_id}</p>
+                    <p><strong>Patente:</strong> {patente}</p>
+                    <p><strong>Vehículo:</strong> {marca} {modelo} ({anio})</p>
+                    <p><strong>Fecha:</strong> {datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y")}</p>
+                    <p><strong>Monto total:</strong> ${total_final}</p>
+                    <p>Gracias por su pago.</p>
+                    <p>Municipalidad de Villa Traful</p>
+                    """,
+                    "attachments": [{
+                        "filename": f"comprobante_patente_{patente}_{comprobante_id}.pdf",
+                        "content": pdf_content
+                    }]
+                }
+                resend.Emails.send(params)
+                email_status = f"Enviado a {email}"
+
+                # Guardar contacto
+                save_contacto(
+                    email=email,
+                    nombre=nombre,
+                    origen='Pago Patente Efectivo'
+                )
+
+                log_to_airtable('INFO', 'Patente Efectivo',
+                                f'Email enviado a {email} con comprobante {comprobante_id}')
+
+                # Actualizar estado del email en PostgreSQL
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE cash_payments
+                                SET pdf_enviado = TRUE, email_status = %s
+                                WHERE comprobante_id = %s
+                            """, (email_status, comprobante_id))
+                            conn.commit()
+                    except Exception as update_error:
+                        print(f"Error actualizando estado email: {update_error}")
+                    finally:
+                        conn.close()
+
+            except Exception as email_error:
+                log_to_airtable('ERROR', 'Patente Efectivo',
+                                f'Error enviando email: {email_error}')
+                email_status = f"Error: {str(email_error)[:100]}"
+
+                # Actualizar estado del error en PostgreSQL
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                UPDATE cash_payments
+                                SET pdf_enviado = FALSE, email_status = %s
+                                WHERE comprobante_id = %s
+                            """, (email_status, comprobante_id))
+                            conn.commit()
+                    except Exception as update_error:
+                        print(f"Error actualizando estado email: {update_error}")
+                    finally:
+                        conn.close()
+
+        return jsonify({
+            "message": f"Pago de patente registrado exitosamente. Comprobante: {comprobante_id}. {email_status}",
+            "comprobante_id": comprobante_id,
+            "pdf_base64": pdf_content,
+            "email_status": email_status
+        }), 200
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Patente Efectivo',
+                        f'Error procesando pago de patente en efectivo: {e}',
+                        details={'error': str(e), 'traceback': traceback.format_exc()})
         return jsonify({"error": str(e)}), 500
 
 
