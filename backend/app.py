@@ -46,7 +46,7 @@ def get_db_connection():
 
 
 def init_db():
-    """Inicializa la base de datos creando la tabla de pagos."""
+    """Inicializa la base de datos creando todas las tablas necesarias."""
     conn = get_db_connection()
     if conn is None:
         print("ERROR: No se puede inicializar la DB porque no hay "
@@ -54,6 +54,7 @@ def init_db():
         return
     try:
         with conn.cursor() as cur:
+            # Tabla payments (existente)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS payments (
                     id SERIAL PRIMARY KEY,
@@ -71,6 +72,75 @@ def init_db():
                         DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            # Tabla payment_history - Historial detallado de pagos
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS payment_history (
+                    id SERIAL PRIMARY KEY,
+                    payment_id VARCHAR(255) NOT NULL,
+                    comprobante_numero VARCHAR(255),
+                    nombre_apellido VARCHAR(255) NOT NULL,
+                    dni VARCHAR(50) NOT NULL,
+                    email VARCHAR(255),
+                    monto NUMERIC(10, 2) NOT NULL,
+                    estado VARCHAR(50) NOT NULL,
+                    fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    items_pagados JSONB,
+                    detalles TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_payment_history_payment_id ON payment_history(payment_id);
+                CREATE INDEX IF NOT EXISTS idx_payment_history_dni ON payment_history(dni);
+                CREATE INDEX IF NOT EXISTS idx_payment_history_fecha_hora ON payment_history(fecha_hora);
+                CREATE INDEX IF NOT EXISTS idx_payment_history_estado ON payment_history(estado);
+            """)
+
+            # Tabla error_logs - Registro de errores y logs
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS error_logs (
+                    id SERIAL PRIMARY KEY,
+                    nivel VARCHAR(20) NOT NULL,
+                    tipo VARCHAR(100) NOT NULL,
+                    mensaje TEXT NOT NULL,
+                    payment_id VARCHAR(255),
+                    related_id VARCHAR(255),
+                    detalles JSONB,
+                    stack_trace TEXT,
+                    ip_address VARCHAR(50),
+                    user_agent TEXT,
+                    fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_error_logs_nivel ON error_logs(nivel);
+                CREATE INDEX IF NOT EXISTS idx_error_logs_tipo ON error_logs(tipo);
+                CREATE INDEX IF NOT EXISTS idx_error_logs_payment_id ON error_logs(payment_id);
+                CREATE INDEX IF NOT EXISTS idx_error_logs_fecha_hora ON error_logs(fecha_hora);
+            """)
+
+            # Tabla contacts - Registro de contactos
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS contacts (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    dni VARCHAR(50),
+                    nombre_apellido VARCHAR(255),
+                    celular VARCHAR(50),
+                    origen VARCHAR(100),
+                    notas TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+                CREATE INDEX IF NOT EXISTS idx_contacts_dni ON contacts(dni);
+                CREATE INDEX IF NOT EXISTS idx_contacts_origen ON contacts(origen);
+            """)
+
+            # Función para actualizar updated_at
             cur.execute("""
                 CREATE OR REPLACE FUNCTION update_updated_at_column()
                 RETURNS TRIGGER AS $$
@@ -80,19 +150,33 @@ def init_db():
                 END;
                 $$ language 'plpgsql';
             """)
+
+            # Triggers para updated_at
             cur.execute("""
-                DROP TRIGGER IF EXISTS update_payments_updated_at
-                    ON payments;
+                DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
                 CREATE TRIGGER update_payments_updated_at
                 BEFORE UPDATE ON payments
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
             """)
+
+            cur.execute("""
+                DROP TRIGGER IF EXISTS update_contacts_updated_at ON contacts;
+                CREATE TRIGGER update_contacts_updated_at
+                BEFORE UPDATE ON contacts
+                FOR EACH ROW
+                EXECUTE FUNCTION update_updated_at_column();
+            """)
+
             conn.commit()
-            print("Tabla 'payments' en PostgreSQL inicializada/verificada "
-                  "correctamente.")
+            print("✅ Tablas en PostgreSQL inicializadas correctamente:")
+            print("   - payments")
+            print("   - payment_history")
+            print("   - error_logs")
+            print("   - contacts")
     except Exception as e:
-        print(f"ERROR al inicializar la tabla 'payments': {e}")
+        print(f"ERROR al inicializar las tablas: {e}")
+        conn.rollback()
     finally:
         if conn:
             conn.close()
