@@ -1171,5 +1171,125 @@ def pagotic_webhook():
         return jsonify({"error": str(e)}), 500
 
 
+# --- Admin Endpoints ---
+
+@app.route('/api/admin/stats-login', methods=['POST', 'OPTIONS'])
+def admin_stats_login():
+    """Login de administrador y obtención de estadísticas"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        data = request.get_json()
+        username = data.get('username', '')
+        password = data.get('password', '')
+
+        # Validar credenciales
+        if password != ADMIN_PASSWORD_FROM_ENV:
+            return jsonify({"error": "Credenciales inválidas"}), 401
+
+        # Obtener estadísticas desde PostgreSQL
+        conn = get_db_connection()
+        stats = {
+            "authenticated": True,
+            "username": username,
+            "total_payments": 0,
+            "total_approved": 0,
+            "total_rejected": 0,
+            "total_amount": 0,
+            "total_logs": 0,
+            "total_contacts": 0
+        }
+
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    # Total de pagos
+                    cur.execute("SELECT COUNT(*) FROM payments")
+                    stats["total_payments"] = cur.fetchone()[0] or 0
+
+                    # Pagos aprobados
+                    cur.execute("SELECT COUNT(*) FROM payments WHERE status = 'approved'")
+                    stats["total_approved"] = cur.fetchone()[0] or 0
+
+                    # Pagos rechazados
+                    cur.execute("SELECT COUNT(*) FROM payments WHERE status = 'rejected'")
+                    stats["total_rejected"] = cur.fetchone()[0] or 0
+
+                    # Monto total
+                    cur.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'approved'")
+                    stats["total_amount"] = float(cur.fetchone()[0] or 0)
+
+                    # Total de logs
+                    cur.execute("SELECT COUNT(*) FROM error_logs")
+                    stats["total_logs"] = cur.fetchone()[0] or 0
+
+                    # Total de contactos
+                    cur.execute("SELECT COUNT(*) FROM contacts")
+                    stats["total_contacts"] = cur.fetchone()[0] or 0
+
+            except Exception as db_error:
+                print(f"Error obteniendo stats: {db_error}")
+            finally:
+                conn.close()
+
+        return jsonify(stats), 200
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin Login',
+                        f'Error en admin login: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/payments', methods=['GET', 'OPTIONS'])
+def admin_get_payments():
+    """Obtener lista de pagos (requiere autenticación)"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        limit = request.args.get('limit', 100, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT payment_id, status, amount, currency, payer_email,
+                           created_at, updated_at
+                    FROM payments
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """, (limit, offset))
+
+                columns = [desc[0] for desc in cur.description]
+                payments = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for payment in payments:
+                    if payment.get('created_at'):
+                        payment['created_at'] = payment['created_at'].isoformat()
+                    if payment.get('updated_at'):
+                        payment['updated_at'] = payment['updated_at'].isoformat()
+
+                return jsonify({"payments": payments, "total": len(payments)}), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin Payments',
+                        f'Error obteniendo pagos: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
