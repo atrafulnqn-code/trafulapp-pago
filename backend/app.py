@@ -684,7 +684,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
 
 @app.route('/api/create_pagotic_payment', methods=['POST', 'OPTIONS'])
 def create_pagotic_payment():
-    """Crea un pago con Pago TIC / Payway"""
+    """Crea un pago usando la API directa de Pago TIC"""
     if request.method == 'OPTIONS':
         return '', 204
 
@@ -729,55 +729,164 @@ def create_pagotic_payment():
             finally:
                 conn.close()
 
-        # Crear checkout con Payway
-        if not all([PAYWAY_SITE_ID, PAYWAY_PRIVATE_KEY]):
+        # Crear pago con API directa de Pago TIC
+        token = get_pagotic_token()
+        if not token:
             return jsonify({
-                "error": "Configuración de Payway incompleta"
+                "error": "No se pudo obtener token de autenticación de Pago TIC"
             }), 500
 
-        # Construir URL de checkout de Payway
-        import hashlib
-        import hmac
+        # Construir el body para la API de Pago TIC
+        from datetime import datetime, timedelta
 
-        # Parámetros para Payway
-        amount_cents = int(unit_price * 100)  # Convertir a centavos
+        # Fecha de vencimiento (7 días desde hoy)
+        due_date = (datetime.now() + timedelta(days=7)).isoformat()
 
-        # Construir firma HMAC
-        string_to_sign = (
-            f"{PAYWAY_SITE_ID}{payment_id}"
-            f"{amount_cents}ARS{PAYWAY_TEMPLATE_ID}"
-        )
-        signature = hmac.new(
-            PAYWAY_PRIVATE_KEY.encode('utf-8'),
-            string_to_sign.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
+        # URL del webhook para recibir notificaciones
+        webhook_url = f"{BACKEND_URL}/api/pagotic_webhook"
 
-        # URL del checkout de Payway
-        init_point = (
-            f"https://checkout.paypertic.com/?siteId={PAYWAY_SITE_ID}"
-            f"&transactionId={payment_id}"
-            f"&amount={amount_cents}"
-            f"&currency=ARS"
-            f"&templateId={PAYWAY_TEMPLATE_ID}"
-            f"&hash={signature}"
-        )
+        # Construir detalles del pago
+        # Por ahora creamos un único detalle con el monto total
+        payment_details = [{
+            "external_reference": payment_id,
+            "concept_id": "pago_municipal",
+            "concept_description": title,
+            "amount": unit_price
+        }]
 
-        log_to_airtable(
-            'INFO', 'Pago TIC Create',
-            f'Checkout creado para pago {payment_id}',
-            related_id=payment_id)
+        # Datos del pagador
+        payer_data = {
+            "name": items_to_pay.get('nombre', 'Sin nombre'),
+            "email": items_to_pay.get('email', ''),
+            "identification": {
+                "type": "DNI",
+                "number": items_to_pay.get('dni', '00000000'),
+                "country": "AR"
+            }
+        }
 
-        return jsonify({
-            "payment_id": payment_id,
-            "init_point": init_point,
-            "status": "pending"
-        })
+        # Body del request a Pago TIC
+        pagotic_request = {
+            "currency_id": "ARS",
+            "external_transaction_id": payment_id,
+            "due_date": due_date,
+            "notification_url": webhook_url,
+            "details": payment_details,
+            "payer": payer_data
+        }
+
+        # Hacer el POST a la API de Pago TIC
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json'
+        }
+
+        try:
+            response = requests.post(
+                'https://api.paypertic.com/pagos',
+                headers=headers,
+                json=pagotic_request,
+                timeout=30
+            )
+            response.raise_for_status()
+            pagotic_response = response.json()
+
+            log_to_airtable(
+                'INFO', 'Pago TIC Create',
+                f'Pago creado exitosamente: {payment_id}',
+                related_id=payment_id,
+                details={'pagotic_response': pagotic_response})
+
+            return jsonify({
+                "payment_id": payment_id,
+                "init_point": pagotic_response.get('form_url'),
+                "status": "pending",
+                "pagotic_id": pagotic_response.get('id')
+            })
+
+        except requests.exceptions.RequestException as api_error:
+            error_msg = f'Error llamando a API de Pago TIC: {api_error}'
+            if hasattr(api_error, 'response') and api_error.response is not None:
+                try:
+                    error_details = api_error.response.json()
+                    error_msg += f' - Details: {error_details}'
+                except:
+                    error_msg += f' - Response: {api_error.response.text}'
+
+            log_to_airtable(
+                'ERROR', 'Pago TIC Create',
+                error_msg,
+                related_id=payment_id)
+
+            return jsonify({
+                "error": "Error al crear el pago en Pago TIC",
+                "details": str(api_error)
+            }), 500
 
     except Exception as e:
         log_to_airtable(
             'ERROR', 'Pago TIC Create',
             f'Error creando pago: {e}',
+            details={'error': str(e), 'traceback': traceback.format_exc()})
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/pagotic_webhook', methods=['POST', 'OPTIONS'])
+def pagotic_webhook():
+    """Webhook para recibir notificaciones de Pago TIC"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        webhook_data = request.get_json()
+
+        log_to_airtable(
+            'INFO', 'Pago TIC Webhook',
+            'Webhook recibido de Pago TIC',
+            details={'webhook_data': webhook_data})
+
+        # Extraer información del webhook
+        payment_id = webhook_data.get('external_transaction_id')
+        status = webhook_data.get('status')
+        pagotic_id = webhook_data.get('id')
+
+        if not payment_id:
+            log_to_airtable(
+                'ERROR', 'Pago TIC Webhook',
+                'Webhook sin external_transaction_id',
+                details={'webhook_data': webhook_data})
+            return jsonify({"error": "Missing external_transaction_id"}), 400
+
+        # Determinar el nuevo estado del pago
+        status_map = {
+            'APROBADO': 'approved',
+            'APPROVED': 'approved',
+            'RECHAZADO': 'rejected',
+            'REJECTED': 'rejected',
+            'PENDIENTE': 'pending',
+            'PENDING': 'pending',
+            'CANCELADO': 'cancelled',
+            'CANCELLED': 'cancelled'
+        }
+
+        new_status = status_map.get(status.upper() if status else '', 'pending')
+
+        log_to_airtable(
+            'INFO', 'Pago TIC Webhook',
+            f'Procesando pago {payment_id} con estado {new_status}',
+            related_id=payment_id,
+            details={'pagotic_id': pagotic_id, 'status': status})
+
+        # Procesar el pago usando la función existente
+        process_pagotic_payment(payment_id, new_status, webhook_data)
+
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        log_to_airtable(
+            'ERROR', 'Pago TIC Webhook',
+            f'Error procesando webhook: {e}',
             details={'error': str(e), 'traceback': traceback.format_exc()})
         return jsonify({"error": str(e)}), 500
 
