@@ -438,46 +438,64 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
         f'Inicio del procesamiento de pago para ID interno: {payment_id}',
         related_id=payment_id)
 
-    conn = get_db_connection()
-    if not conn:
-        log_to_airtable('ERROR', 'Pago TIC Process',
-                        'No se pudo conectar a la base de datos '
-                        'PostgreSQL.')
-        raise Exception("Error de conexión a la base de datos.")
-
     historial_record_id = None
-    try:
-        items_context = {}
-        monto_pagado = 0
+    items_context = {}
+    monto_pagado = 0
 
-        # 1. Actualizar el registro en la base de datos PostgreSQL
-        # y obtener detalles
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                UPDATE payments
-                SET status = %s, wallet_response = %s
-                WHERE payment_id = %s
-                RETURNING items_paid, amount;
-                """,
-                (new_status, json.dumps(wallet_response), payment_id)
-            )
-            updated_record = cur.fetchone()
+    # Intentar obtener datos de PostgreSQL si está disponible
+    conn = get_db_connection()
+    if conn:
+        try:
+            # 1. Actualizar el registro en la base de datos PostgreSQL
+            # y obtener detalles
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE payments
+                    SET status = %s, wallet_response = %s
+                    WHERE payment_id = %s
+                    RETURNING items_paid, amount;
+                    """,
+                    (new_status, json.dumps(wallet_response), payment_id)
+                )
+                updated_record = cur.fetchone()
 
-            if not updated_record:
-                raise Exception(
-                    f"No se encontró el pago con ID {payment_id} para "
-                    f"actualizar.")
+                if updated_record:
+                    items_context = updated_record[0] or {}
+                    monto_pagado = float(updated_record[1])
+                    conn.commit()
 
-            items_context = updated_record[0] or {}
-            monto_pagado = float(updated_record[1])
-            conn.commit()
-
+                    log_to_airtable(
+                        'INFO', 'Pago TIC Process',
+                        f'Registro de pago {payment_id} actualizado en PostgreSQL a '
+                        f'{new_status}.')
+        except Exception as db_error:
+            log_to_airtable(
+                'ERROR', 'Pago TIC Process',
+                f'Error actualizando PostgreSQL: {db_error}')
+            conn.rollback()
+        finally:
+            conn.close()
+    else:
         log_to_airtable(
-            'INFO', 'Pago TIC Process',
-            f'Registro de pago {payment_id} actualizado en PostgreSQL a '
-            f'{new_status}.')
+            'WARNING', 'Pago TIC Process',
+            'PostgreSQL no disponible, continuando sin DB')
 
+        # Si no hay PostgreSQL, intentar obtener datos del metadata del webhook
+        if wallet_response and isinstance(wallet_response, dict):
+            items_context = wallet_response.get('metadata', {})
+            # Intentar obtener el monto del webhook
+            if 'final_amount' in wallet_response:
+                monto_pagado = float(wallet_response.get('final_amount', 0))
+            elif 'amount' in wallet_response:
+                monto_pagado = float(wallet_response.get('amount', 0))
+
+            log_to_airtable(
+                'INFO', 'Pago TIC Process',
+                f'Datos recuperados del metadata del webhook',
+                details={'items_context': items_context, 'monto': monto_pagado})
+
+    try:
         # 2. Si el pago fue aprobado, ejecutar la lógica de negocio
         # (actualizar Airtable, enviar email)
         if new_status == 'approved':
@@ -677,9 +695,6 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
             related_id=payment_id,
             details={'error_message': str(e)})
         raise
-    finally:
-        if conn:
-            conn.close()
 
 
 @app.route('/api/create_pagotic_payment', methods=['POST', 'OPTIONS'])
@@ -776,7 +791,8 @@ def create_pagotic_payment():
             "last_due_date": last_due_date,
             "notification_url": webhook_url,
             "details": payment_details,
-            "payer": payer_data
+            "payer": payer_data,
+            "metadata": items_to_pay  # Guardar items_to_pay para recuperar en webhook
         }
 
         # Hacer el POST a la API de Pago TIC
