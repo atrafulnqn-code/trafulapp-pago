@@ -13,6 +13,10 @@ import AdminLogs from './pages/AdminLogs';
 import AdminRecaudacion from './pages/AdminRecaudacion';
 import AdminPatentes from './pages/AdminPatentes';
 import AdminAccessLogs from './pages/AdminAccessLogs';
+import AdminDBPayments from './pages/AdminDBPayments';
+import AdminDBPaymentHistory from './pages/AdminDBPaymentHistory';
+import AdminDBErrorLogs from './pages/AdminDBErrorLogs';
+import AdminDBContacts from './pages/AdminDBContacts';
 import StaffLogin from './pages/StaffLogin';
 import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
@@ -50,6 +54,10 @@ const AppContent: React.FC = () => {
           <Route path="/admin/patentes" element={<AdminPatentes />} />
           <Route path="/admin/stats-login" element={<StatsLogin />} />
           <Route path="/admin/stats" element={<StatsDashboard />} />
+          <Route path="/admin/db/payments" element={<AdminDBPayments />} />
+          <Route path="/admin/db/payment-history" element={<AdminDBPaymentHistory />} />
+          <Route path="/admin/db/error-logs" element={<AdminDBErrorLogs />} />
+          <Route path="/admin/db/contacts" element={<AdminDBContacts />} />
           <Route path="/staff/login" element={<StaffLogin />} />
           <Route path="/staff/dashboard" element={<StaffDashboard />} />
           <Route path="/staff/recaudacion" element={<RecaudacionForm />} />

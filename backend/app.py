@@ -1291,5 +1291,329 @@ def admin_get_payments():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/db/payments', methods=['GET', 'OPTIONS'])
+def admin_db_payments():
+    """Obtener tabla payments con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda
+                search_query = ""
+                params = []
+                if search:
+                    search_query = """
+                        WHERE payment_id ILIKE %s
+                        OR payment_id_external ILIKE %s
+                        OR payer_email ILIKE %s
+                        OR status ILIKE %s
+                    """
+                    search_param = f"%{search}%"
+                    params = [search_param, search_param, search_param, search_param]
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM payments {search_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, payment_id, payment_id_external, status, amount,
+                           currency, payer_email, created_at, updated_at
+                    FROM payments
+                    {search_query}
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for record in records:
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+                    if record.get('updated_at'):
+                        record['updated_at'] = record['updated_at'].isoformat()
+                    if record.get('amount'):
+                        record['amount'] = float(record['amount'])
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB Payments',
+                        f'Error obteniendo payments: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/payment-history', methods=['GET', 'OPTIONS'])
+def admin_db_payment_history():
+    """Obtener tabla payment_history con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda
+                search_query = ""
+                params = []
+                if search:
+                    search_query = """
+                        WHERE payment_id ILIKE %s
+                        OR comprobante_numero ILIKE %s
+                        OR nombre_apellido ILIKE %s
+                        OR dni ILIKE %s
+                        OR email ILIKE %s
+                        OR estado ILIKE %s
+                    """
+                    search_param = f"%{search}%"
+                    params = [search_param] * 6
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM payment_history {search_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, payment_id, comprobante_numero, nombre_apellido, dni,
+                           email, monto, estado, fecha_hora, created_at
+                    FROM payment_history
+                    {search_query}
+                    ORDER BY fecha_hora DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for record in records:
+                    if record.get('fecha_hora'):
+                        record['fecha_hora'] = record['fecha_hora'].isoformat()
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+                    if record.get('monto'):
+                        record['monto'] = float(record['monto'])
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB Payment History',
+                        f'Error obteniendo payment_history: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/error-logs', methods=['GET', 'OPTIONS'])
+def admin_db_error_logs():
+    """Obtener tabla error_logs con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda
+                search_query = ""
+                params = []
+                if search:
+                    search_query = """
+                        WHERE nivel ILIKE %s
+                        OR tipo ILIKE %s
+                        OR mensaje ILIKE %s
+                        OR payment_id ILIKE %s
+                        OR related_id ILIKE %s
+                    """
+                    search_param = f"%{search}%"
+                    params = [search_param] * 5
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM error_logs {search_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, nivel, tipo, mensaje, payment_id, related_id,
+                           fecha_hora, created_at
+                    FROM error_logs
+                    {search_query}
+                    ORDER BY fecha_hora DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for record in records:
+                    if record.get('fecha_hora'):
+                        record['fecha_hora'] = record['fecha_hora'].isoformat()
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB Error Logs',
+                        f'Error obteniendo error_logs: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/contacts', methods=['GET', 'OPTIONS'])
+def admin_db_contacts():
+    """Obtener tabla contacts con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or ADMIN_PASSWORD_FROM_ENV not in auth_header:
+            return jsonify({"error": "No autorizado"}), 401
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda
+                search_query = ""
+                params = []
+                if search:
+                    search_query = """
+                        WHERE email ILIKE %s
+                        OR dni ILIKE %s
+                        OR nombre_apellido ILIKE %s
+                        OR celular ILIKE %s
+                        OR origen ILIKE %s
+                    """
+                    search_param = f"%{search}%"
+                    params = [search_param] * 5
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM contacts {search_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, email, dni, nombre_apellido, celular, origen,
+                           created_at, updated_at
+                    FROM contacts
+                    {search_query}
+                    ORDER BY updated_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for record in records:
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+                    if record.get('updated_at'):
+                        record['updated_at'] = record['updated_at'].isoformat()
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB Contacts',
+                        f'Error obteniendo contacts: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
