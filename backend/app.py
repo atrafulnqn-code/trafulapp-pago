@@ -739,9 +739,10 @@ def create_pagotic_payment():
         # Construir el body para la API de Pago TIC
         from datetime import datetime, timedelta
 
-        # Fechas de vencimiento
-        due_date = (datetime.now() + timedelta(days=7)).isoformat()
-        last_due_date = (datetime.now() + timedelta(days=30)).isoformat()
+        # Fechas de vencimiento en formato RFC 822 (requerido por Pago TIC)
+        # Formato: yyyy-MM-dd'T'HH:mm:ssZ (ejemplo: "2020-12-10T00:00:00-0300")
+        due_date = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%S-0300')
+        last_due_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%dT%H:%M:%S-0300')
 
         # URL del webhook para recibir notificaciones
         webhook_url = f"{BACKEND_URL}/api/pagotic_webhook"
