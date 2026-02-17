@@ -2406,7 +2406,7 @@ def get_stats():
             """)
             daily_recaudacion = cur.fetchall()
             
-            # Formatear datos para el gráfico (orden cronológico)
+            # Formatear datos para el gráfico diario (orden cronológico)
             daily_chart = [
                 {
                     "date": row[1],  # fecha_formateada
@@ -2416,17 +2416,39 @@ def get_stats():
                 for row in reversed(daily_recaudacion)  # Invertir para orden cronológico
             ]
             
-            # --- DATOS ADICIONALES: Promedio diario ---
-            promedio_diario = round(monto_total_recaudacion / max(len(daily_chart), 1), 2)
+            # --- GRÁFICO MENSUAL: Recaudación de tasas y derechos por mes ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'recaudacion'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_recaudacion = cur.fetchall()
+            
+            # Formatear datos para el gráfico mensual
+            monthly_chart = [
+                {
+                    "month": row[0].strip(),  # mes_nombre
+                    "total": round(float(row[2]), 2),  # total_mes
+                    "cantidad": int(row[3])  # cantidad_registros
+                } 
+                for row in monthly_recaudacion
+            ]
             
             # --- CONSTRUIR RESPUESTA ---
             response_data = {
                 "recaudacion_tasas": {
                     "total_registros": total_registros_recaudacion,
-                    "monto_total": round(monto_total_recaudacion, 2),
-                    "promedio_diario": promedio_diario
+                    "monto_total": round(monto_total_recaudacion, 2)
                 },
-                "daily_chart": daily_chart
+                "daily_chart": daily_chart,
+                "monthly_chart": monthly_chart
             }
             
             log_to_airtable('INFO', 'Stats Dashboard', 

@@ -109,7 +109,7 @@ const StatsDashboard: React.FC = () => {
     );
   }
 
-  const { recaudacion_tasas, daily_chart } = data;
+  const { recaudacion_tasas, daily_chart, monthly_chart } = data;
 
   return (
     <Container className="py-5 mt-5" fluid style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
@@ -147,7 +147,7 @@ const StatsDashboard: React.FC = () => {
 
       {/* KPI Cards */}
       <Row className="g-4 mb-5">
-        <Col md={4}>
+        <Col md={6}>
           <Card className="border-0 shadow-lg h-100 overflow-hidden position-relative"
             style={{
               background: `linear-gradient(135deg, ${GRADIENT_COLORS.primary.start} 0%, ${GRADIENT_COLORS.primary.end} 100%)`,
@@ -198,38 +198,11 @@ const StatsDashboard: React.FC = () => {
             </Card.Body>
           </Card>
         </Col>
-
-        <Col md={4}>
-          <Card className="border-0 shadow-lg h-100 overflow-hidden"
-            style={{
-              background: `linear-gradient(135deg, ${GRADIENT_COLORS.warning.start} 0%, ${GRADIENT_COLORS.warning.end} 100%)`,
-              transform: 'translateY(0)',
-              transition: 'transform 0.3s ease'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          >
-            <Card.Body className="text-white p-4">
-              <div className="d-flex justify-content-between align-items-start mb-3">
-                <div className="opacity-75 small fw-semibold">Promedio Diario</div>
-                <div className="bg-white bg-opacity-25 rounded-circle p-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="h2 fw-bold mb-0">
-                ${recaudacion_tasas.promedio_diario.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="small opacity-75 mt-2">Por día con actividad</div>
-            </Card.Body>
-          </Card>
-        </Col>
       </Row>
 
       {/* Gráfico de Barras - Recaudación por Día */}
-      <Row>
-        <Col>
+      <Row className="g-4">
+        <Col md={12}>
           <Card className="border-0 shadow-sm p-4">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h5 className="fw-bold text-dark mb-0">📅 Recaudación Diaria de Tasas y Derechos</h5>
@@ -270,6 +243,49 @@ const StatsDashboard: React.FC = () => {
             </div>
             <div className="mt-3 text-center text-muted small">
               Mostrando los últimos 60 días con actividad de recaudación
+            </div>
+          </Card>
+        </Col>
+
+        {/* Gráfico de Barras - Recaudación Mensual */}
+        <Col md={12}>
+          <Card className="border-0 shadow-sm p-4">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h5 className="fw-bold text-dark mb-0">📊 Recaudación Mensual de Tasas y Derechos</h5>
+              <span className="badge bg-success">{monthly_chart.length} meses con actividad</span>
+            </div>
+            <div style={{ width: '100%', height: 400 }}>
+              <ResponsiveContainer>
+                <BarChart data={monthly_chart} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis
+                    dataKey="month"
+                    fontSize={12}
+                    stroke="#6B7280"
+                  />
+                  <YAxis
+                    fontSize={12}
+                    stroke="#6B7280"
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="total"
+                    radius={[8, 8, 0, 0]}
+                    animationDuration={1500}
+                  >
+                    {monthly_chart.map((entry: any, index: number) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={`hsl(${140 + (index * 15) % 60}, 65%, ${45 + (index % 3) * 10}%)`}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 text-center text-muted small">
+              Resumen mensual del año 2026
             </div>
           </Card>
         </Col>
