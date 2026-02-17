@@ -2341,5 +2341,257 @@ def patente_efectivo():
         return jsonify({"error": str(e)}), 500
 
 
+# --- ENDPOINTS DE ESTADÍSTICAS ---
+@app.route('/api/admin/stats-login', methods=['POST'])
+def stats_login():
+    """Endpoint para autenticar acceso al panel de estadísticas"""
+    try:
+        data = request.get_json()
+        password = data.get('password')
+        
+        if not password:
+            return jsonify({"error": "Contraseña requerida"}), 400
+        
+        if password == ADMIN_PASSWORD_FROM_ENV:
+            log_to_airtable('INFO', 'Stats Login', 'Acceso exitoso al panel de estadísticas')
+            return jsonify({"success": True}), 200
+        else:
+            log_to_airtable('WARNING', 'Stats Login', 'Intento de acceso fallido al panel de estadísticas')
+            return jsonify({"error": "Contraseña incorrecta"}), 401
+    except Exception as e:
+        log_to_airtable('ERROR', 'Stats Login', f'Error en stats_login: {e}')
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+
+@app.route('/api/admin/stats', methods=['GET'])
+def get_stats():
+    """Endpoint para obtener estadísticas de recaudación del año 2026"""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Error de conexión a la base de datos"}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            # --- RESUMEN GENERAL ---
+            # Total anual de todos los pagos
+            cur.execute("""
+                SELECT 
+                    COALESCE(SUM(monto), 0) as total_anual,
+                    COUNT(*) as total_operaciones
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+            """)
+            result = cur.fetchone()
+            total_anual = float(result[0]) if result[0] else 0
+            total_operaciones_history = int(result[1]) if result[1] else 0
+            
+            # Sumar también los pagos en efectivo
+            cur.execute("""
+                SELECT 
+                    COALESCE(SUM(monto_total), 0) as total_efectivo,
+                    COUNT(*) as total_operaciones_efectivo
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            result = cur.fetchone()
+            total_efectivo = float(result[0]) if result[0] else 0
+            total_operaciones_efectivo = int(result[1]) if result[1] else 0
+            
+            total_anual += total_efectivo
+            total_operaciones = total_operaciones_history + total_operaciones_efectivo
+            
+            # --- CANTIDAD DE OPERACIONES POR CATEGORÍA ---
+            # Contar operaciones de deudas (asumiendo que tienen "deuda" en detalles)
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                    AND (LOWER(detalles) LIKE '%deuda%' OR LOWER(detalles) LIKE '%otras deudas%')
+            """)
+            cantidad_deudas = cur.fetchone()[0] or 0
+            
+            # Contar operaciones de contributivos (tasas retributivas)
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                    AND (LOWER(detalles) LIKE '%contributivo%' OR LOWER(detalles) LIKE '%tasa%')
+            """)
+            cantidad_contributivos = cur.fetchone()[0] or 0
+            
+            # Contar operaciones de recaudación (pagos en efectivo tipo recaudacion)
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                    AND tipo_pago = 'recaudacion'
+            """)
+            cantidad_recaudacion = cur.fetchone()[0] or 0
+            
+            # Contar operaciones de patente
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                    AND tipo_pago = 'patente'
+            """)
+            cantidad_patente = cur.fetchone()[0] or 0
+            
+            # --- TOTALES POR CATEGORÍA ---
+            # Total de deudas
+            cur.execute("""
+                SELECT COALESCE(SUM(monto), 0)
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                    AND (LOWER(detalles) LIKE '%deuda%' OR LOWER(detalles) LIKE '%otras deudas%')
+            """)
+            total_deudas = float(cur.fetchone()[0] or 0)
+            
+            # Total de contributivos
+            cur.execute("""
+                SELECT COALESCE(SUM(monto), 0)
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                    AND (LOWER(detalles) LIKE '%contributivo%' OR LOWER(detalles) LIKE '%tasa%')
+            """)
+            total_contributivos = float(cur.fetchone()[0] or 0)
+            
+            # Total de recaudación
+            cur.execute("""
+                SELECT COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                    AND tipo_pago = 'recaudacion'
+            """)
+            total_recaudacion = float(cur.fetchone()[0] or 0)
+            
+            # Total de patente
+            cur.execute("""
+                SELECT COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                    AND tipo_pago = 'patente'
+            """)
+            total_patente = float(cur.fetchone()[0] or 0)
+            
+            # --- DATOS PARA GRÁFICO DIARIO ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_hora, 'DD/MM') as date,
+                    COALESCE(SUM(monto), 0) as total
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                GROUP BY TO_CHAR(fecha_hora, 'DD/MM'), DATE(fecha_hora)
+                ORDER BY DATE(fecha_hora) DESC
+                LIMIT 30
+            """)
+            daily_history = cur.fetchall()
+            
+            # Sumar pagos en efectivo al gráfico diario
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'DD/MM') as date,
+                    COALESCE(SUM(monto_total), 0) as total
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'DD/MM'), fecha_pago
+                ORDER BY fecha_pago DESC
+                LIMIT 30
+            """)
+            daily_cash = cur.fetchall()
+            
+            # Combinar datos diarios
+            daily_dict = {}
+            for date, total in daily_history:
+                daily_dict[date] = daily_dict.get(date, 0) + float(total)
+            for date, total in daily_cash:
+                daily_dict[date] = daily_dict.get(date, 0) + float(total)
+            
+            daily_chart = [{"date": date, "total": total} for date, total in sorted(daily_dict.items(), key=lambda x: x[0])]
+            daily_chart = daily_chart[-30:]  # Últimos 30 días
+            
+            # --- DATOS PARA GRÁFICO MENSUAL ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_hora, 'Mon') as month,
+                    EXTRACT(MONTH FROM fecha_hora) as month_num,
+                    COALESCE(SUM(monto), 0) as total
+                FROM payment_history
+                WHERE EXTRACT(YEAR FROM fecha_hora) = 2026
+                    AND estado = 'exitoso'
+                GROUP BY TO_CHAR(fecha_hora, 'Mon'), EXTRACT(MONTH FROM fecha_hora)
+                ORDER BY month_num
+            """)
+            monthly_history = cur.fetchall()
+            
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Mon') as month,
+                    EXTRACT(MONTH FROM fecha_pago) as month_num,
+                    COALESCE(SUM(monto_total), 0) as total
+                FROM cash_payments
+                WHERE EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Mon'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY month_num
+            """)
+            monthly_cash = cur.fetchall()
+            
+            # Combinar datos mensuales
+            monthly_dict = {}
+            for month, month_num, total in monthly_history:
+                key = (month, month_num)
+                monthly_dict[key] = monthly_dict.get(key, 0) + float(total)
+            for month, month_num, total in monthly_cash:
+                key = (month, month_num)
+                monthly_dict[key] = monthly_dict.get(key, 0) + float(total)
+            
+            monthly_chart = [
+                {"month": month, "total": total} 
+                for (month, month_num), total in sorted(monthly_dict.items(), key=lambda x: x[0][1])
+            ]
+            
+            # --- CONSTRUIR RESPUESTA ---
+            response_data = {
+                "summary": {
+                    "total_anual": round(total_anual, 2),
+                    "cantidad_operaciones": {
+                        "total": total_operaciones,
+                        "deudas": cantidad_deudas,
+                        "contributivos": cantidad_contributivos,
+                        "recaudacion": cantidad_recaudacion,
+                        "patente": cantidad_patente
+                    },
+                    "totales_categoria": {
+                        "deudas": round(total_deudas, 2),
+                        "contributivos": round(total_contributivos, 2),
+                        "recaudacion": round(total_recaudacion, 2),
+                        "patente": round(total_patente, 2)
+                    }
+                },
+                "daily_chart": daily_chart,
+                "monthly_chart": monthly_chart
+            }
+            
+            log_to_airtable('INFO', 'Stats Dashboard', 
+                          f'Estadísticas generadas: Total anual ${total_anual:.2f}, {total_operaciones} operaciones')
+            
+            return jsonify(response_data), 200
+            
+    except Exception as e:
+        log_to_airtable('ERROR', 'Stats Dashboard', 
+                       f'Error generando estadísticas: {e}',
+                       details={'error': str(e), 'traceback': traceback.format_exc()})
+        return jsonify({"error": f"Error al generar estadísticas: {str(e)}"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
