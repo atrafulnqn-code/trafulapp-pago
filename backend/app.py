@@ -2715,18 +2715,25 @@ def get_stats():
                 tasas_data = []
                 agua_data = []
                 
+                
                 for record in historial_records:
                     fields = record['fields']
-                    tipo_pago = fields.get('TIPO_PAGO', '').lower()
-                    metodo_pago = fields.get('METODO_PAGO', '').lower()
-                    fecha_str = fields.get('FECHA_PAGO', '')
-                    monto = float(fields.get('MONTO', 0))
+                    estado = fields.get('Estado', '')
+                    fecha_str = fields.get('Fecha de Transacción', '')
+                    items_json_str = fields.get('ItemsPagadosJSON', '[]')
                     
-                    # Solo pagos online (no efectivo)
-                    if 'efectivo' in metodo_pago or 'cash' in metodo_pago or not fecha_str:
+                    # Solo pagos exitosos
+                    if estado != 'Exitoso' or not fecha_str:
                         continue
                     
                     try:
+                        # Parsear ItemsPagadosJSON
+                        import json
+                        items = json.loads(items_json_str) if items_json_str else []
+                        
+                        if not items:
+                            continue
+                        
                         # Parsear fecha
                         if '-' in fecha_str:
                             fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
@@ -2737,20 +2744,29 @@ def get_stats():
                         if fecha.year != 2026:
                             continue
                         
-                        data_item = {
-                            'fecha': fecha,
-                            'fecha_str': fecha.strftime('%d/%m/%Y'),
-                            'monto': monto,
-                            'mes': fecha.month,
-                            'mes_nombre': fecha.strftime('%B')
-                        }
-                        
-                        # Clasificar por tipo de pago
-                        if 'tasa' in tipo_pago or 'contributivo' in tipo_pago:
-                            tasas_data.append(data_item)
-                        elif 'agua' in tipo_pago or 'water' in tipo_pago:
-                            agua_data.append(data_item)
-                    except:
+                        # Procesar cada item del pago
+                        for item in items:
+                            description = item.get('description', '').lower()
+                            amount = float(item.get('amount', 0))
+                            
+                            if amount <= 0:
+                                continue
+                            
+                            data_item = {
+                                'fecha': fecha,
+                                'fecha_str': fecha.strftime('%d/%m/%Y'),
+                                'monto': amount,
+                                'mes': fecha.month,
+                                'mes_nombre': fecha.strftime('%B')
+                            }
+                            
+                            # Clasificar por tipo según descripción
+                            if 'tasas' in description or 'cuota tasas' in description:
+                                tasas_data.append(data_item)
+                            elif 'agua' in description or 'cuota agua' in description:
+                                agua_data.append(data_item)
+                    except Exception as e:
+                        print(f"Error procesando registro: {e}")
                         continue
                 
                 # Calcular totales
