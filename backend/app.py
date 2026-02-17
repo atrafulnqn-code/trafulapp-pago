@@ -2704,72 +2704,51 @@ def get_stats():
                 monthly_chart_rec_efectivo = []
                 monthly_chart_pat_efectivo = []
             
-            # ============= DATOS DE PAGOS AUTOMATIZADOS (desde Airtable) =============
+            # ============= DATOS DE PAGOS AUTOMATIZADOS (desde Airtable - Historial) =============
             
             try:
-                # Tasas Retributivas (CONTRIBUTIVOS)
-                contributivos_table = api.table(BASE_ID, CONTRIBUTIVOS_TABLE_ID)
-                contributivos_records = contributivos_table.all()
+                # Obtener todos los registros del historial de pagos
+                historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
+                historial_records = historial_table.all()
                 
                 tasas_data = []
-                for record in contributivos_records:
-                    fields = record['fields']
-                    estado = fields.get('ESTADO_PAGO', '').lower()
-                    fecha_str = fields.get('FECHA_PAGO', '')
-                    monto = float(fields.get('MONTO_TOTAL', 0))
-                    
-                    if 'pagado' not in estado or not fecha_str:
-                        continue
-                    
-                    try:
-                        if '-' in fecha_str:
-                            fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
-                        else:
-                            fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
-                        
-                        if fecha.year != 2026:
-                            continue
-                        
-                        tasas_data.append({
-                            'fecha': fecha,
-                            'fecha_str': fecha.strftime('%d/%m/%Y'),
-                            'monto': monto,
-                            'mes': fecha.month,
-                            'mes_nombre': fecha.strftime('%B')
-                        })
-                    except:
-                        continue
-                
-                # Agua (WATER)
-                water_table = api.table(BASE_ID, WATER_TABLE_ID)
-                water_records = water_table.all()
-                
                 agua_data = []
-                for record in water_records:
+                
+                for record in historial_records:
                     fields = record['fields']
-                    estado = fields.get('ESTADO_PAGO', '').lower()
+                    tipo_pago = fields.get('TIPO_PAGO', '').lower()
+                    metodo_pago = fields.get('METODO_PAGO', '').lower()
                     fecha_str = fields.get('FECHA_PAGO', '')
-                    monto = float(fields.get('MONTO_TOTAL', 0))
+                    monto = float(fields.get('MONTO', 0))
                     
-                    if 'pagado' not in estado or not fecha_str:
+                    # Solo pagos online (no efectivo)
+                    if 'efectivo' in metodo_pago or 'cash' in metodo_pago or not fecha_str:
                         continue
                     
                     try:
+                        # Parsear fecha
                         if '-' in fecha_str:
                             fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
                         else:
                             fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
                         
+                        # Filtrar por año 2026
                         if fecha.year != 2026:
                             continue
                         
-                        agua_data.append({
+                        data_item = {
                             'fecha': fecha,
                             'fecha_str': fecha.strftime('%d/%m/%Y'),
                             'monto': monto,
                             'mes': fecha.month,
                             'mes_nombre': fecha.strftime('%B')
-                        })
+                        }
+                        
+                        # Clasificar por tipo de pago
+                        if 'tasa' in tipo_pago or 'contributivo' in tipo_pago:
+                            tasas_data.append(data_item)
+                        elif 'agua' in tipo_pago or 'water' in tipo_pago:
+                            agua_data.append(data_item)
                     except:
                         continue
                 
@@ -2845,6 +2824,7 @@ def get_stats():
                 daily_chart_agua_online = []
                 monthly_chart_tasas_online = []
                 monthly_chart_agua_online = []
+
 
             
             # --- CONSTRUIR RESPUESTA ---
