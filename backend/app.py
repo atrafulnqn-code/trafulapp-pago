@@ -1758,6 +1758,220 @@ def admin_db_contacts():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/stats-postgres', methods=['GET', 'OPTIONS'])
+def admin_stats_postgres():
+    """Obtener estadísticas agregadas de payments (online/efectivo) desde PostgreSQL"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "No hay conexión a base de datos"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # ---------------------------------------------------------
+                # 1. Obtener TODOS los pagos exitosos de 2026 en adelante
+                # ---------------------------------------------------------
+                # Filtramos por fecha >= 2026-01-01.
+                # Estado: 'approved' (online) o 'exitoso' (efectivo/historial).
+                query = """
+                    SELECT 
+                        id, 
+                        monto, 
+                        fecha_hora, 
+                        detalles, 
+                        items_pagados,
+                        payment_id
+                    FROM payment_history
+                    WHERE fecha_hora >= '2026-01-01'
+                      AND (LOWER(estado) = 'approved' OR LOWER(estado) = 'exitoso')
+                    ORDER BY fecha_hora ASC
+                """
+                cur.execute(query)
+                rows = cur.fetchall()
+
+                # Estructuras de acumulación
+                stats = {
+                    "resumen_anual": {
+                        "total_general": {"monto": 0.0, "cantidad": 0},
+                        "online": {"monto": 0.0, "cantidad": 0},
+                        "efectivo": {"monto": 0.0, "cantidad": 0}
+                    },
+                    "por_categoria": {
+                        "tasas": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
+                        "agua": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
+                        "patentes": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
+                        "planes": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
+                        "otros": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0}
+                    },
+                    "graficos": {
+                        "diario_online": {},   # date_str -> amount
+                        "diario_efectivo": {}, # date_str -> amount
+                        "mensual_online": {},  # month_int -> amount
+                        "mensual_efectivo": {} # month_int -> amount
+                    }
+                }
+
+                for row in rows:
+                    p_id = row[0]
+                    monto = float(row[1]) if row[1] else 0.0
+                    fecha = row[2]
+                    detalles = str(row[3]).lower() if row[3] else ""
+                    items_json = row[4]
+                    payment_id_ext = str(row[5]) if row[5] else ""
+                    
+                    # -------------------------------------------------
+                    # A. Determinar ORIGEN (Online vs Efectivo)
+                    # -------------------------------------------------
+                    # Criterio: 
+                    #  - Si payment_id empieza con 'pay-' o 'tr-' (pagotic/payway) -> Online
+                    #  - Si detalles contiene 'pago tic' -> Online
+                    #  - Si items_json tiene estructura de online -> Online
+                    #  - Si detalles contiene 'efectivo' o 'caja' -> Efectivo
+                    #  - Por defecto: Si viene de 'cash_payments' (que guarda en history), es Efectivo.
+                    #    Pero aquí solo leemos history. Asumimos Online salvo evidencia de Efectivo.
+                    
+                    is_online = True
+                    
+                    # Indicadores fuertes de Efectivo
+                    if "efectivo" in detalles or "caja" in detalles or "mostrador" in detalles:
+                        is_online = False
+                    # Indicadores fuertes de Online
+                    elif "pago tic" in detalles or "payway" in detalles or "mercadopago" in detalles:
+                        is_online = True
+                    else:
+                        # Fallback por ID
+                        if payment_id_ext.startswith("PAY-") or payment_id_ext.startswith("TR-"):
+                             is_online = True
+                        # Si el ID parece un UUID o correlativo simple (ej. cobro manual)
+                        elif len(payment_id_ext) < 15 and payment_id_ext.isdigit():
+                             is_online = False
+                        else:
+                             # Default a Online si no estamos seguros (o ajustar según preferencia)
+                             is_online = True
+
+                    # -------------------------------------------------
+                    # B. Determinar CATEGORÍA (Tasas, Agua, Patente, Plan)
+                    # -------------------------------------------------
+                    categoria = "otros"
+                    
+                    # Buscar en detalles primero
+                    if "agua" in detalles or "comercial" in detalles:
+                        categoria = "agua"
+                    elif "tasa" in detalles or "lote" in detalles or "retributiv" in detalles:
+                        categoria = "tasas"
+                    elif "patente" in detalles or "vehiculo" in detalles or "rodado" in detalles:
+                        categoria = "patentes"
+                    elif "plan" in detalles or "deuda" in detalles:
+                        categoria = "planes"
+                    
+                    # Si sigue en otros, buscar en items_json
+                    if categoria == "otros" and items_json:
+                        try:
+                            # items_json puede ser lista o dict
+                            items_str = json.dumps(items_json).lower()
+                            if "agua" in items_str or "comercial" in items_str:
+                                categoria = "agua"
+                            elif "tasa" in items_str or "lote" in items_str or "retributiv" in items_str:
+                                categoria = "tasas"
+                            elif "patente" in items_str or "vehiculo" in items_str:
+                                categoria = "patentes"
+                            elif "plan" in items_str or "deuda" in items_str:
+                                categoria = "planes"
+                        except:
+                            pass
+
+                    # -------------------------------------------------
+                    # C. Acumular Totales
+                    # -------------------------------------------------
+                    # Global
+                    stats["resumen_anual"]["total_general"]["monto"] += monto
+                    stats["resumen_anual"]["total_general"]["cantidad"] += 1
+                    
+                    # Por Origen
+                    origen_key = "online" if is_online else "efectivo"
+                    stats["resumen_anual"][origen_key]["monto"] += monto
+                    stats["resumen_anual"][origen_key]["cantidad"] += 1
+                    
+                    # Por Categoría
+                    stats["por_categoria"][categoria]["monto"] += monto
+                    stats["por_categoria"][categoria]["cantidad"] += 1
+                    stats["por_categoria"][categoria][origen_key] += 1
+                    
+                    # -------------------------------------------------
+                    # D. Acumular Gráficos (Series Temporales)
+                    # -------------------------------------------------
+                    if fecha:
+                        # Diario (YYYY-MM-DD)
+                        date_str = fecha.strftime('%Y-%m-%d')
+                        if date_str not in stats["graficos"][f"diario_{origen_key}"]:
+                            stats["graficos"][f"diario_{origen_key}"][date_str] = 0.0
+                        stats["graficos"][f"diario_{origen_key}"][date_str] += monto
+                        
+                        # Mensual (1-12)
+                        month_int = fecha.month
+                        if month_int not in stats["graficos"][f"mensual_{origen_key}"]:
+                            stats["graficos"][f"mensual_{origen_key}"][month_int] = 0.0
+                        stats["graficos"][f"mensual_{origen_key}"][month_int] += monto
+
+                # -------------------------------------------------
+                # E. Formatear Gráficos para el Frontend
+                # -------------------------------------------------
+                # Convertir dicts a listas ordenadas
+                
+                def format_chart_data(data_dict, is_monthly=False):
+                    chart_list = []
+                    for key, val in data_dict.items():
+                        item = {"total": round(val, 2)}
+                        if is_monthly:
+                            meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                            item["month"] = meses[key - 1] if 1 <= key <= 12 else str(key)
+                            item["month_index"] = key
+                        else:
+                            item["date"] = key
+                            # Formato DD/MM para mostrar
+                            try:
+                                dt = datetime.strptime(key, '%Y-%m-%d')
+                                item["display_date"] = dt.strftime('%d/%m')
+                            except:
+                                item["display_date"] = key
+                        chart_list.append(item)
+                    
+                    # Ordenar
+                    if is_monthly:
+                        chart_list.sort(key=lambda x: x["month_index"])
+                    else:
+                        chart_list.sort(key=lambda x: x["date"])
+                    return chart_list
+
+                final_response = {
+                    "resumen_anual": stats["resumen_anual"],
+                    "por_categoria": stats["por_categoria"],
+                    "graficos": {
+                        "diario_online": format_chart_data(stats["graficos"]["diario_online"]),
+                        "diario_efectivo": format_chart_data(stats["graficos"]["diario_efectivo"]),
+                        "mensual_online": format_chart_data(stats["graficos"]["mensual_online"], is_monthly=True),
+                        "mensual_efectivo": format_chart_data(stats["graficos"]["mensual_efectivo"], is_monthly=True)
+                    }
+                }
+                
+                return jsonify(final_response)
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin Stats Postgres', f'Error: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/db/cash-payments', methods=['GET', 'OPTIONS'])
 def admin_db_cash_payments():
     """Obtener tabla cash_payments con búsqueda y paginación"""
@@ -2592,7 +2806,7 @@ def get_stats():
                 # Filtrar por año 2026 y procesar
                 from datetime import datetime
                 
-                rec_efectivo_data = []
+                # Solo procesamos patentes efectivo
                 pat_efectivo_data = []
                 
                 for record in efectivo_records:
@@ -2623,38 +2837,22 @@ def get_stats():
                             'mes_nombre': fecha.strftime('%B')
                         }
                         
-                        # Clasificar por tipo (los valores en Airtable son exactos)
-                        if tipo in ['recaudación de tasas', 'recaudacion de tasas', 'tasa', 'tasas']:
-                            rec_efectivo_data.append(data_item)
-                        elif tipo in ['patente', 'patentes']:
+                        # Solo procesamos patentes
+                        if tipo in ['patente', 'patentes']:
                             pat_efectivo_data.append(data_item)
                     except:
                         continue
                 
-                # Calcular totales
-                total_registros_rec_efectivo = len(rec_efectivo_data)
-                monto_total_rec_efectivo = sum(item['monto'] for item in rec_efectivo_data)
-                
+                # Calcular totales (solo patentes)
                 total_registros_pat_efectivo = len(pat_efectivo_data)
                 monto_total_pat_efectivo = sum(item['monto'] for item in pat_efectivo_data)
                 
-                total_registros_efectivo = total_registros_rec_efectivo + total_registros_pat_efectivo
-                monto_total_efectivo = monto_total_rec_efectivo + monto_total_pat_efectivo
-                
-                # Gráficos diarios - Recaudación
-                from collections import defaultdict
-                daily_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
-                for item in rec_efectivo_data:
-                    daily_rec_dict[item['fecha_str']]['total'] += item['monto']
-                    daily_rec_dict[item['fecha_str']]['cantidad'] += 1
-                
-                daily_chart_rec_efectivo = [
-                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
-                    for fecha, data in sorted(daily_rec_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
-                ]
-                daily_chart_rec_efectivo.reverse()
+                # Total efectivo = solo patentes
+                total_registros_efectivo = total_registros_pat_efectivo
+                monto_total_efectivo = monto_total_pat_efectivo
                 
                 # Gráficos diarios - Patentes
+                from collections import defaultdict
                 daily_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
                 for item in pat_efectivo_data:
                     daily_pat_dict[item['fecha_str']]['total'] += item['monto']
@@ -2665,19 +2863,6 @@ def get_stats():
                     for fecha, data in sorted(daily_pat_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
                 ]
                 daily_chart_pat_efectivo.reverse()
-                
-                # Gráficos mensuales - Recaudación
-                monthly_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
-                for item in rec_efectivo_data:
-                    mes_nombre = item['mes_nombre']
-                    monthly_rec_dict[mes_nombre]['total'] += item['monto']
-                    monthly_rec_dict[mes_nombre]['cantidad'] += 1
-                    monthly_rec_dict[mes_nombre]['mes_num'] = item['mes']
-                
-                monthly_chart_rec_efectivo = [
-                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
-                    for mes, data in sorted(monthly_rec_dict.items(), key=lambda x: x[1]['mes_num'])
-                ]
                 
                 # Gráficos mensuales - Patentes
                 monthly_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
@@ -2694,15 +2879,11 @@ def get_stats():
                 
             except Exception as e:
                 print(f"Error obteniendo datos de efectivo desde Airtable: {e}")
-                total_registros_rec_efectivo = 0
-                monto_total_rec_efectivo = 0
                 total_registros_pat_efectivo = 0
                 monto_total_pat_efectivo = 0
                 total_registros_efectivo = 0
                 monto_total_efectivo = 0
-                daily_chart_rec_efectivo = []
                 daily_chart_pat_efectivo = []
-                monthly_chart_rec_efectivo = []
                 monthly_chart_pat_efectivo = []
             
             # ============= DATOS DE PAGOS AUTOMATIZADOS (desde Airtable - Historial) =============
@@ -2869,10 +3050,6 @@ def get_stats():
                 "daily_chart_planes": daily_chart_planes,
                 "monthly_chart_planes": monthly_chart_planes,
                 "cobro_efectivo": {
-                    "recaudacion": {
-                        "total_registros": total_registros_rec_efectivo,
-                        "monto_total": round(monto_total_rec_efectivo, 2)
-                    },
                     "patentes": {
                         "total_registros": total_registros_pat_efectivo,
                         "monto_total": round(monto_total_pat_efectivo, 2)
@@ -2882,9 +3059,7 @@ def get_stats():
                         "monto_total": round(monto_total_efectivo, 2)
                     }
                 },
-                "daily_chart_rec_efectivo": daily_chart_rec_efectivo,
                 "daily_chart_pat_efectivo": daily_chart_pat_efectivo,
-                "monthly_chart_rec_efectivo": monthly_chart_rec_efectivo,
                 "monthly_chart_pat_efectivo": monthly_chart_pat_efectivo,
                 "pagos_automatizados": {
                     "tasas_retributivas": {
