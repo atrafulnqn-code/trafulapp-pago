@@ -109,7 +109,7 @@ const StatsDashboard: React.FC = () => {
     );
   }
 
-  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes } = data;
+  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes, planes_pago, daily_chart_planes, monthly_chart_planes } = data;
 
   return (
     <Container className="py-5 mt-5" fluid style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
@@ -433,6 +433,163 @@ const StatsDashboard: React.FC = () => {
                         <Cell
                           key={`cell-${index}`}
                           fill={`hsl(${280 + (index * 15) % 60}, 65%, ${45 + (index % 3) * 10}%)`}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 text-center text-muted small">
+                Resumen mensual del año 2026
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ==================== SECCIÓN DE PLANES DE PAGO COBRADOS ==================== */}
+      <div className="mt-5 pt-4">
+        <div className="d-flex justify-content-between align-items-center mb-4 bg-white p-4 rounded-3 shadow-sm">
+          <div>
+            <h2 className="fw-bold text-dark mb-1">💳 Planes de Pago Cobrados</h2>
+            <p className="text-muted mb-0 small">Municipalidad de Villa Traful - Año 2026</p>
+          </div>
+        </div>
+
+        {/* KPI Cards - Planes de Pago */}
+        <Row className="g-4 mb-5">
+          <Col md={6}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden position-relative"
+              style={{
+                background: `linear-gradient(135deg, #F59E0B 0%, #D97706 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Total Registros</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                      <path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">{planes_pago.total_registros}</div>
+                <div className="small opacity-75 mt-2">Cuotas cobradas</div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={6}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #10B981 0%, #059669 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Monto Total Recaudado</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${planes_pago.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">Total año 2026</div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Gráficos de Planes de Pago */}
+        <Row className="g-4">
+          <Col md={12}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📅 Planes de Pago Cobrados - Diario</h5>
+                <span className="badge bg-primary">{daily_chart_planes.length} días con actividad</span>
+              </div>
+              <div style={{ width: '100%', height: 450 }}>
+                <ResponsiveContainer>
+                  <BarChart data={daily_chart_planes} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={11}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    >
+                      {daily_chart_planes.map((entry: any, index: number) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={`hsl(${30 + (index * 3) % 60}, 75%, ${50 + (index % 3) * 10}%)`}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 text-center text-muted small">
+                Mostrando los últimos 60 días con actividad de planes de pago
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico de Barras - Planes de Pago Mensual */}
+          <Col md={12}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📊 Planes de Pago Cobrados - Mensual</h5>
+                <span className="badge bg-success">{monthly_chart_planes.length} meses con actividad</span>
+              </div>
+              <div style={{ width: '100%', height: 400 }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthly_chart_planes} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="month"
+                      fontSize={12}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    >
+                      {monthly_chart_planes.map((entry: any, index: number) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={`hsl(${30 + (index * 15) % 60}, 70%, ${45 + (index % 3) * 10}%)`}
                         />
                       ))}
                     </Bar>
