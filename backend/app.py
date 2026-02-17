@@ -2761,7 +2761,11 @@ def get_stats():
                             }
                             
                             # Clasificar por tipo según descripción
-                            if 'tasas' in description or 'cuota tasas' in description:
+                            # Tasas Retributivas: incluye Cuota Tasas, Pago Recaudación Manual, Pago Patente
+                            if ('tasas' in description or 
+                                'recaudación' in description or 
+                                'recaudacion' in description or
+                                'patente' in description):
                                 tasas_data.append(data_item)
                             elif 'agua' in description or 'cuota agua' in description:
                                 agua_data.append(data_item)
