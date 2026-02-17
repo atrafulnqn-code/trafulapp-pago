@@ -2709,6 +2709,132 @@ def get_stats():
                 for row in monthly_pat_efectivo
             ]
             
+            # ============= DATOS DE PAGOS AUTOMATIZADOS (ONLINE) =============
+            
+            # --- CONTADOR: Tasas retributivas online ---
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE tipo_pago = 'tasas_retributivas'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            result_tasas_online = cur.fetchone()
+            total_registros_tasas_online = result_tasas_online[0] or 0
+            monto_total_tasas_online = float(result_tasas_online[1] or 0)
+            
+            # --- CONTADOR: Agua online ---
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE tipo_pago = 'agua'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            result_agua_online = cur.fetchone()
+            total_registros_agua_online = result_agua_online[0] or 0
+            monto_total_agua_online = float(result_agua_online[1] or 0)
+            
+            # --- TOTALES COMBINADOS DE PAGOS AUTOMATIZADOS ---
+            total_registros_automatizados = total_registros_tasas_online + total_registros_agua_online
+            monto_total_automatizados = monto_total_tasas_online + monto_total_agua_online
+            
+            # --- GRÁFICO DIARIO: Tasas retributivas online ---
+            cur.execute("""
+                SELECT 
+                    fecha_pago,
+                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
+                    COALESCE(SUM(monto_total), 0) as total_dia,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'tasas_retributivas'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
+                ORDER BY fecha_pago DESC
+                LIMIT 60
+            """)
+            daily_tasas_online = cur.fetchall()
+            
+            daily_chart_tasas_online = [
+                {
+                    "date": row[1],
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in reversed(daily_tasas_online)
+            ]
+            
+            # --- GRÁFICO DIARIO: Agua online ---
+            cur.execute("""
+                SELECT 
+                    fecha_pago,
+                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
+                    COALESCE(SUM(monto_total), 0) as total_dia,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'agua'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
+                ORDER BY fecha_pago DESC
+                LIMIT 60
+            """)
+            daily_agua_online = cur.fetchall()
+            
+            daily_chart_agua_online = [
+                {
+                    "date": row[1],
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in reversed(daily_agua_online)
+            ]
+            
+            # --- GRÁFICO MENSUAL: Tasas retributivas online ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'tasas_retributivas'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_tasas_online = cur.fetchall()
+            
+            monthly_chart_tasas_online = [
+                {
+                    "month": row[0].strip(),
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in monthly_tasas_online
+            ]
+            
+            # --- GRÁFICO MENSUAL: Agua online ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'agua'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_agua_online = cur.fetchall()
+            
+            monthly_chart_agua_online = [
+                {
+                    "month": row[0].strip(),
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in monthly_agua_online
+            ]
+            
             # --- CONSTRUIR RESPUESTA ---
             response_data = {
                 "recaudacion_tasas": {
@@ -2746,11 +2872,29 @@ def get_stats():
                 "daily_chart_rec_efectivo": daily_chart_rec_efectivo,
                 "daily_chart_pat_efectivo": daily_chart_pat_efectivo,
                 "monthly_chart_rec_efectivo": monthly_chart_rec_efectivo,
-                "monthly_chart_pat_efectivo": monthly_chart_pat_efectivo
+                "monthly_chart_pat_efectivo": monthly_chart_pat_efectivo,
+                "pagos_automatizados": {
+                    "tasas_retributivas": {
+                        "total_registros": total_registros_tasas_online,
+                        "monto_total": round(monto_total_tasas_online, 2)
+                    },
+                    "agua": {
+                        "total_registros": total_registros_agua_online,
+                        "monto_total": round(monto_total_agua_online, 2)
+                    },
+                    "total": {
+                        "total_registros": total_registros_automatizados,
+                        "monto_total": round(monto_total_automatizados, 2)
+                    }
+                },
+                "daily_chart_tasas_online": daily_chart_tasas_online,
+                "daily_chart_agua_online": daily_chart_agua_online,
+                "monthly_chart_tasas_online": monthly_chart_tasas_online,
+                "monthly_chart_agua_online": monthly_chart_agua_online
             }
             
             log_to_airtable('INFO', 'Stats Dashboard', 
-                          f'Estadísticas - Recaudación: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f}), Efectivo: {total_registros_efectivo} (${monto_total_efectivo:.2f})')
+                          f'Estadísticas - Recaudación: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f}), Efectivo: {total_registros_efectivo} (${monto_total_efectivo:.2f}), Automatizados: {total_registros_automatizados} (${monto_total_automatizados:.2f})')
             
             return jsonify(response_data), 200
             

@@ -109,7 +109,7 @@ const StatsDashboard: React.FC = () => {
     );
   }
 
-  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes, planes_pago, daily_chart_planes, monthly_chart_planes, cobro_efectivo, daily_chart_rec_efectivo, daily_chart_pat_efectivo, monthly_chart_rec_efectivo, monthly_chart_pat_efectivo } = data;
+  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes, planes_pago, daily_chart_planes, monthly_chart_planes, cobro_efectivo, daily_chart_rec_efectivo, daily_chart_pat_efectivo, monthly_chart_rec_efectivo, monthly_chart_pat_efectivo, pagos_automatizados, daily_chart_tasas_online, daily_chart_agua_online, monthly_chart_tasas_online, monthly_chart_agua_online } = data;
 
   return (
     <Container className="py-5 mt-5" fluid style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
@@ -833,6 +833,248 @@ const StatsDashboard: React.FC = () => {
                     <Bar
                       dataKey="total"
                       fill="#8B5CF6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ==================== SECCIÓN DE PAGOS AUTOMATIZADOS ==================== */}
+      <div className="mt-5 pt-4">
+        <div className="d-flex justify-content-between align-items-center mb-4 bg-white p-4 rounded-3 shadow-sm">
+          <div>
+            <h2 className="fw-bold text-dark mb-1">🌐 Pagos Automatizados</h2>
+            <p className="text-muted mb-0 small">Municipalidad de Villa Traful - Año 2026</p>
+          </div>
+        </div>
+
+        {/* KPI Cards - Pagos Automatizados */}
+        <Row className="g-4 mb-5">
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden position-relative"
+              style={{
+                background: `linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Tasas Retributivas</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z" />
+                      <path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${pagos_automatizados.tasas_retributivas.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{pagos_automatizados.tasas_retributivas.total_registros} pagos online</div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Agua</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path fillRule="evenodd" d="M7.21.8C7.69.295 8 0 8 0c.109.363.234.708.371 1.038.812 1.946 2.073 3.35 3.197 4.6C12.878 7.096 14 8.345 14 10a6 6 0 0 1-12 0C2 6.668 5.58 2.517 7.21.8zm.413 1.021A31.25 31.25 0 0 0 5.794 3.99c-.726.95-1.436 2.008-1.96 3.07C3.304 8.133 3 9.138 3 10a5 5 0 0 0 10 0c0-1.201-.796-2.157-2.181-3.7l-.03-.032C9.75 5.11 8.5 3.72 7.623 1.82z" />
+                      <path fillRule="evenodd" d="M4.553 7.776c.82-1.641 1.717-2.753 2.093-3.13l.708.708c-.29.29-1.128 1.311-1.907 2.87l-.894-.448z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${pagos_automatizados.agua.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{pagos_automatizados.agua.total_registros} pagos online</div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Total Automatizado</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z" />
+                      <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${pagos_automatizados.total.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{pagos_automatizados.total.total_registros} pagos totales</div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Gráficos de Pagos Automatizados */}
+        <Row className="g-4">
+          {/* Gráfico Diario - Tasas Retributivas */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📅 Tasas Retributivas - Diario</h5>
+                <span className="badge bg-primary">{daily_chart_tasas_online.length} días</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={daily_chart_tasas_online} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={10}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#06B6D4"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Diario - Agua */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📅 Agua - Diario</h5>
+                <span className="badge bg-primary">{daily_chart_agua_online.length} días</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={daily_chart_agua_online} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={10}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#14B8A6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Mensual - Tasas Retributivas */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📊 Tasas Retributivas - Mensual</h5>
+                <span className="badge bg-success">{monthly_chart_tasas_online.length} meses</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthly_chart_tasas_online} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="month"
+                      fontSize={12}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#06B6D4"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Mensual - Agua */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📊 Agua - Mensual</h5>
+                <span className="badge bg-success">{monthly_chart_agua_online.length} meses</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthly_chart_agua_online} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="month"
+                      fontSize={12}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#14B8A6"
                       radius={[8, 8, 0, 0]}
                       animationDuration={1500}
                     />
