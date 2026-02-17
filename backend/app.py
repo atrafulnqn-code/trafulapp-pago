@@ -2597,9 +2597,9 @@ def get_stats():
                 
                 for record in efectivo_records:
                     fields = record['fields']
-                    fecha_str = fields.get('FECHA_PAGO', '')
-                    tipo = fields.get('TIPO_PAGO', '').lower()
-                    monto = float(fields.get('MONTO_TOTAL', 0))
+                    fecha_str = fields.get('Fecha y Hora', '')
+                    tipo = fields.get('Tipo', '').lower()
+                    monto = float(fields.get('Total', 0))
                     
                     if not fecha_str:
                         continue
@@ -2623,9 +2623,10 @@ def get_stats():
                             'mes_nombre': fecha.strftime('%B')
                         }
                         
-                        if 'recaudacion' in tipo or 'tasa' in tipo:
+                        # Clasificar por tipo (los valores en Airtable son exactos)
+                        if tipo in ['recaudación de tasas', 'recaudacion de tasas', 'tasa', 'tasas']:
                             rec_efectivo_data.append(data_item)
-                        elif 'patente' in tipo:
+                        elif tipo in ['patente', 'patentes']:
                             pat_efectivo_data.append(data_item)
                     except:
                         continue
