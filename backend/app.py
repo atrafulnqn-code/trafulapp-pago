@@ -2589,7 +2589,7 @@ def get_stats():
             cur.execute("""
                 SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
                 FROM cash_payments
-                WHERE tipo_pago = 'recaudacion_efectivo'
+                WHERE tipo_pago = 'recaudacion'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
             """)
             result_rec_ef = cur.fetchone()
@@ -2600,7 +2600,7 @@ def get_stats():
             cur.execute("""
                 SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
                 FROM cash_payments
-                WHERE tipo_pago = 'patente_efectivo'
+                WHERE tipo_pago = 'patente'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
             """)
             result_pat_ef = cur.fetchone()
@@ -2619,7 +2619,7 @@ def get_stats():
                     COALESCE(SUM(monto_total), 0) as total_dia,
                     COUNT(*) as cantidad_registros
                 FROM cash_payments
-                WHERE tipo_pago = 'recaudacion_efectivo'
+                WHERE tipo_pago = 'recaudacion'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
                 GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
                 ORDER BY fecha_pago DESC
@@ -2644,7 +2644,7 @@ def get_stats():
                     COALESCE(SUM(monto_total), 0) as total_dia,
                     COUNT(*) as cantidad_registros
                 FROM cash_payments
-                WHERE tipo_pago = 'patente_efectivo'
+                WHERE tipo_pago = 'patente'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
                 GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
                 ORDER BY fecha_pago DESC
@@ -2669,7 +2669,7 @@ def get_stats():
                     COALESCE(SUM(monto_total), 0) as total_mes,
                     COUNT(*) as cantidad_registros
                 FROM cash_payments
-                WHERE tipo_pago = 'recaudacion_efectivo'
+                WHERE tipo_pago = 'recaudacion'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
                 GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
                 ORDER BY mes_num
@@ -2693,7 +2693,7 @@ def get_stats():
                     COALESCE(SUM(monto_total), 0) as total_mes,
                     COUNT(*) as cantidad_registros
                 FROM cash_payments
-                WHERE tipo_pago = 'patente_efectivo'
+                WHERE tipo_pago = 'patente'
                     AND EXTRACT(YEAR FROM fecha_pago) = 2026
                 GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
                 ORDER BY mes_num
