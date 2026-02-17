@@ -2583,257 +2583,269 @@ def get_stats():
                 for row in monthly_planes
             ]
             
-            # ============= DATOS DE COBRO EFECTIVO =============
+            # ============= DATOS DE COBRO EFECTIVO (desde Airtable) =============
             
-            # --- CONTADOR: Recaudación en efectivo ---
-            cur.execute("""
-                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
-                FROM cash_payments
-                WHERE tipo_pago = 'recaudacion'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-            """)
-            result_rec_ef = cur.fetchone()
-            total_registros_rec_efectivo = result_rec_ef[0] or 0
-            monto_total_rec_efectivo = float(result_rec_ef[1] or 0)
+            try:
+                efectivo_table = api.table(BASE_ID, EFECTIVO_TABLE_ID)
+                efectivo_records = efectivo_table.all()
+                
+                # Filtrar por año 2026 y procesar
+                from datetime import datetime
+                
+                rec_efectivo_data = []
+                pat_efectivo_data = []
+                
+                for record in efectivo_records:
+                    fields = record['fields']
+                    fecha_str = fields.get('FECHA_PAGO', '')
+                    tipo = fields.get('TIPO_PAGO', '').lower()
+                    monto = float(fields.get('MONTO_TOTAL', 0))
+                    
+                    if not fecha_str:
+                        continue
+                    
+                    try:
+                        # Parsear fecha (formato: YYYY-MM-DD o DD/MM/YYYY)
+                        if '-' in fecha_str:
+                            fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
+                        else:
+                            fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
+                        
+                        # Filtrar por año 2026
+                        if fecha.year != 2026:
+                            continue
+                        
+                        data_item = {
+                            'fecha': fecha,
+                            'fecha_str': fecha.strftime('%d/%m/%Y'),
+                            'monto': monto,
+                            'mes': fecha.month,
+                            'mes_nombre': fecha.strftime('%B')
+                        }
+                        
+                        if 'recaudacion' in tipo or 'tasa' in tipo:
+                            rec_efectivo_data.append(data_item)
+                        elif 'patente' in tipo:
+                            pat_efectivo_data.append(data_item)
+                    except:
+                        continue
+                
+                # Calcular totales
+                total_registros_rec_efectivo = len(rec_efectivo_data)
+                monto_total_rec_efectivo = sum(item['monto'] for item in rec_efectivo_data)
+                
+                total_registros_pat_efectivo = len(pat_efectivo_data)
+                monto_total_pat_efectivo = sum(item['monto'] for item in pat_efectivo_data)
+                
+                total_registros_efectivo = total_registros_rec_efectivo + total_registros_pat_efectivo
+                monto_total_efectivo = monto_total_rec_efectivo + monto_total_pat_efectivo
+                
+                # Gráficos diarios - Recaudación
+                from collections import defaultdict
+                daily_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
+                for item in rec_efectivo_data:
+                    daily_rec_dict[item['fecha_str']]['total'] += item['monto']
+                    daily_rec_dict[item['fecha_str']]['cantidad'] += 1
+                
+                daily_chart_rec_efectivo = [
+                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for fecha, data in sorted(daily_rec_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
+                ]
+                daily_chart_rec_efectivo.reverse()
+                
+                # Gráficos diarios - Patentes
+                daily_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
+                for item in pat_efectivo_data:
+                    daily_pat_dict[item['fecha_str']]['total'] += item['monto']
+                    daily_pat_dict[item['fecha_str']]['cantidad'] += 1
+                
+                daily_chart_pat_efectivo = [
+                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for fecha, data in sorted(daily_pat_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
+                ]
+                daily_chart_pat_efectivo.reverse()
+                
+                # Gráficos mensuales - Recaudación
+                monthly_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
+                for item in rec_efectivo_data:
+                    mes_nombre = item['mes_nombre']
+                    monthly_rec_dict[mes_nombre]['total'] += item['monto']
+                    monthly_rec_dict[mes_nombre]['cantidad'] += 1
+                    monthly_rec_dict[mes_nombre]['mes_num'] = item['mes']
+                
+                monthly_chart_rec_efectivo = [
+                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for mes, data in sorted(monthly_rec_dict.items(), key=lambda x: x[1]['mes_num'])
+                ]
+                
+                # Gráficos mensuales - Patentes
+                monthly_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
+                for item in pat_efectivo_data:
+                    mes_nombre = item['mes_nombre']
+                    monthly_pat_dict[mes_nombre]['total'] += item['monto']
+                    monthly_pat_dict[mes_nombre]['cantidad'] += 1
+                    monthly_pat_dict[mes_nombre]['mes_num'] = item['mes']
+                
+                monthly_chart_pat_efectivo = [
+                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for mes, data in sorted(monthly_pat_dict.items(), key=lambda x: x[1]['mes_num'])
+                ]
+                
+            except Exception as e:
+                print(f"Error obteniendo datos de efectivo desde Airtable: {e}")
+                total_registros_rec_efectivo = 0
+                monto_total_rec_efectivo = 0
+                total_registros_pat_efectivo = 0
+                monto_total_pat_efectivo = 0
+                total_registros_efectivo = 0
+                monto_total_efectivo = 0
+                daily_chart_rec_efectivo = []
+                daily_chart_pat_efectivo = []
+                monthly_chart_rec_efectivo = []
+                monthly_chart_pat_efectivo = []
             
-            # --- CONTADOR: Patentes en efectivo ---
-            cur.execute("""
-                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
-                FROM cash_payments
-                WHERE tipo_pago = 'patente'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-            """)
-            result_pat_ef = cur.fetchone()
-            total_registros_pat_efectivo = result_pat_ef[0] or 0
-            monto_total_pat_efectivo = float(result_pat_ef[1] or 0)
+            # ============= DATOS DE PAGOS AUTOMATIZADOS (desde Airtable) =============
             
-            # --- TOTALES COMBINADOS DE EFECTIVO ---
-            total_registros_efectivo = total_registros_rec_efectivo + total_registros_pat_efectivo
-            monto_total_efectivo = monto_total_rec_efectivo + monto_total_pat_efectivo
-            
-            # --- GRÁFICO DIARIO: Recaudación en efectivo ---
-            cur.execute("""
-                SELECT 
-                    fecha_pago,
-                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
-                    COALESCE(SUM(monto_total), 0) as total_dia,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'recaudacion'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
-                ORDER BY fecha_pago DESC
-                LIMIT 60
-            """)
-            daily_rec_efectivo = cur.fetchall()
-            
-            daily_chart_rec_efectivo = [
-                {
-                    "date": row[1],
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in reversed(daily_rec_efectivo)
-            ]
-            
-            # --- GRÁFICO DIARIO: Patentes en efectivo ---
-            cur.execute("""
-                SELECT 
-                    fecha_pago,
-                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
-                    COALESCE(SUM(monto_total), 0) as total_dia,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'patente'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
-                ORDER BY fecha_pago DESC
-                LIMIT 60
-            """)
-            daily_pat_efectivo = cur.fetchall()
-            
-            daily_chart_pat_efectivo = [
-                {
-                    "date": row[1],
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in reversed(daily_pat_efectivo)
-            ]
-            
-            # --- GRÁFICO MENSUAL: Recaudación en efectivo ---
-            cur.execute("""
-                SELECT 
-                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
-                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
-                    COALESCE(SUM(monto_total), 0) as total_mes,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'recaudacion'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
-                ORDER BY mes_num
-            """)
-            monthly_rec_efectivo = cur.fetchall()
-            
-            monthly_chart_rec_efectivo = [
-                {
-                    "month": row[0].strip(),
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in monthly_rec_efectivo
-            ]
-            
-            # --- GRÁFICO MENSUAL: Patentes en efectivo ---
-            cur.execute("""
-                SELECT 
-                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
-                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
-                    COALESCE(SUM(monto_total), 0) as total_mes,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'patente'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
-                ORDER BY mes_num
-            """)
-            monthly_pat_efectivo = cur.fetchall()
-            
-            monthly_chart_pat_efectivo = [
-                {
-                    "month": row[0].strip(),
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in monthly_pat_efectivo
-            ]
-            
-            # ============= DATOS DE PAGOS AUTOMATIZADOS (ONLINE) =============
-            
-            # --- CONTADOR: Tasas retributivas online ---
-            cur.execute("""
-                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
-                FROM cash_payments
-                WHERE tipo_pago = 'tasas_retributivas'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-            """)
-            result_tasas_online = cur.fetchone()
-            total_registros_tasas_online = result_tasas_online[0] or 0
-            monto_total_tasas_online = float(result_tasas_online[1] or 0)
-            
-            # --- CONTADOR: Agua online ---
-            cur.execute("""
-                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
-                FROM cash_payments
-                WHERE tipo_pago = 'agua'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-            """)
-            result_agua_online = cur.fetchone()
-            total_registros_agua_online = result_agua_online[0] or 0
-            monto_total_agua_online = float(result_agua_online[1] or 0)
-            
-            # --- TOTALES COMBINADOS DE PAGOS AUTOMATIZADOS ---
-            total_registros_automatizados = total_registros_tasas_online + total_registros_agua_online
-            monto_total_automatizados = monto_total_tasas_online + monto_total_agua_online
-            
-            # --- GRÁFICO DIARIO: Tasas retributivas online ---
-            cur.execute("""
-                SELECT 
-                    fecha_pago,
-                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
-                    COALESCE(SUM(monto_total), 0) as total_dia,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'tasas_retributivas'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
-                ORDER BY fecha_pago DESC
-                LIMIT 60
-            """)
-            daily_tasas_online = cur.fetchall()
-            
-            daily_chart_tasas_online = [
-                {
-                    "date": row[1],
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in reversed(daily_tasas_online)
-            ]
-            
-            # --- GRÁFICO DIARIO: Agua online ---
-            cur.execute("""
-                SELECT 
-                    fecha_pago,
-                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
-                    COALESCE(SUM(monto_total), 0) as total_dia,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'agua'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
-                ORDER BY fecha_pago DESC
-                LIMIT 60
-            """)
-            daily_agua_online = cur.fetchall()
-            
-            daily_chart_agua_online = [
-                {
-                    "date": row[1],
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in reversed(daily_agua_online)
-            ]
-            
-            # --- GRÁFICO MENSUAL: Tasas retributivas online ---
-            cur.execute("""
-                SELECT 
-                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
-                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
-                    COALESCE(SUM(monto_total), 0) as total_mes,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'tasas_retributivas'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
-                ORDER BY mes_num
-            """)
-            monthly_tasas_online = cur.fetchall()
-            
-            monthly_chart_tasas_online = [
-                {
-                    "month": row[0].strip(),
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in monthly_tasas_online
-            ]
-            
-            # --- GRÁFICO MENSUAL: Agua online ---
-            cur.execute("""
-                SELECT 
-                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
-                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
-                    COALESCE(SUM(monto_total), 0) as total_mes,
-                    COUNT(*) as cantidad_registros
-                FROM cash_payments
-                WHERE tipo_pago = 'agua'
-                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
-                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
-                ORDER BY mes_num
-            """)
-            monthly_agua_online = cur.fetchall()
-            
-            monthly_chart_agua_online = [
-                {
-                    "month": row[0].strip(),
-                    "total": round(float(row[2]), 2),
-                    "cantidad": int(row[3])
-                } 
-                for row in monthly_agua_online
-            ]
+            try:
+                # Tasas Retributivas (CONTRIBUTIVOS)
+                contributivos_table = api.table(BASE_ID, CONTRIBUTIVOS_TABLE_ID)
+                contributivos_records = contributivos_table.all()
+                
+                tasas_data = []
+                for record in contributivos_records:
+                    fields = record['fields']
+                    estado = fields.get('ESTADO_PAGO', '').lower()
+                    fecha_str = fields.get('FECHA_PAGO', '')
+                    monto = float(fields.get('MONTO_TOTAL', 0))
+                    
+                    if 'pagado' not in estado or not fecha_str:
+                        continue
+                    
+                    try:
+                        if '-' in fecha_str:
+                            fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
+                        else:
+                            fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
+                        
+                        if fecha.year != 2026:
+                            continue
+                        
+                        tasas_data.append({
+                            'fecha': fecha,
+                            'fecha_str': fecha.strftime('%d/%m/%Y'),
+                            'monto': monto,
+                            'mes': fecha.month,
+                            'mes_nombre': fecha.strftime('%B')
+                        })
+                    except:
+                        continue
+                
+                # Agua (WATER)
+                water_table = api.table(BASE_ID, WATER_TABLE_ID)
+                water_records = water_table.all()
+                
+                agua_data = []
+                for record in water_records:
+                    fields = record['fields']
+                    estado = fields.get('ESTADO_PAGO', '').lower()
+                    fecha_str = fields.get('FECHA_PAGO', '')
+                    monto = float(fields.get('MONTO_TOTAL', 0))
+                    
+                    if 'pagado' not in estado or not fecha_str:
+                        continue
+                    
+                    try:
+                        if '-' in fecha_str:
+                            fecha = datetime.strptime(fecha_str[:10], '%Y-%m-%d')
+                        else:
+                            fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
+                        
+                        if fecha.year != 2026:
+                            continue
+                        
+                        agua_data.append({
+                            'fecha': fecha,
+                            'fecha_str': fecha.strftime('%d/%m/%Y'),
+                            'monto': monto,
+                            'mes': fecha.month,
+                            'mes_nombre': fecha.strftime('%B')
+                        })
+                    except:
+                        continue
+                
+                # Calcular totales
+                total_registros_tasas_online = len(tasas_data)
+                monto_total_tasas_online = sum(item['monto'] for item in tasas_data)
+                
+                total_registros_agua_online = len(agua_data)
+                monto_total_agua_online = sum(item['monto'] for item in agua_data)
+                
+                total_registros_automatizados = total_registros_tasas_online + total_registros_agua_online
+                monto_total_automatizados = monto_total_tasas_online + monto_total_agua_online
+                
+                # Gráficos diarios - Tasas
+                daily_tasas_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
+                for item in tasas_data:
+                    daily_tasas_dict[item['fecha_str']]['total'] += item['monto']
+                    daily_tasas_dict[item['fecha_str']]['cantidad'] += 1
+                
+                daily_chart_tasas_online = [
+                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for fecha, data in sorted(daily_tasas_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
+                ]
+                daily_chart_tasas_online.reverse()
+                
+                # Gráficos diarios - Agua
+                daily_agua_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
+                for item in agua_data:
+                    daily_agua_dict[item['fecha_str']]['total'] += item['monto']
+                    daily_agua_dict[item['fecha_str']]['cantidad'] += 1
+                
+                daily_chart_agua_online = [
+                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for fecha, data in sorted(daily_agua_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
+                ]
+                daily_chart_agua_online.reverse()
+                
+                # Gráficos mensuales - Tasas
+                monthly_tasas_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
+                for item in tasas_data:
+                    mes_nombre = item['mes_nombre']
+                    monthly_tasas_dict[mes_nombre]['total'] += item['monto']
+                    monthly_tasas_dict[mes_nombre]['cantidad'] += 1
+                    monthly_tasas_dict[mes_nombre]['mes_num'] = item['mes']
+                
+                monthly_chart_tasas_online = [
+                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for mes, data in sorted(monthly_tasas_dict.items(), key=lambda x: x[1]['mes_num'])
+                ]
+                
+                # Gráficos mensuales - Agua
+                monthly_agua_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
+                for item in agua_data:
+                    mes_nombre = item['mes_nombre']
+                    monthly_agua_dict[mes_nombre]['total'] += item['monto']
+                    monthly_agua_dict[mes_nombre]['cantidad'] += 1
+                    monthly_agua_dict[mes_nombre]['mes_num'] = item['mes']
+                
+                monthly_chart_agua_online = [
+                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for mes, data in sorted(monthly_agua_dict.items(), key=lambda x: x[1]['mes_num'])
+                ]
+                
+            except Exception as e:
+                print(f"Error obteniendo datos de pagos automatizados desde Airtable: {e}")
+                total_registros_tasas_online = 0
+                monto_total_tasas_online = 0
+                total_registros_agua_online = 0
+                monto_total_agua_online = 0
+                total_registros_automatizados = 0
+                monto_total_automatizados = 0
+                daily_chart_tasas_online = []
+                daily_chart_agua_online = []
+                monthly_chart_tasas_online = []
+                monthly_chart_agua_online = []
+
             
             # --- CONSTRUIR RESPUESTA ---
             response_data = {
