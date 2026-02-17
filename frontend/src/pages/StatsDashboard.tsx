@@ -109,7 +109,7 @@ const StatsDashboard: React.FC = () => {
     );
   }
 
-  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes, planes_pago, daily_chart_planes, monthly_chart_planes } = data;
+  const { recaudacion_tasas, daily_chart, monthly_chart, patentes, daily_chart_patentes, monthly_chart_patentes, planes_pago, daily_chart_planes, monthly_chart_planes, cobro_efectivo, daily_chart_rec_efectivo, daily_chart_pat_efectivo, monthly_chart_rec_efectivo, monthly_chart_pat_efectivo } = data;
 
   return (
     <Container className="py-5 mt-5" fluid style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
@@ -598,6 +598,246 @@ const StatsDashboard: React.FC = () => {
               </div>
               <div className="mt-3 text-center text-muted small">
                 Resumen mensual del año 2026
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ==================== SECCIÓN DE COBRO EFECTIVO ==================== */}
+      <div className="mt-5 pt-4">
+        <div className="d-flex justify-content-between align-items-center mb-4 bg-white p-4 rounded-3 shadow-sm">
+          <div>
+            <h2 className="fw-bold text-dark mb-1">💵 Cobro Efectivo</h2>
+            <p className="text-muted mb-0 small">Municipalidad de Villa Traful - Año 2026</p>
+          </div>
+        </div>
+
+        {/* KPI Cards - Cobro Efectivo */}
+        <Row className="g-4 mb-5">
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden position-relative"
+              style={{
+                background: `linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Recaudación Efectivo</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1H1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                      <path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V5zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2H3z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${cobro_efectivo.recaudacion.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{cobro_efectivo.recaudacion.total_registros} registros</div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Patentes Efectivo</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3 2.5A1.5 1.5 0 0 1 4.5 1h3.563a2 2 0 0 1 1.267.46l2.921 2.46A1.5 1.5 0 0 1 13 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 14.5v-12z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${cobro_efectivo.patentes.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{cobro_efectivo.patentes.total_registros} registros</div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={4}>
+            <Card className="border-0 shadow-lg h-100 overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, #10B981 0%, #059669 100%)`,
+                transform: 'translateY(0)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <Card.Body className="text-white p-4">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div className="opacity-75 small fw-semibold">Total Efectivo</div>
+                  <div className="bg-white bg-opacity-25 rounded-circle p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="h2 fw-bold mb-0">
+                  ${cobro_efectivo.total.monto_total.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="small opacity-75 mt-2">{cobro_efectivo.total.total_registros} registros totales</div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Gráficos de Cobro Efectivo */}
+        <Row className="g-4">
+          {/* Gráfico Diario - Recaudación Efectivo */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📅 Recaudación Efectivo - Diario</h5>
+                <span className="badge bg-primary">{daily_chart_rec_efectivo.length} días</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={daily_chart_rec_efectivo} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={10}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#3B82F6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Diario - Patentes Efectivo */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📅 Patentes Efectivo - Diario</h5>
+                <span className="badge bg-primary">{daily_chart_pat_efectivo.length} días</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={daily_chart_pat_efectivo} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="date"
+                      fontSize={10}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#8B5CF6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Mensual - Recaudación Efectivo */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📊 Recaudación Efectivo - Mensual</h5>
+                <span className="badge bg-success">{monthly_chart_rec_efectivo.length} meses</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthly_chart_rec_efectivo} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="month"
+                      fontSize={12}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#3B82F6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </Col>
+
+          {/* Gráfico Mensual - Patentes Efectivo */}
+          <Col md={6}>
+            <Card className="border-0 shadow-sm p-4">
+              <div className="d-flex justify-content-between align-items-center mb-4">
+                <h5 className="fw-bold text-dark mb-0">📊 Patentes Efectivo - Mensual</h5>
+                <span className="badge bg-success">{monthly_chart_pat_efectivo.length} meses</span>
+              </div>
+              <div style={{ width: '100%', height: 350 }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthly_chart_pat_efectivo} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                    <XAxis
+                      dataKey="month"
+                      fontSize={12}
+                      stroke="#6B7280"
+                    />
+                    <YAxis
+                      fontSize={12}
+                      stroke="#6B7280"
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar
+                      dataKey="total"
+                      fill="#8B5CF6"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </Card>
           </Col>

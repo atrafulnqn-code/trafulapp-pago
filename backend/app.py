@@ -2583,6 +2583,132 @@ def get_stats():
                 for row in monthly_planes
             ]
             
+            # ============= DATOS DE COBRO EFECTIVO =============
+            
+            # --- CONTADOR: Recaudación en efectivo ---
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE tipo_pago = 'recaudacion_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            result_rec_ef = cur.fetchone()
+            total_registros_rec_efectivo = result_rec_ef[0] or 0
+            monto_total_rec_efectivo = float(result_rec_ef[1] or 0)
+            
+            # --- CONTADOR: Patentes en efectivo ---
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE tipo_pago = 'patente_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            result_pat_ef = cur.fetchone()
+            total_registros_pat_efectivo = result_pat_ef[0] or 0
+            monto_total_pat_efectivo = float(result_pat_ef[1] or 0)
+            
+            # --- TOTALES COMBINADOS DE EFECTIVO ---
+            total_registros_efectivo = total_registros_rec_efectivo + total_registros_pat_efectivo
+            monto_total_efectivo = monto_total_rec_efectivo + monto_total_pat_efectivo
+            
+            # --- GRÁFICO DIARIO: Recaudación en efectivo ---
+            cur.execute("""
+                SELECT 
+                    fecha_pago,
+                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
+                    COALESCE(SUM(monto_total), 0) as total_dia,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'recaudacion_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
+                ORDER BY fecha_pago DESC
+                LIMIT 60
+            """)
+            daily_rec_efectivo = cur.fetchall()
+            
+            daily_chart_rec_efectivo = [
+                {
+                    "date": row[1],
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in reversed(daily_rec_efectivo)
+            ]
+            
+            # --- GRÁFICO DIARIO: Patentes en efectivo ---
+            cur.execute("""
+                SELECT 
+                    fecha_pago,
+                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
+                    COALESCE(SUM(monto_total), 0) as total_dia,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'patente_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
+                ORDER BY fecha_pago DESC
+                LIMIT 60
+            """)
+            daily_pat_efectivo = cur.fetchall()
+            
+            daily_chart_pat_efectivo = [
+                {
+                    "date": row[1],
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in reversed(daily_pat_efectivo)
+            ]
+            
+            # --- GRÁFICO MENSUAL: Recaudación en efectivo ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'recaudacion_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_rec_efectivo = cur.fetchall()
+            
+            monthly_chart_rec_efectivo = [
+                {
+                    "month": row[0].strip(),
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in monthly_rec_efectivo
+            ]
+            
+            # --- GRÁFICO MENSUAL: Patentes en efectivo ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'patente_efectivo'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_pat_efectivo = cur.fetchall()
+            
+            monthly_chart_pat_efectivo = [
+                {
+                    "month": row[0].strip(),
+                    "total": round(float(row[2]), 2),
+                    "cantidad": int(row[3])
+                } 
+                for row in monthly_pat_efectivo
+            ]
+            
             # --- CONSTRUIR RESPUESTA ---
             response_data = {
                 "recaudacion_tasas": {
@@ -2602,11 +2728,29 @@ def get_stats():
                     "monto_total": round(monto_total_planes, 2)
                 },
                 "daily_chart_planes": daily_chart_planes,
-                "monthly_chart_planes": monthly_chart_planes
+                "monthly_chart_planes": monthly_chart_planes,
+                "cobro_efectivo": {
+                    "recaudacion": {
+                        "total_registros": total_registros_rec_efectivo,
+                        "monto_total": round(monto_total_rec_efectivo, 2)
+                    },
+                    "patentes": {
+                        "total_registros": total_registros_pat_efectivo,
+                        "monto_total": round(monto_total_pat_efectivo, 2)
+                    },
+                    "total": {
+                        "total_registros": total_registros_efectivo,
+                        "monto_total": round(monto_total_efectivo, 2)
+                    }
+                },
+                "daily_chart_rec_efectivo": daily_chart_rec_efectivo,
+                "daily_chart_pat_efectivo": daily_chart_pat_efectivo,
+                "monthly_chart_rec_efectivo": monthly_chart_rec_efectivo,
+                "monthly_chart_pat_efectivo": monthly_chart_pat_efectivo
             }
             
             log_to_airtable('INFO', 'Stats Dashboard', 
-                          f'Estadísticas - Recaudación: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f})')
+                          f'Estadísticas - Recaudación: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f}), Efectivo: {total_registros_efectivo} (${monto_total_efectivo:.2f})')
             
             return jsonify(response_data), 200
             
