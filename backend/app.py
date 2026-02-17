@@ -2441,6 +2441,77 @@ def get_stats():
                 for row in monthly_recaudacion
             ]
             
+            # ============= DATOS DE PATENTES =============
+            
+            # --- CONTADOR: Total de registros de patentes ---
+            cur.execute("""
+                SELECT COUNT(*) 
+                FROM cash_payments
+                WHERE tipo_pago = 'patente'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            total_registros_patentes = cur.fetchone()[0] or 0
+            
+            # --- MONTO TOTAL de patentes ---
+            cur.execute("""
+                SELECT COALESCE(SUM(monto_total), 0)
+                FROM cash_payments
+                WHERE tipo_pago = 'patente'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+            """)
+            monto_total_patentes = float(cur.fetchone()[0] or 0)
+            
+            # --- GRÁFICO DIARIO: Patentes por día ---
+            cur.execute("""
+                SELECT 
+                    fecha_pago,
+                    TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_formateada,
+                    COALESCE(SUM(monto_total), 0) as total_dia,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'patente'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY fecha_pago, TO_CHAR(fecha_pago, 'DD/MM/YYYY')
+                ORDER BY fecha_pago DESC
+                LIMIT 60
+            """)
+            daily_patentes = cur.fetchall()
+            
+            # Formatear datos para el gráfico diario de patentes
+            daily_chart_patentes = [
+                {
+                    "date": row[1],  # fecha_formateada
+                    "total": round(float(row[2]), 2),  # total_dia
+                    "cantidad": int(row[3])  # cantidad_registros
+                } 
+                for row in reversed(daily_patentes)  # Invertir para orden cronológico
+            ]
+            
+            # --- GRÁFICO MENSUAL: Patentes por mes ---
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(fecha_pago, 'Month') as mes_nombre,
+                    EXTRACT(MONTH FROM fecha_pago) as mes_num,
+                    COALESCE(SUM(monto_total), 0) as total_mes,
+                    COUNT(*) as cantidad_registros
+                FROM cash_payments
+                WHERE tipo_pago = 'patente'
+                    AND EXTRACT(YEAR FROM fecha_pago) = 2026
+                GROUP BY TO_CHAR(fecha_pago, 'Month'), EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes_num
+            """)
+            monthly_patentes = cur.fetchall()
+            
+            # Formatear datos para el gráfico mensual de patentes
+            monthly_chart_patentes = [
+                {
+                    "month": row[0].strip(),  # mes_nombre
+                    "total": round(float(row[2]), 2),  # total_mes
+                    "cantidad": int(row[3])  # cantidad_registros
+                } 
+                for row in monthly_patentes
+            ]
+            
             # --- CONSTRUIR RESPUESTA ---
             response_data = {
                 "recaudacion_tasas": {
@@ -2448,11 +2519,17 @@ def get_stats():
                     "monto_total": round(monto_total_recaudacion, 2)
                 },
                 "daily_chart": daily_chart,
-                "monthly_chart": monthly_chart
+                "monthly_chart": monthly_chart,
+                "patentes": {
+                    "total_registros": total_registros_patentes,
+                    "monto_total": round(monto_total_patentes, 2)
+                },
+                "daily_chart_patentes": daily_chart_patentes,
+                "monthly_chart_patentes": monthly_chart_patentes
             }
             
             log_to_airtable('INFO', 'Stats Dashboard', 
-                          f'Estadísticas de recaudación: {total_registros_recaudacion} registros, ${monto_total_recaudacion:.2f}')
+                          f'Estadísticas - Recaudación: {total_registros_recaudacion} registros (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} registros (${monto_total_patentes:.2f})')
             
             return jsonify(response_data), 200
             
