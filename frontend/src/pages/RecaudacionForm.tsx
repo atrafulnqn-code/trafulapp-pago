@@ -5,12 +5,12 @@ import { useNavigate } from 'react-router-dom';
 // Configuración de URL de API robusta
 // @ts-ignore
 const getApiBaseUrl = () => {
-    // @ts-ignore
-    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
-    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
-        return runtimeUrl;
-    }
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+  // @ts-ignore
+  const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+  if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+    return runtimeUrl;
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -97,8 +97,8 @@ const RecaudacionForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (seleccionados.length === 0) {
-        setStatus({ type: 'danger', msg: 'Debe seleccionar al menos un concepto.' });
-        return;
+      setStatus({ type: 'danger', msg: 'Debe seleccionar al menos un concepto.' });
+      return;
     }
     setLoading(true);
     setStatus(null);
@@ -121,7 +121,7 @@ const RecaudacionForm: React.FC = () => {
         total_final: totalFinal
       };
 
-      const response = await fetch(`${API_BASE_URL}/recaudacion`, {
+      const response = await fetch(`${API_BASE_URL}/recaudacion_efectivo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -134,17 +134,17 @@ const RecaudacionForm: React.FC = () => {
         setStatus({ type: 'success', msg: data.message || 'Recaudación registrada exitosamente.' });
         // Crear URL para descargar PDF
         if (data.pdf_base64) {
-            const byteCharacters = atob(data.pdf_base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            setPdfDownloadUrl(url);
+          const byteCharacters = atob(data.pdf_base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          setPdfDownloadUrl(url);
         }
-        
+
         // Reset form
         setFormData({ ...formData, nombre: '', email: '', descuento: 0 });
         setImportes({});
@@ -190,45 +190,45 @@ const RecaudacionForm: React.FC = () => {
             </Row>
 
             <h5 className="mb-3 text-primary border-bottom pb-2">Seleccione Conceptos</h5>
-            
+
             {items.map((item) => (
               <div key={item.id} className="mb-3 border-bottom pb-2">
-                  <Form.Check 
-                    type="checkbox"
-                    id={`check-${item.id}`}
-                    label={item.label}
-                    checked={seleccionados.includes(item.id)}
-                    onChange={() => handleCheckboxChange(item.id)}
-                    className="mb-2 fw-bold"
-                  />
-                  {seleccionados.includes(item.id) && (
-                      <div className="ms-4">
-                          <InputGroup size="sm" className="mb-2" style={{ maxWidth: '200px' }}>
-                            <InputGroup.Text>$</InputGroup.Text>
-                            <Form.Control 
-                              type="number" 
-                              placeholder="0.00" 
-                              value={importes[item.id] || ''} 
-                              onChange={(e) => handleImporteChange(item.id, e.target.value)} 
-                              min="0"
-                              step="0.01"
-                              autoFocus
-                            />
-                          </InputGroup>
-                          <Form.Control 
-                              size="sm"
-                              type="text" 
-                              placeholder="Aclaración / Nota (opcional)" 
-                              value={notas[item.id] || ''} 
-                              onChange={(e) => handleNotaChange(item.id, e.target.value)}
-                              className="text-muted fst-italic"
-                          />
-                      </div>
-                  )}
+                <Form.Check
+                  type="checkbox"
+                  id={`check-${item.id}`}
+                  label={item.label}
+                  checked={seleccionados.includes(item.id)}
+                  onChange={() => handleCheckboxChange(item.id)}
+                  className="mb-2 fw-bold"
+                />
+                {seleccionados.includes(item.id) && (
+                  <div className="ms-4">
+                    <InputGroup size="sm" className="mb-2" style={{ maxWidth: '200px' }}>
+                      <InputGroup.Text>$</InputGroup.Text>
+                      <Form.Control
+                        type="number"
+                        placeholder="0.00"
+                        value={importes[item.id] || ''}
+                        onChange={(e) => handleImporteChange(item.id, e.target.value)}
+                        min="0"
+                        step="0.01"
+                        autoFocus
+                      />
+                    </InputGroup>
+                    <Form.Control
+                      size="sm"
+                      type="text"
+                      placeholder="Aclaración / Nota (opcional)"
+                      value={notas[item.id] || ''}
+                      onChange={(e) => handleNotaChange(item.id, e.target.value)}
+                      className="text-muted fst-italic"
+                    />
+                  </div>
+                )}
               </div>
             ))}
 
-            <hr className="my-4"/>
+            <hr className="my-4" />
 
             <Row className="mb-3">
               <Col md={6} className="offset-md-6">
@@ -239,12 +239,12 @@ const RecaudacionForm: React.FC = () => {
                 <Form.Group as={Row} className="mb-2 align-items-center" controlId="descuento">
                   <Form.Label column sm={6} className="text-end">Descuento %:</Form.Label>
                   <Col sm={6}>
-                    <Form.Control 
-                      type="number" 
-                      name="descuento" 
-                      value={formData.descuento} 
-                      onChange={handleChange} 
-                      min="0" 
+                    <Form.Control
+                      type="number"
+                      name="descuento"
+                      value={formData.descuento}
+                      onChange={handleChange}
+                      min="0"
                       max="100"
                     />
                   </Col>
@@ -265,7 +265,7 @@ const RecaudacionForm: React.FC = () => {
                 </Form.Group>
               </Col>
             </Row>
-            
+
             <Row className="mb-4">
               <Col md={6}>
                 <Form.Group controlId="administrativa">
@@ -284,11 +284,11 @@ const RecaudacionForm: React.FC = () => {
               <Button variant="primary" type="submit" disabled={loading}>
                 {loading ? <Spinner animation="border" size="sm" /> : 'Registrar y Enviar por Email'}
               </Button>
-              
+
               {pdfDownloadUrl && (
-                  <Button variant="outline-dark" href={pdfDownloadUrl} download={`comprobante_${new Date().getTime()}.pdf`}>
-                      Descargar PDF
-                  </Button>
+                <Button variant="outline-dark" href={pdfDownloadUrl} download={`comprobante_${new Date().getTime()}.pdf`}>
+                  Descargar PDF
+                </Button>
               )}
             </div>
           </Form>

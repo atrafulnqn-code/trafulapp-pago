@@ -2469,16 +2469,18 @@ def recaudacion_efectivo():
         if api:
             try:
                 recaudacion_table = api.table(BASE_ID, RECAUDACION_TABLE_ID)
+                # Airtable schema: ['Contribuyente', 'Fecha', 'Email', 'Total', 'Detalles', 
+                # 'Administrativo', 'Referencia', 'Estado Pago', 'MP Preference ID', 'PDF_ID']
                 airtable_record = recaudacion_table.create({
-                    'Comprobante ID': comprobante_id,
+                    'Referencia': comprobante_id,
                     'Fecha': fecha,
-                    'Nombre': nombre,
+                    'Contribuyente': nombre,
                     'Email': email,
-                    'Monto Total': total_final,
-                    'Descuento': float(descuento) if descuento else 0,
-                    'Detalle': detalle_completo,
-                    'Administrativa': administrativa,
-                    'Items JSON': json.dumps(items_for_pdf)
+                    'Total': total_final,
+                    'Detalles': detalle_completo,
+                    'Administrativo': administrativa,
+                    'Estado Pago': 'Pagado en Efectivo',
+                    'PDF_ID': comprobante_id
                 })
                 log_to_airtable('INFO', 'Recaudacion Efectivo',
                                 f'Registro creado: {comprobante_id} - ${total_final}')
@@ -2682,20 +2684,25 @@ def patente_efectivo():
         if api:
             try:
                 patente_table = api.table(BASE_ID, PATENTE_MANUAL_TABLE_ID)
+                # Map variables to the exact Airtable columns
+                # Airtable schema: ['Dominio', 'Fecha', 'Contribuyente', 'Vehículo', 'Año', 'Monto Original',
+                # 'Descuento', 'Monto Final', 'Medio de Pago', 'Responsable de Cobro', 'Importe Neto',
+                # 'Referencia de Pago', 'Recibo URL', 'Reference ID', 'Plan_de_Pago', 'PDF_ID', 'Comentarios']
                 airtable_record = patente_table.create({
-                    'Comprobante ID': comprobante_id,
+                    'Reference ID': comprobante_id,
                     'Fecha': fecha,
-                    'Nombre': nombre,
-                    'Email': email,
-                    'Patente': patente,
-                    'Marca': marca,
-                    'Modelo': modelo,
+                    'Contribuyente': nombre,
+                    'Dominio': patente,
+                    'Vehículo': f"{marca} {modelo}".strip(),
                     'Año': anio,
-                    'Monto': total_final,
+                    'Monto Original': monto,
                     'Descuento': descuento,
-                    'Detalle': detalle_completo,
-                    'Administrativo': administrativo,
-                    'Comentarios': comentarios
+                    'Monto Final': total_final,
+                    'Importe Neto': total_final,
+                    'Responsable de Cobro': administrativo,
+                    'Comentarios': comentarios,
+                    'Medio de Pago': 'Efectivo',
+                    'Referencia de Pago': detalle_completo
                 })
                 log_to_airtable('INFO', 'Patente Efectivo',
                                 f'Registro creado: {comprobante_id} - Patente {patente} - ${total_final}')
