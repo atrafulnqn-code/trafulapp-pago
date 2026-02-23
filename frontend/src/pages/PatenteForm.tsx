@@ -5,12 +5,12 @@ import { useNavigate } from 'react-router-dom';
 // Configuración de URL de API robusta
 // @ts-ignore
 const getApiBaseUrl = () => {
-    // @ts-ignore
-    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
-    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
-        return runtimeUrl;
-    }
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+  // @ts-ignore
+  const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+  if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+    return runtimeUrl;
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -67,7 +67,7 @@ const PatenteForm: React.FC = () => {
         total_final: totalFinal
       };
 
-      const response = await fetch(`${API_BASE_URL}/patente_manual`, {
+      const response = await fetch(`${API_BASE_URL}/patente_efectivo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -77,20 +77,20 @@ const PatenteForm: React.FC = () => {
 
       if (response.ok) {
         setStatus({ type: 'success', msg: 'Pago de Patente registrado, PDF generado y email enviado con éxito.' });
-        
+
         // Crear URL para descargar PDF
         if (data.pdf_base64) {
-            const byteCharacters = atob(data.pdf_base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            setPdfDownloadUrl(url);
+          const byteCharacters = atob(data.pdf_base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          setPdfDownloadUrl(url);
         }
-        
+
         // Reset form parcial
         setFormData({ ...formData, nombre: '', patente: '', marca: '', modelo: '', anio: '', comentarios: '', monto: '', descuento: 0, email: '', transferencia: '' });
       } else {
@@ -154,7 +154,7 @@ const PatenteForm: React.FC = () => {
               </Col>
             </Row>
             <Row className="mb-3">
-               <Col md={4}>
+              <Col md={4}>
                 <Form.Group controlId="anio">
                   <Form.Label>Año</Form.Label>
                   <Form.Control type="number" name="anio" value={formData.anio} onChange={handleChange} required min="1900" max="2100" />
@@ -189,8 +189,8 @@ const PatenteForm: React.FC = () => {
               </Col>
               <Col md={4}>
                 <div className="bg-light p-2 rounded text-center">
-                    <span className="text-muted d-block small">Total Final</span>
-                    <span className="h4 fw-bold text-success">${totalFinal.toFixed(2)}</span>
+                  <span className="text-muted d-block small">Total Final</span>
+                  <span className="h4 fw-bold text-success">${totalFinal.toFixed(2)}</span>
                 </div>
               </Col>
             </Row>
@@ -204,7 +204,7 @@ const PatenteForm: React.FC = () => {
                 </Form.Group>
               </Col>
             </Row>
-            
+
             <Row className="mb-4">
               <Col md={6}>
                 <Form.Group controlId="administrativo">
@@ -221,11 +221,11 @@ const PatenteForm: React.FC = () => {
               <Button variant="success" size="sm" type="submit" disabled={loading} className="px-4 py-2">
                 {loading ? <Spinner animation="border" size="sm" /> : 'Registrar y Enviar por Email'}
               </Button>
-              
+
               {pdfDownloadUrl && (
-                  <Button variant="outline-dark" size="sm" href={pdfDownloadUrl} download={`patente_${formData.patente || 'comprobante'}.pdf`} className="px-4 py-2">
-                      Descargar PDF
-                  </Button>
+                <Button variant="outline-dark" size="sm" href={pdfDownloadUrl} download={`patente_${formData.patente || 'comprobante'}.pdf`} className="px-4 py-2">
+                  Descargar PDF
+                </Button>
               )}
             </div>
           </Form>
