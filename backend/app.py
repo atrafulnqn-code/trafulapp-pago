@@ -2354,11 +2354,19 @@ def staff_register_access():
         # Guardar en Airtable
         if api:
             try:
+                now = datetime.now()
+                ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+                # If there are multiple IPs in X-Forwarded-For, take the first one
+                if ip_address and ',' in ip_address:
+                    ip_address = ip_address.split(',')[0].strip()
+                    
                 accesos_table = api.table(BASE_ID, ACCESOS_PERSONAL_TABLE_ID)
                 accesos_table.create({
-                    'Nombre': username,
-                    'Fecha': datetime.now().isoformat(),
-                    'Tipo': 'Login'
+                    'Usuario': username,
+                    'Fecha': now.strftime('%Y-%m-%d'),
+                    'Hora': now.strftime('%H:%M:%S'),
+                    'IP': ip_address or 'Desconocida',
+                    'Observaciones': 'Registro de acceso'
                 })
                 log_to_airtable('INFO', 'Staff Access',
                                 f'Acceso registrado para {username}')
