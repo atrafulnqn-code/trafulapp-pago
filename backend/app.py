@@ -404,43 +404,36 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 if not AIRTABLE_PAT_FROM_ENV:
-    print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.")
+    print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.", flush=True)
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
-    print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no "
-          "está configurada.")
+    print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no está configurada.", flush=True)
 if not ADMIN_PASSWORD_FROM_ENV:
-    print("FATAL: La variable de entorno ADMIN_PASSWORD no está configurada. "
-          "El panel de administración no funcionará correctamente.")
+    print("FATAL: La variable de entorno ADMIN_PASSWORD no está configurada. El panel de administración no funcionará correctamente.", flush=True)
 if not RESEND_API_KEY_FROM_ENV:
-    print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está "
-          "configurada. El envío de emails no funcionará.")
-if not all([PAGOTIC_USERNAME, PAGOTIC_PASSWORD, PAGOTIC_CLIENT_ID,
-            PAGOTIC_CLIENT_SECRET]):
-    print("ADVERTENCIA: Credenciales de Pago TIC incompletas. "
-          "La integración de Pago TIC no funcionará.")
+    print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está configurada. El envío de emails no funcionará.", flush=True)
+if not all([PAGOTIC_USERNAME, PAGOTIC_PASSWORD, PAGOTIC_CLIENT_ID, PAGOTIC_CLIENT_SECRET]):
+    print("ADVERTENCIA: Credenciales de Pago TIC incompletas. La integración de Pago TIC no funcionará.", flush=True)
 if not all([PAYWAY_SITE_ID, PAYWAY_PRIVATE_KEY]):
-    print("ADVERTENCIA: Credenciales de Payway incompletas.")
+    print("ADVERTENCIA: Credenciales de Payway incompletas.", flush=True)
 else:
-    print(f"Configuración Payway cargada. Site ID: {PAYWAY_SITE_ID}")
+    print(f"Configuración Payway cargada. Site ID: {PAYWAY_SITE_ID}", flush=True)
 
 if not GOOGLE_SERVICE_ACCOUNT_JSON and not GOOGLE_CREDENTIALS_PATH:
-    print("ADVERTENCIA: Credenciales de Google Drive no configuradas. "
-          "Los recibos de sueldo no funcionarán.")
+    print("ADVERTENCIA: Credenciales de Google Drive no configuradas. Los recibos de sueldo no funcionarán.", flush=True)
 else:
     if GOOGLE_SERVICE_ACCOUNT_JSON:
-        print("Configuración Google Drive (JSON) detectada.")
+        print("Configuración Google Drive (JSON) detectada.", flush=True)
     if GOOGLE_CREDENTIALS_PATH:
-        print(f"Configuración Google Drive (Path) detectada: {GOOGLE_CREDENTIALS_PATH}")
+        print(f"Configuración Google Drive (Path) detectada: {GOOGLE_CREDENTIALS_PATH}", flush=True)
 
 if not GOOGLE_DRIVE_FOLDER_ID:
-    print("ADVERTENCIA: GOOGLE_DRIVE_FOLDER_ID no configurada.")
+    print("ADVERTENCIA: GOOGLE_DRIVE_FOLDER_ID no configurada.", flush=True)
 else:
-    print(f"Folder ID de Google Drive configurado: {GOOGLE_DRIVE_FOLDER_ID}")
+    print(f"Folder ID de Google Drive configurado: {GOOGLE_DRIVE_FOLDER_ID}", flush=True)
 
 if not ADMIN_PASSWORD_FROM_ENV:
-    print("ADVERTENCIA: La variable de entorno ADMIN_PASSWORD no está "
-          "configurada. El acceso de administrador no funcionará.")
-print("--- Fin Verificación ---")
+    print("ADVERTENCIA: La variable de entorno ADMIN_PASSWORD no está configurada. El acceso de administrador no funcionará.", flush=True)
+print("--- Fin Verificación ---", flush=True)
 
 
 # --- CONFIGURACION ---
