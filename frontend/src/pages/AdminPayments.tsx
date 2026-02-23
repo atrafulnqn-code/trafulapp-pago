@@ -10,6 +10,7 @@ const getApiBaseUrl = () => {
     if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
         return runtimeUrl;
     }
+    // @ts-ignore
     return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 
@@ -84,7 +85,10 @@ const AdminPayments: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/payments_history?page=${currentPage}&per_page=${perPage}`);
+                const password = localStorage.getItem('adminPassword') || '';
+                const response = await fetch(`${API_BASE_URL}/admin/payments_history?page=${currentPage}&per_page=${perPage}`, {
+                    headers: { 'Authorization': `Bearer ${password}` }
+                });
                 const result = await response.json(); // La respuesta es un objeto con 'payments', 'total_records', etc.
 
                 if (response.ok) {
@@ -139,7 +143,7 @@ const AdminPayments: React.FC = () => {
                                 </div>
                                 <Button variant="primary" size="sm" onClick={() => window.location.reload()}>Refrescar</Button>
                             </div>
-                            
+
                             {error && <Alert variant="danger">{error}</Alert>}
                             <div className="text-end mb-3">
                                 {/* ... other buttons if needed ... */}
@@ -152,99 +156,99 @@ const AdminPayments: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                <div className="table-responsive">
-                                <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
-                                    <thead className="bg-light">
-                                        <tr>
-                                            <th>Fecha de Transacción</th>
-                                            <th>Estado</th>
-                                            <th>MP Payment ID</th>
-                                            <th>Contribuyente</th>
-                                            <th>DNI</th>
-                                            <th>Conceptos Pagados</th>
-                                            <th>Comprobante Status</th>
-                                            <th className="text-end">Monto</th>
-                                            <th>Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {payments.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={9} className="text-center py-3">No se encontraron registros.</td>
-                                            </tr>
-                                        ) : (
-                                            payments.map((payment) => (
-                                                <tr key={payment.id}>
-                                                    <td>
-                                                        {payment.fecha_transaccion ? new Date(payment.fecha_transaccion).toLocaleString('es-AR', {
-                                                            year: 'numeric',
-                                                            month: '2-digit',
-                                                            day: '2-digit',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        }) : (payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
-                                                            year: 'numeric',
-                                                            month: '2-digit',
-                                                            day: '2-digit',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        }) : '-')}
-                                                    </td>
-                                                    <td>
-                                                        <span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : payment.estado.includes('Fallido') ? 'danger' : 'secondary'}`}>
-                                                            {payment.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td className="font-monospace small">{payment.mp_payment_id}</td>
-                                                    <td>{payment.contribuyente !== 'N/A' ? payment.contribuyente : '-'}</td>
-                                                    <td>{payment.contribuyente_dni !== 'N/A' ? payment.contribuyente_dni : '-'}</td>
-                                                    <td className="text-truncate" style={{maxWidth: '250px'}} title={parseItemsPagados(payment.items_pagados_json)}>
-                                                        {parseItemsPagados(payment.items_pagados_json) || '-'}
-                                                    </td>
-                                                    <td className="small">{payment.comprobante_status !== 'N/A' ? payment.comprobante_status : '-'}</td>
-                                                    <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
-                                                    <td>
-                                                        {payment.link_comprobante && payment.link_comprobante !== 'N/A' && (
-                                                            <Button
-                                                                variant="outline-primary"
-                                                                size="sm"
-                                                                className="py-0"
-                                                                href={payment.link_comprobante}
-                                                                target="_blank"
-                                                            >
-                                                                Ver Comprobante
-                                                            </Button>
-                                                        )}
-                                                    </td>
+                                    <div className="table-responsive">
+                                        <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
+                                            <thead className="bg-light">
+                                                <tr>
+                                                    <th>Fecha de Transacción</th>
+                                                    <th>Estado</th>
+                                                    <th>MP Payment ID</th>
+                                                    <th>Contribuyente</th>
+                                                    <th>DNI</th>
+                                                    <th>Conceptos Pagados</th>
+                                                    <th>Comprobante Status</th>
+                                                    <th className="text-end">Monto</th>
+                                                    <th>Acción</th>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </Table>
-                                </div>
-                                {totalPages > 1 && (
-                                    <div className="d-flex justify-content-center mt-3">
-                                        <Pagination>
-                                            <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
-                                            <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                                            {getPageNumbers().map((page, index) => (
-                                                page === '...' ? (
-                                                    <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                            </thead>
+                                            <tbody>
+                                                {payments.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={9} className="text-center py-3">No se encontraron registros.</td>
+                                                    </tr>
                                                 ) : (
-                                                    <Pagination.Item
-                                                        key={page}
-                                                        active={page === currentPage}
-                                                        onClick={() => handlePageChange(page as number)}
-                                                    >
-                                                        {page}
-                                                    </Pagination.Item>
-                                                )
-                                            ))}
-                                            <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
-                                            <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
-                                        </Pagination>
+                                                    payments.map((payment) => (
+                                                        <tr key={payment.id}>
+                                                            <td>
+                                                                {payment.fecha_transaccion ? new Date(payment.fecha_transaccion).toLocaleString('es-AR', {
+                                                                    year: 'numeric',
+                                                                    month: '2-digit',
+                                                                    day: '2-digit',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                }) : (payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
+                                                                    year: 'numeric',
+                                                                    month: '2-digit',
+                                                                    day: '2-digit',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                }) : '-')}
+                                                            </td>
+                                                            <td>
+                                                                <span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : payment.estado.includes('Fallido') ? 'danger' : 'secondary'}`}>
+                                                                    {payment.estado}
+                                                                </span>
+                                                            </td>
+                                                            <td className="font-monospace small">{payment.mp_payment_id}</td>
+                                                            <td>{payment.contribuyente !== 'N/A' ? payment.contribuyente : '-'}</td>
+                                                            <td>{payment.contribuyente_dni !== 'N/A' ? payment.contribuyente_dni : '-'}</td>
+                                                            <td className="text-truncate" style={{ maxWidth: '250px' }} title={parseItemsPagados(payment.items_pagados_json)}>
+                                                                {parseItemsPagados(payment.items_pagados_json) || '-'}
+                                                            </td>
+                                                            <td className="small">{payment.comprobante_status !== 'N/A' ? payment.comprobante_status : '-'}</td>
+                                                            <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
+                                                            <td>
+                                                                {payment.link_comprobante && payment.link_comprobante !== 'N/A' && (
+                                                                    <Button
+                                                                        variant="outline-primary"
+                                                                        size="sm"
+                                                                        className="py-0"
+                                                                        href={payment.link_comprobante}
+                                                                        target="_blank"
+                                                                    >
+                                                                        Ver Comprobante
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </Table>
                                     </div>
-                                )}
+                                    {totalPages > 1 && (
+                                        <div className="d-flex justify-content-center mt-3">
+                                            <Pagination>
+                                                <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
+                                                <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+                                                {getPageNumbers().map((page, index) => (
+                                                    page === '...' ? (
+                                                        <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                                    ) : (
+                                                        <Pagination.Item
+                                                            key={page}
+                                                            active={page === currentPage}
+                                                            onClick={() => handlePageChange(page as number)}
+                                                        >
+                                                            {page}
+                                                        </Pagination.Item>
+                                                    )
+                                                ))}
+                                                <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
+                                                <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+                                            </Pagination>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </Card.Body>

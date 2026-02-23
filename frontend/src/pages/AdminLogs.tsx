@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Table, Spinner, Alert, Button, Pagination } from 'react-bootstrap';
 
+// @ts-ignore
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 
 interface LogRecord {
@@ -67,7 +68,10 @@ const AdminLogs: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const response = await fetch(`${API_BASE_URL}/admin/access_logs?page=${currentPage}&per_page=${perPage}`);
+                const password = localStorage.getItem('adminPassword') || '';
+                const response = await fetch(`${API_BASE_URL}/admin/access_logs?page=${currentPage}&per_page=${perPage}`, {
+                    headers: { 'Authorization': `Bearer ${password}` }
+                });
                 const result = await response.json(); // La respuesta es un objeto con 'logs', 'total_records', etc.
 
                 if (response.ok) {
@@ -116,56 +120,56 @@ const AdminLogs: React.FC = () => {
                                 </div>
                             ) : (
                                 <>
-                                <div className="table-responsive">
-                                <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
-                                    <thead className="bg-light">
-                                        <tr>
-                                            <th>Fecha/Hora</th><th>Nivel</th><th>Fuente</th><th>Mensaje</th><th>ID Relacionado</th><th>Detalles</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {logs.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={6} className="text-center py-3">No se encontraron registros.</td>
-                                            </tr>
-                                        ) : (
-                                            logs.map((log) => (
-                                                <tr key={log.id}>
-                                                    <td>{log.timestamp ? new Date(log.timestamp).toLocaleString('es-AR') : '-'}</td>
-                                                    <td><span className={`badge bg-${log.level === 'ERROR' ? 'danger' : log.level === 'WARNING' ? 'warning' : 'info'}`}>{log.level}</span></td>
-                                                    <td>{log.source}</td>
-                                                    <td className="text-truncate" style={{maxWidth: '300px'}} title={log.message}>{log.message}</td>
-                                                    <td className="font-monospace">{log.related_id || '-'}</td>
-                                                    <td className="text-truncate" style={{ maxWidth: '150px' }} title={log.details}>{log.details ? '...' : '-'}</td>
+                                    <div className="table-responsive">
+                                        <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
+                                            <thead className="bg-light">
+                                                <tr>
+                                                    <th>Fecha/Hora</th><th>Nivel</th><th>Fuente</th><th>Mensaje</th><th>ID Relacionado</th><th>Detalles</th>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </Table>
-                                </div>
-                                {totalPages > 1 && (
-                                    <div className="d-flex justify-content-center mt-3">
-                                        <Pagination>
-                                            <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
-                                            <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                                            {getPageNumbers().map((page, index) => (
-                                                page === '...' ? (
-                                                    <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                            </thead>
+                                            <tbody>
+                                                {logs.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="text-center py-3">No se encontraron registros.</td>
+                                                    </tr>
                                                 ) : (
-                                                    <Pagination.Item
-                                                        key={page}
-                                                        active={page === currentPage}
-                                                        onClick={() => handlePageChange(page as number)}
-                                                    >
-                                                        {page}
-                                                    </Pagination.Item>
-                                                )
-                                            ))}
-                                            <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
-                                            <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
-                                        </Pagination>
+                                                    logs.map((log) => (
+                                                        <tr key={log.id}>
+                                                            <td>{log.timestamp ? new Date(log.timestamp).toLocaleString('es-AR') : '-'}</td>
+                                                            <td><span className={`badge bg-${log.level === 'ERROR' ? 'danger' : log.level === 'WARNING' ? 'warning' : 'info'}`}>{log.level}</span></td>
+                                                            <td>{log.source}</td>
+                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={log.message}>{log.message}</td>
+                                                            <td className="font-monospace">{log.related_id || '-'}</td>
+                                                            <td className="text-truncate" style={{ maxWidth: '150px' }} title={log.details}>{log.details ? '...' : '-'}</td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </Table>
                                     </div>
-                                )}
+                                    {totalPages > 1 && (
+                                        <div className="d-flex justify-content-center mt-3">
+                                            <Pagination>
+                                                <Pagination.First onClick={() => handlePageChange(1)} disabled={currentPage === 1} />
+                                                <Pagination.Prev onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+                                                {getPageNumbers().map((page, index) => (
+                                                    page === '...' ? (
+                                                        <Pagination.Ellipsis key={`ellipsis-${index}`} disabled />
+                                                    ) : (
+                                                        <Pagination.Item
+                                                            key={page}
+                                                            active={page === currentPage}
+                                                            onClick={() => handlePageChange(page as number)}
+                                                        >
+                                                            {page}
+                                                        </Pagination.Item>
+                                                    )
+                                                ))}
+                                                <Pagination.Next onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
+                                                <Pagination.Last onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} />
+                                            </Pagination>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </Card.Body>

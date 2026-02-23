@@ -11,6 +11,7 @@ const getApiBaseUrl = () => {
   if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
     return runtimeUrl;
   }
+  // @ts-ignore
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 
@@ -55,7 +56,10 @@ const StatsDashboard: React.FC = () => {
     setLoading(true);
     try {
       // Fetch Airtable Stats
-      const responseAirtable = await fetch(`${API_BASE_URL}/admin/stats`);
+      const password = localStorage.getItem('adminPassword') || '';
+      const responseAirtable = await fetch(`${API_BASE_URL}/admin/stats`, {
+        headers: { 'Authorization': `Bearer ${password}` }
+      });
       const resultAirtable = await responseAirtable.json();
 
       if (responseAirtable.ok) {
@@ -67,7 +71,7 @@ const StatsDashboard: React.FC = () => {
       // Fetch Postgres Stats
       const responsePostgres = await fetch(`${API_BASE_URL}/admin/stats-postgres`, {
         headers: {
-          'Authorization': localStorage.getItem('adminPassword') || ''
+          'Authorization': `Bearer ${password}`
         }
       });
       if (responsePostgres.ok) {

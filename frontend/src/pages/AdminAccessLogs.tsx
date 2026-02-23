@@ -5,22 +5,23 @@ import { useNavigate } from 'react-router-dom';
 // Configuración de URL de API robusta
 // @ts-ignore
 const getApiBaseUrl = () => {
-    // @ts-ignore
-    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
-    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
-        return runtimeUrl;
-    }
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+  // @ts-ignore
+  const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+  if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+    return runtimeUrl;
+  }
+  // @ts-ignore
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
 interface StaffAccessLogRecord {
-    id: string;
-    fecha: string;
-    hora: string;
-    usuario: string;
-    ip: string;
+  id: string;
+  fecha: string;
+  hora: string;
+  usuario: string;
+  ip: string;
 }
 
 const AdminAccessLogs: React.FC = () => {
@@ -34,7 +35,12 @@ const AdminAccessLogs: React.FC = () => {
   const fetchLogs = async (page: number) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/staff_access_logs?page=${page}`);
+      const password = localStorage.getItem('adminPassword') || '';
+      const response = await fetch(`${API_BASE_URL}/admin/staff_access_logs?page=${page}`, {
+        headers: {
+          'Authorization': `Bearer ${password}`
+        }
+      });
       const data = await response.json();
       if (response.ok) {
         setLogs(data.logs);
@@ -57,8 +63,8 @@ const AdminAccessLogs: React.FC = () => {
     <Container className="py-5 mt-5" fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div className="d-flex align-items-center">
-            <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
-            <h4 className="fw-bold mb-0">Accesos de Personal</h4>
+          <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/dashboard')} className="me-3">&larr; Volver</Button>
+          <h4 className="fw-bold mb-0">Accesos de Personal</h4>
         </div>
         <Button variant="primary" size="sm" onClick={() => fetchLogs(currentPage)}>Refrescar</Button>
       </div>
@@ -97,13 +103,13 @@ const AdminAccessLogs: React.FC = () => {
           </Table>
         </Card.Body>
         <Card.Footer className="bg-white d-flex justify-content-center py-3">
-            <Pagination>
-                <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} />
-                <Pagination.Prev onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} />
-                <Pagination.Item active>{currentPage}</Pagination.Item>
-                <Pagination.Next onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} />
-                <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} />
-            </Pagination>
+          <Pagination>
+            <Pagination.First onClick={() => setCurrentPage(1)} disabled={currentPage === 1} />
+            <Pagination.Prev onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} />
+            <Pagination.Item active>{currentPage}</Pagination.Item>
+            <Pagination.Next onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} />
+            <Pagination.Last onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} />
+          </Pagination>
         </Card.Footer>
       </Card>
     </Container>

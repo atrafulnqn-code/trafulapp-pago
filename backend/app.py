@@ -2871,6 +2871,11 @@ def patente_efectivo():
 def get_staff_access_logs():
     if request.method == 'OPTIONS':
         return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     offset = (page - 1) * per_page
@@ -2916,6 +2921,11 @@ def get_staff_access_logs():
 def get_system_access_logs():
     if request.method == 'OPTIONS':
         return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     offset = (page - 1) * per_page
@@ -2963,6 +2973,11 @@ def get_system_access_logs():
 def get_patentes_manuales():
     if request.method == 'OPTIONS':
         return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     offset = (page - 1) * per_page
@@ -3015,6 +3030,11 @@ def get_patentes_manuales():
 def get_payments_history():
     if request.method == 'OPTIONS':
         return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     offset = (page - 1) * per_page
@@ -3065,6 +3085,11 @@ def get_payments_history():
 def get_recaudacion():
     if request.method == 'OPTIONS':
         return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     offset = (page - 1) * per_page
@@ -3295,31 +3320,14 @@ def get_history_by_payment_id(payment_id):
 
 
 
-# --- ENDPOINTS DE ESTADÍSTICAS ---
-@app.route('/api/admin/stats-login', methods=['POST'])
-def stats_login():
-    """Endpoint para autenticar acceso al panel de estadísticas"""
-    try:
-        data = request.get_json()
-        password = data.get('password')
-        
-        if not password:
-            return jsonify({"error": "Contraseña requerida"}), 400
-        
-        if password == ADMIN_PASSWORD_FROM_ENV:
-            log_to_airtable('INFO', 'Stats Login', 'Acceso exitoso al panel de estadísticas')
-            return jsonify({"success": True}), 200
-        else:
-            log_to_airtable('WARNING', 'Stats Login', 'Intento de acceso fallido al panel de estadísticas')
-            return jsonify({"error": "Contraseña incorrecta"}), 401
-    except Exception as e:
-        log_to_airtable('ERROR', 'Stats Login', f'Error en stats_login: {e}')
-        return jsonify({"error": "Error interno del servidor"}), 500
-
 
 @app.route('/api/admin/stats', methods=['GET'])
 def get_stats():
     """Endpoint para obtener estadísticas de recaudación de tasas y derechos"""
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+        
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "Error de conexión a la base de datos"}), 500
