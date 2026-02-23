@@ -254,6 +254,48 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_hr_payslip_requests_email ON hr_payslip_requests(email);
             """)
 
+            # Tabla staff_access_logs - Registro de accesos al panel
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS staff_access_logs (
+                    id SERIAL PRIMARY KEY,
+                    usuario VARCHAR(255) NOT NULL,
+                    ip_address VARCHAR(50),
+                    fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Tabla patentes_manuales - Registro de pagos manuales de patentes
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS patentes_manuales (
+                    id SERIAL PRIMARY KEY,
+                    dominio VARCHAR(50) NOT NULL,
+                    vehiculo VARCHAR(255),
+                    anio VARCHAR(10),
+                    contribuyente VARCHAR(255),
+                    operador VARCHAR(255),
+                    total NUMERIC(10, 2),
+                    transferencia VARCHAR(255),
+                    estado VARCHAR(50) DEFAULT 'Pendiente',
+                    fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            # Tabla plan_pago - Registro de planes de pago
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS plan_pago (
+                    id SERIAL PRIMARY KEY,
+                    fecha DATE NOT NULL,
+                    nombre VARCHAR(255) NOT NULL,
+                    cuota_plan VARCHAR(50),
+                    monto_total NUMERIC(10, 2) NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    administrativo VARCHAR(255),
+                    mp_link VARCHAR(500),
+                    pdf_url VARCHAR(500),
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
             conn.commit()
             print("✅ Tablas en PostgreSQL inicializadas correctamente:")
             print("   - payments")
@@ -262,6 +304,9 @@ def init_db():
             print("   - contacts")
             print("   - cash_payments")
             print("   - hr_payslip_requests")
+            print("   - staff_access_logs")
+            print("   - patentes_manuales")
+            print("   - plan_pago")
     except Exception as e:
         print(f"ERROR al inicializar las tablas: {e}")
         conn.rollback()
@@ -2818,6 +2863,436 @@ def patente_efectivo():
                         f'Error procesando pago de patente en efectivo: {e}',
                         details={'error': str(e), 'traceback': traceback.format_exc()})
         return jsonify({"error": str(e)}), 500
+
+
+# --- NUEVOS ENDPOINTS PARA POSTGRESQL ---
+
+@app.route('/api/admin/staff_access_logs', methods=['GET', 'OPTIONS'])
+def get_staff_access_logs():
+    if request.method == 'OPTIONS':
+        return '', 204
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM staff_access_logs")
+            total = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT id, usuario, ip_address, fecha_hora 
+                FROM staff_access_logs 
+                ORDER BY fecha_hora DESC LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
+            logs = []
+            for row in cur.fetchall():
+                logs.append({
+                    "id": row[0],
+                    "usuario": row[1],
+                    "ip": row[2] or "N/A",
+                    "fecha": row[3].strftime("%Y-%m-%d") if row[3] else "N/A",
+                    "hora": row[3].strftime("%H:%M:%S") if row[3] else "N/A"
+                })
+            
+            return jsonify({
+                "logs": logs,
+                "total_records": total,
+                "page": page,
+                "per_page": per_page
+            }), 200
+    except Exception as e:
+        print(f"Error in staff_access_logs: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/access_logs', methods=['GET', 'OPTIONS'])
+def get_system_access_logs():
+    if request.method == 'OPTIONS':
+        return '', 204
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM error_logs")
+            total = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT id, nivel, tipo, mensaje, related_id, detalles, fecha_hora 
+                FROM error_logs 
+                ORDER BY fecha_hora DESC LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
+            logs = []
+            for row in cur.fetchall():
+                logs.append({
+                    "id": row[0],
+                    "level": row[1],
+                    "source": row[2],
+                    "message": row[3],
+                    "related_id": row[4],
+                    "details": json.dumps(row[5]) if row[5] else None,
+                    "timestamp": row[6].isoformat() if row[6] else None
+                })
+            
+            return jsonify({
+                "logs": logs,
+                "total_records": total,
+                "page": page,
+                "per_page": per_page
+            }), 200
+    except Exception as e:
+        print(f"Error in map access logs: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/patentes_manuales', methods=['GET', 'OPTIONS'])
+def get_patentes_manuales():
+    if request.method == 'OPTIONS':
+        return '', 204
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM patentes_manuales")
+            total = cur.fetchone()[0]
+
+            # In case the frontend expects data from `cash_payments` because patentes_manuales is a specific type:
+            # For this task, we'll query from our newly created table:
+            cur.execute("""
+                SELECT id, dominio, vehiculo, anio, contribuyente, operador, total, transferencia, estado, fecha_hora 
+                FROM patentes_manuales 
+                ORDER BY fecha_hora DESC LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
+            records = []
+            for row in cur.fetchall():
+                records.append({
+                    "id": row[0],
+                    "dominio": row[1],
+                    "vehiculo": row[2],
+                    "anio": row[3],
+                    "contribuyente": row[4],
+                    "operador": row[5],
+                    "total": str(row[6]) if row[6] else "0",
+                    "transferencia": row[7],
+                    "estado": row[8],
+                    "fecha": row[9].strftime("%Y-%m-%d") if row[9] else "N/A"
+                })
+            
+            return jsonify({
+                "records": records,
+                "total_records": total,
+                "page": page,
+                "per_page": per_page
+            }), 200
+    except Exception as e:
+        print(f"Error in patentes_manuales: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/payments_history', methods=['GET', 'OPTIONS'])
+def get_payments_history():
+    if request.method == 'OPTIONS':
+        return '', 204
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM payment_history")
+            total = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT id, payment_id, comprobante_numero, nombre_apellido, dni, email, monto, estado, fecha_hora, items_pagados 
+                FROM payment_history 
+                ORDER BY fecha_hora DESC LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
+            payments = []
+            for row in cur.fetchall():
+                payments.append({
+                    "id": row[0],
+                    "mp_payment_id": row[1],
+                    "comprobante_status": "Generado" if row[2] else "N/A",
+                    "link_comprobante": f"{BACKEND_URL}/api/receipt/{row[0]}" if row[2] else None,
+                    "contribuyente": row[3],
+                    "contribuyente_dni": row[4],
+                    "email": row[5],
+                    "monto": float(row[6]) if row[6] else 0,
+                    "estado": row[7],
+                    "timestamp": row[8].isoformat() if row[8] else None,
+                    "items_pagados_json": json.dumps(row[9]) if row[9] else '[]'
+                })
+            
+            return jsonify({
+                "payments": payments,
+                "total_records": total,
+                "page": page,
+                "per_page": per_page
+            }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/recaudacion', methods=['GET', 'OPTIONS'])
+def get_recaudacion():
+    if request.method == 'OPTIONS':
+        return '', 204
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM cash_payments")
+            total = cur.fetchone()[0]
+            
+            cur.execute("""
+                SELECT id, fecha_pago, nombre, email, monto_original, descuento, monto_total, administrativo, transferencia, tipo_pago, detalle
+                FROM cash_payments 
+                ORDER BY fecha_pago DESC LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
+            records = []
+            for row in cur.fetchall():
+                records.append({
+                    "id": row[0],
+                    "fecha": row[1].strftime("%Y-%m-%d") if row[1] else "N/A",
+                    "contribuyente": row[2],
+                    "email": row[3],
+                    "subtotal": str(row[4]) if row[4] else str(row[6]),
+                    "descuento": str(row[5]) if row[5] else '0',
+                    "total": str(row[6]) if row[6] else '0',
+                    "operador": row[7],
+                    "transferencia": row[8],
+                    "estado": "Pagado",
+                    "tipo_pago": row[9],
+                    "detalle": row[10]
+                })
+            
+            return jsonify({
+                "records": records,
+                "total_records": total,
+                "page": page,
+                "per_page": per_page
+            }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/send_payment_link', methods=['POST', 'OPTIONS'])
+def send_payment_link():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.json or {}
+    email = data.get('email')
+    monto = data.get('monto')
+    concepto = data.get('concepto')
+    link = data.get('link')
+    
+    if not all([email, monto, link]):
+        return jsonify({"error": "Faltan datos requeridos"}), 400
+        
+    try:
+        if resend.api_key:
+            html = f"""
+            <h2>Solicitud de Pago</h2>
+            <p>Hola,</p>
+            <p>Se ha generado una solicitud de pago por un monto de <b>${monto}</b>.</p>
+            <p>Concepto: {concepto or 'N/A'}</p>
+            <p>Por favor, realiza el pago usando el siguiente enlace:</p>
+            <a href="{link}">Pagar aquí con Mercado Pago</a>
+            <p>Gracias.</p>
+            """
+            resend.Emails.send({
+                "from": "Pagos Traful <pagos@comunatraful.ar>",
+                "to": [email],
+                "subject": "Solicitud de Pago - Comuna Traful",
+                "html": html
+            })
+            
+            # Save into error_logs as an INFO event just to track it
+            log_to_airtable('INFO', 'Send Payment Link', f"Email sent to {email} for ${monto}")
+            return jsonify({"success": True}), 200
+        else:
+            return jsonify({"error": "Resend API no configurada"}), 500
+    except Exception as e:
+        log_to_airtable('ERROR', 'Send Payment Link', f"Failed to send email: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/plan_pago', methods=['POST', 'OPTIONS'])
+def plan_pago():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.json or {}
+    fecha = data.get('fecha')
+    nombre = data.get('nombre')
+    cuota_plan = data.get('cuota_plan')
+    monto_total = data.get('monto_total')
+    email = data.get('email')
+    administrativo = data.get('administrativo')
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No DB connection"}), 500
+        
+    pdf_generated = False
+    pdf_base64 = None
+    email_sent = False
+    mp_link = "https://link.mercadopago.com.ar/comunavillatraful"
+    
+    try:
+        # 1. Generar un supuesto PDF
+        pdf_details = {
+            "FECHA_PAGO": fecha,
+            "ESTADO_PAGO": "Plan de Pago - Pendiente",
+            "NOMBRE_PAGADOR": nombre,
+            "MONTO_TOTAL": monto_total,
+            "items": [{"description": f"Cuota Plan: {cuota_plan}", "amount": monto_total}]
+        }
+        pdf_file, _ = create_receipt_pdf(pdf_details)
+        if pdf_file:
+            pdf_generated = True
+            pdf_base64 = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
+            
+        # 2. Enviar email (simulado) si resend está configurado
+        if resend.api_key and email:
+            html = f"""
+            <h2>Plan de Pago - Comuna Traful</h2>
+            <p>Hola {nombre},</p>
+            <p>Se ha registrado su plan de pago. Cuota: {cuota_plan}. Monto: ${monto_total}</p>
+            <p>Puede pagar a través del siguiente botón:</p>
+            <a href="{mp_link}">Pagar Cuota</a>
+            """
+            try:
+                # Optionally attach PDF if supported
+                mail_data = {
+                    "from": "Pagos Traful <pagos@comunatraful.ar>",
+                    "to": [email],
+                    "subject": "Plan de Pago - Comuna Traful",
+                    "html": html
+                }
+                if pdf_file:
+                    mail_data["attachments"] = [
+                        {"filename": f"PlanPago_{cuota_plan}.pdf", "content": list(pdf_file.getvalue())}
+                    ]
+                resend.Emails.send(mail_data)
+                email_sent = True
+            except Exception as e:
+                print(f"Error Email Plan Pago: {e}")
+        
+        # 3. Guardar en Base de Datos
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO plan_pago 
+                (fecha, nombre, cuota_plan, monto_total, email, administrativo, mp_link)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (fecha, nombre, cuota_plan, monto_total, email, administrativo, mp_link))
+            conn.commit()
+            
+        return jsonify({
+            "success": True,
+            "mp_link": mp_link,
+            "pdf_generated": pdf_generated,
+            "pdf_base64": pdf_base64,
+            "email_sent": email_sent
+        }), 200
+        
+    except Exception as e:
+        print(f"Error en Plan Pago: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/get_history_by_payment_id/<payment_id>', methods=['GET'])
+def get_history_by_payment_id(payment_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT payment_id, estado, fecha_hora, monto 
+                FROM payment_history 
+                WHERE payment_id = %s OR payment_id LIKE %s LIMIT 1
+            """, (payment_id, f"%{payment_id}%"))
+            
+            row = cur.fetchone()
+            if row:
+                return jsonify({
+                    "id": row[0],
+                    "fields": {
+                        "MP_Payment_ID": row[0],
+                        "Estado": row[1],
+                        "Timestamp": row[2].isoformat() if row[2] else None,
+                        "Monto": float(row[3]) if row[3] else 0
+                    }
+                }), 200
+            
+            # Optionally check payments table if not in history yet
+            cur.execute("""
+                SELECT payment_id, status, created_at, amount
+                FROM payments
+                WHERE payment_id = %s OR payment_id_external = %s LIMIT 1
+            """, (payment_id, payment_id))
+            
+            row2 = cur.fetchone()
+            if row2:
+                return jsonify({
+                    "id": row2[0],
+                    "fields": {
+                        "MP_Payment_ID": row2[0],
+                        "Estado": row2[1],
+                        "Timestamp": row2[2].isoformat() if row2[2] else None,
+                        "Monto": float(row2[3]) if row2[3] else 0
+                    }
+                }), 200
+                
+            return jsonify({"error": "Pago no encontrado"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+
 
 
 # --- ENDPOINTS DE ESTADÍSTICAS ---
