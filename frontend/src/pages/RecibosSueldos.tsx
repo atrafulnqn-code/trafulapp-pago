@@ -14,8 +14,10 @@ const RecibosSueldos: React.FC = () => {
         setLoading(true);
         setMessage(null);
 
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000'}/api/hr/payslip/send`, {
+            const response = await fetch(`${API_BASE_URL}/hr/payslip/send`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
