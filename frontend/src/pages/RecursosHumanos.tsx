@@ -1,7 +1,9 @@
 import React from 'react';
-import { Container, Row, Col, Card } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 
 const RecursosHumanos: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <Container className="my-5 pt-5">
       <Row className="justify-content-center mb-4">
@@ -60,6 +62,19 @@ const RecursosHumanos: React.FC = () => {
               <a href="https://geoarg.com/?ff_landing=18" target="_blank" rel="noopener noreferrer" className="btn btn-outline-danger w-100 mt-3 fw-semibold">
                 Acceder al formulario
               </a>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={6} lg={3}>
+          <Card className="shadow-sm h-100 text-center hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+            <Card.Body className="d-flex flex-column justify-content-between py-4">
+              <h5 className="card-title text-primary fw-bold mb-2">Recibos de Sueldos</h5>
+              <Card.Text className="text-muted mb-3 flex-grow-1">
+                Consulta y envía tus recibos de sueldo directamente a tu email.
+              </Card.Text>
+              <Button onClick={() => navigate('/recursos-humanos/recibos')} variant="outline-primary" className="w-100 mt-3 fw-semibold">
+                Acceder al buscador
+              </Button>
             </Card.Body>
           </Card>
         </Col>

@@ -17,6 +17,9 @@ from flask_cors import CORS
 from pyairtable import Api
 from pyairtable.formulas import AND, LOWER, OR, SEARCH, Field, match
 from weasyprint import HTML
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 
 # Cargar variables de entorno desde el archivo .env
@@ -443,6 +446,11 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = (os.getenv("RENDER_EXTERNAL_URL") or
                os.getenv("BACKEND_URL", "http://localhost:10000"))
 
+GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "1xC0yd1iJoxDaclneXbTTZpGYPveONQo0")
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+# Alternativa: GOOGLE_APPLICATION_CREDENTIALS como path
+GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
 
 # --- Inicializar SDKs ---
 api = None
@@ -748,6 +756,118 @@ def search_agua():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/hr/payslip/send', methods=['POST'])
+def send_payslip():
+    data = request.json
+    query = data.get('query')
+    email = data.get('email')
+
+    if not query or not email:
+        return jsonify({"error": "Faltan datos requeridos (query y email)."}), 400
+
+    log_to_airtable('INFO', 'HR Payslip', f'Petición de recibo para: {query}, enviar a: {email}')
+
+    try:
+        # Autenticación con Google Drive
+        creds = None
+        if GOOGLE_SERVICE_ACCOUNT_JSON:
+            try:
+                service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+                creds = service_account.Credentials.from_service_account_info(service_account_info)
+            except Exception as e:
+                print(f"Error parseando GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+        
+        if not creds and GOOGLE_CREDENTIALS_PATH and os.path.exists(GOOGLE_CREDENTIALS_PATH):
+            creds = service_account.Credentials.from_service_account_file(GOOGLE_CREDENTIALS_PATH)
+        
+        if not creds:
+            # Intento de autenticación por defecto (útil en entornos GCloud)
+            import google.auth
+            creds, _ = google.auth.default()
+
+        if not creds:
+            return jsonify({"error": "Credenciales de Google no configuradas."}), 500
+
+        service = build('drive', 'v3', credentials=creds)
+
+        # Buscar el archivo en la carpeta específica
+        # Usamos q para filtrar por nombre y carpeta
+        # La búsqueda es case-insensitive para el nombre en Drive API v3
+        folder_id = GOOGLE_DRIVE_FOLDER_ID
+        q = f"'{folder_id}' in parents and name contains '{query}' and mimeType = 'application/pdf' and trashed = false"
+        
+        results = service.files().list(
+            q=q,
+            spaces='drive',
+            fields='files(id, name)',
+            pageSize=10
+        ).execute()
+        
+        files = results.get('files', [])
+
+        if not files:
+            log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {query}')
+            return jsonify({"error": "Recibo no encontrado."}), 404
+
+        # Seleccionar el mejor archivo (el primero que devuelva la búsqueda con contains)
+        target_file = files[0]
+        file_id = target_file['id']
+        file_name = target_file['name']
+
+        log_to_airtable('INFO', 'HR Payslip', f'Archivo encontrado: {file_name} (ID: {file_id})')
+
+        # Descargar el archivo
+        file_request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, file_request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        fh.seek(0)
+        file_content = fh.read()
+
+        # Enviar email con Resend
+        if not RESEND_API_KEY_FROM_ENV:
+            return jsonify({"error": "Configuración de Resend faltante."}), 500
+
+        attachments = [
+            {
+                "filename": file_name,
+                "content": list(file_content)
+            }
+        ]
+
+        params = {
+            "from": os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com"),
+            "to": [email],
+            "subject": f"Recibo de Sueldo - {query}",
+            "html": f"""
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #0f4c81;">Hola,</h2>
+                    <p>Adjunto encontrarás tu recibo de sueldo solicitado.</p>
+                    <p><strong>Archivo:</strong> {file_name}</p>
+                    <hr>
+                    <p style="font-size: 0.8em; color: #777;">Este es un mensaje automático de la Comuna de Villa Traful.</p>
+                </div>
+            """,
+            "attachments": attachments
+        }
+
+        email_result = resend.Emails.send(params)
+        
+        log_to_airtable('INFO', 'HR Payslip', f'Email enviado exitosamente a {email} para {query}. Result: {email_result}')
+
+        return jsonify({"message": "Recibo encontrado exitosamente.", "file_name": file_name}), 200
+
+    except Exception as e:
+        error_msg = f"Error en send_payslip: {str(e)}"
+        print(error_msg)
+        print(traceback.format_exc())
+        log_to_airtable('ERROR', 'HR Payslip', error_msg, details={"traceback": traceback.format_exc()})
+        return jsonify({"error": "Ocurrió un error al procesar la solicitud."}), 500
+
+
 def process_payment(payment_id, payment_info, items_context,
                     is_simulation=False):
     log_to_airtable('INFO', 'Payment Process',
@@ -798,6 +918,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                         'INFO', 'Pago TIC Process',
                         f'Registro de pago {payment_id} actualizado en PostgreSQL a '
                         f'{new_status}.')
+
         except Exception as db_error:
             log_to_airtable(
                 'ERROR', 'Pago TIC Process',
