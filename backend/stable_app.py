@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 import base64
 import uuid
@@ -17,9 +17,6 @@ from flask_cors import CORS
 from pyairtable import Api
 from pyairtable.formulas import AND, LOWER, OR, SEARCH, Field, match
 from weasyprint import HTML
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 
 
 # Cargar variables de entorno desde el archivo .env
@@ -28,16 +25,16 @@ load_dotenv()
 app = Flask(__name__)
 
 
-# --- CONFIGURACIÓN POStGRESQL ---
+# --- CONFIGURACI├ôN POStGRESQL ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    print("ADVERTENCIA: La variable de entorno DATABASE_URL no está "
+    print("ADVERTENCIA: La variable de entorno DATABASE_URL no est├í "
           "configurada. La funcionalidad de la nueva billetera no "
-          "funcionará.")
+          "funcionar├í.")
 
 
 def get_db_connection():
-    """Crea y retorna una nueva conexión a la base de datos."""
+    """Crea y retorna una nueva conexi├│n a la base de datos."""
     if not DATABASE_URL:
         return None
     try:
@@ -50,22 +47,22 @@ def get_db_connection():
 
 def validate_admin_auth():
     """
-    Valida la autenticación del administrador desde el header Authorization.
-    Retorna (is_valid, error_response) donde error_response es None si es válido.
+    Valida la autenticaci├│n del administrador desde el header Authorization.
+    Retorna (is_valid, error_response) donde error_response es None si es v├ílido.
     """
     auth_header = request.headers.get('Authorization')
 
     if not auth_header:
         print("[DEBUG] No auth header provided")
-        return False, (jsonify({"error": "No autorizado - No se proporcionó token"}), 401)
+        return False, (jsonify({"error": "No autorizado - No se proporcion├│ token"}), 401)
 
     if not ADMIN_PASSWORD_FROM_ENV:
         print("[ERROR] ADMIN_PASSWORD environment variable not set!")
-        return False, (jsonify({"error": "Error de configuración del servidor"}), 500)
+        return False, (jsonify({"error": "Error de configuraci├│n del servidor"}), 500)
 
     if ADMIN_PASSWORD_FROM_ENV not in auth_header:
         print(f"[DEBUG] Password mismatch - Auth header: {auth_header[:20]}...")
-        return False, (jsonify({"error": "No autorizado - Credenciales inválidas"}), 401)
+        return False, (jsonify({"error": "No autorizado - Credenciales inv├ílidas"}), 401)
 
     return True, None
 
@@ -75,7 +72,7 @@ def init_db():
     conn = get_db_connection()
     if conn is None:
         print("ERROR: No se puede inicializar la DB porque no hay "
-              "conexión.")
+              "conexi├│n.")
         return
     try:
         with conn.cursor() as cur:
@@ -201,7 +198,7 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_cash_payments_created ON cash_payments(created_at);
             """)
 
-            # Función para actualizar updated_at
+            # Funci├│n para actualizar updated_at
             cur.execute("""
                 CREATE OR REPLACE FUNCTION update_updated_at_column()
                 RETURNS TRIGGER AS $$
@@ -239,7 +236,7 @@ def init_db():
             """)
 
             conn.commit()
-            print("✅ Tablas en PostgreSQL inicializadas correctamente:")
+            print("Ô£à Tablas en PostgreSQL inicializadas correctamente:")
             print("   - payments")
             print("   - payment_history")
             print("   - error_logs")
@@ -272,7 +269,7 @@ def save_payment_history(payment_id, comprobante_numero, nombre_apellido, dni,
                   monto, estado, json.dumps(items_pagados) if items_pagados else None,
                   detalles))
             conn.commit()
-            print(f"✅ Payment history guardado: {payment_id} - {estado}")
+            print(f"Ô£à Payment history guardado: {payment_id} - {estado}")
     except Exception as e:
         print(f"ERROR al guardar payment_history: {e}")
         conn.rollback()
@@ -321,7 +318,7 @@ def save_contact_db(email, dni=None, nombre_apellido=None, celular=None,
                     updated_at = CURRENT_TIMESTAMP
             """, (email, dni, nombre_apellido, celular, origen))
             conn.commit()
-            print(f"✅ Contacto guardado: {email}")
+            print(f"Ô£à Contacto guardado: {email}")
     except Exception as e:
         print(f"ERROR al guardar contacto: {e}")
         conn.rollback()
@@ -338,7 +335,7 @@ def save_cash_payment(comprobante_id, tipo_pago, fecha_pago, nombre, email,
     """Guarda un pago en efectivo en la tabla cash_payments."""
     conn = get_db_connection()
     if not conn:
-        print("ADVERTENCIA: No hay conexión DB. Pago en efectivo no guardado en PostgreSQL.")
+        print("ADVERTENCIA: No hay conexi├│n DB. Pago en efectivo no guardado en PostgreSQL.")
         return
     try:
         with conn.cursor() as cur:
@@ -355,7 +352,7 @@ def save_cash_payment(comprobante_id, tipo_pago, fecha_pago, nombre, email,
                   patente, marca, modelo, anio, comentarios, transferencia,
                   pdf_enviado, email_status))
             conn.commit()
-            print(f"✅ Pago en efectivo guardado en PostgreSQL: {comprobante_id} - {tipo_pago} - ${monto_total}")
+            print(f"Ô£à Pago en efectivo guardado en PostgreSQL: {comprobante_id} - {tipo_pago} - ${monto_total}")
     except Exception as e:
         print(f"ERROR al guardar pago en efectivo: {e}")
         conn.rollback()
@@ -363,7 +360,7 @@ def save_cash_payment(comprobante_id, tipo_pago, fecha_pago, nombre, email,
         conn.close()
 
 
-# Configuración CORS
+# Configuraci├│n CORS
 cors_origins = os.getenv("CORS_ORIGINS", "*")
 if cors_origins != "*":
     cors_origins = [origin.strip() for origin in cors_origins.split(",")]
@@ -375,8 +372,8 @@ CORS(app, resources={r"/*": {"origins": cors_origins}},
 init_db()
 
 
-# --- Verificación de Variables de Entorno ---
-print("--- Iniciando Verificación de Variables de Entorno ---")
+# --- Verificaci├│n de Variables de Entorno ---
+print("--- Iniciando Verificaci├│n de Variables de Entorno ---")
 AIRTABLE_PAT_FROM_ENV = os.getenv("AIRTABLE_PAT")
 MERCADOPAGO_ACCESS_TOKEN_FROM_ENV = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 RESEND_API_KEY_FROM_ENV = os.getenv("RESEND_API_KEY")
@@ -398,43 +395,28 @@ PAYWAY_TEMPLATE_ID = os.getenv("PAYWAY_TEMPLATE_ID", "34164")
 ADMIN_PASSWORD_FROM_ENV = os.getenv("ADMIN_PASSWORD")
 
 if not AIRTABLE_PAT_FROM_ENV:
-    print("FATAL: La variable de entorno AIRTABLE_PAT no está configurada.")
+    print("FATAL: La variable de entorno AIRTABLE_PAT no est├í configurada.")
 if not MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
     print("FATAL: La variable de entorno MERCADOPAGO_ACCESS_TOKEN no "
-          "está configurada.")
+          "est├í configurada.")
 if not ADMIN_PASSWORD_FROM_ENV:
-    print("FATAL: La variable de entorno ADMIN_PASSWORD no está configurada. "
-          "El panel de administración no funcionará correctamente.")
+    print("FATAL: La variable de entorno ADMIN_PASSWORD no est├í configurada. "
+          "El panel de administraci├│n no funcionar├í correctamente.")
 if not RESEND_API_KEY_FROM_ENV:
-    print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no está "
-          "configurada. El envío de emails no funcionará.")
+    print("ADVERTENCIA: La variable de entorno RESEND_API_KEY no est├í "
+          "configurada. El env├¡o de emails no funcionar├í.")
 if not all([PAGOTIC_USERNAME, PAGOTIC_PASSWORD, PAGOTIC_CLIENT_ID,
             PAGOTIC_CLIENT_SECRET]):
     print("ADVERTENCIA: Credenciales de Pago TIC incompletas. "
-          "La integración de Pago TIC no funcionará.")
+          "La integraci├│n de Pago TIC no funcionar├í.")
 if not all([PAYWAY_SITE_ID, PAYWAY_PRIVATE_KEY]):
     print("ADVERTENCIA: Credenciales de Payway incompletas.")
 else:
-    print(f"Configuración Payway cargada. Site ID: {PAYWAY_SITE_ID}")
-
-if not GOOGLE_SERVICE_ACCOUNT_JSON and not GOOGLE_CREDENTIALS_PATH:
-    print("ADVERTENCIA: Credenciales de Google Drive no configuradas. "
-          "Los recibos de sueldo no funcionarán.")
-else:
-    if GOOGLE_SERVICE_ACCOUNT_JSON:
-        print("Configuración Google Drive (JSON) detectada.")
-    if GOOGLE_CREDENTIALS_PATH:
-        print(f"Configuración Google Drive (Path) detectada: {GOOGLE_CREDENTIALS_PATH}")
-
-if not GOOGLE_DRIVE_FOLDER_ID:
-    print("ADVERTENCIA: GOOGLE_DRIVE_FOLDER_ID no configurada.")
-else:
-    print(f"Folder ID de Google Drive configurado: {GOOGLE_DRIVE_FOLDER_ID}")
-
+    print(f"Configuraci├│n Payway cargada. Site ID: {PAYWAY_SITE_ID}")
 if not ADMIN_PASSWORD_FROM_ENV:
-    print("ADVERTENCIA: La variable de entorno ADMIN_PASSWORD no está "
-          "configurada. El acceso de administrador no funcionará.")
-print("--- Fin Verificación ---")
+    print("ADVERTENCIA: La variable de entorno ADMIN_PASSWORD no est├í "
+          "configurada. El acceso de administrador no funcionar├í.")
+print("--- Fin Verificaci├│n ---")
 
 
 # --- CONFIGURACION ---
@@ -461,35 +443,30 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = (os.getenv("RENDER_EXTERNAL_URL") or
                os.getenv("BACKEND_URL", "http://localhost:10000"))
 
-GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "1xC0yd1iJoxDaclneXbTTZpGYPveONQo0")
-GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-# Alternativa: GOOGLE_APPLICATION_CREDENTIALS como path
-GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-
 
 # --- Inicializar SDKs ---
 api = None
 try:
     if AIRTABLE_PAT_FROM_ENV:
         api = Api(AIRTABLE_PAT_FROM_ENV)
-        print("SDK de Airtable inicializada con éxito.")
+        print("SDK de Airtable inicializada con ├®xito.")
 except Exception as e:
-    print(f"ERROR: Falló la inicialización de la SDK de Airtable: {e}")
+    print(f"ERROR: Fall├│ la inicializaci├│n de la SDK de Airtable: {e}")
 
 sdk = None
 try:
     if MERCADOPAGO_ACCESS_TOKEN_FROM_ENV:
         sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN_FROM_ENV)
-        print("SDK de Mercado Pago inicializada con éxito.")
+        print("SDK de Mercado Pago inicializada con ├®xito.")
 except Exception as e:
-    print(f"ERROR: Falló la inicialización de la SDK de Mercado Pago: {e}")
+    print(f"ERROR: Fall├│ la inicializaci├│n de la SDK de Mercado Pago: {e}")
 
 try:
     if RESEND_API_KEY_FROM_ENV:
         resend.api_key = RESEND_API_KEY_FROM_ENV
         print("API Key de Resend configurada.")
 except Exception as e:
-    print(f"ERROR: Falló la configuración de Resend: {e}")
+    print(f"ERROR: Fall├│ la configuraci├│n de Resend: {e}")
 
 
 # --- Funciones Auxiliares ---
@@ -523,7 +500,7 @@ def log_to_airtable(level, source, message, related_id=None, details=None):
             log_entry['Details'] = json.dumps(details)
         logs_table.create(log_entry)
     except Exception as e:
-        print(f"ERROR: Falló la escritura de log en Airtable: {e} - "
+        print(f"ERROR: Fall├│ la escritura de log en Airtable: {e} - "
               f"Mensaje original: {message}")
 
 
@@ -568,13 +545,13 @@ def save_contacto(email, nombre=None, origen=None, dni=None, celular=None):
             contactos_table.create(new_contact)
     except Exception as e:
         error_str = str(e)
-        # Si el error es por opciones de select inválidas, intentar guardar
+        # Si el error es por opciones de select inv├ílidas, intentar guardar
         # sin el campo origen
         if 'INVALID_MULTIPLE_CHOICE_OPTIONS' in error_str:
             try:
                 log_to_airtable(
                     'WARNING', 'Contactos',
-                    f'Valor de origen "{origen}" no válido para {email}. '
+                    f'Valor de origen "{origen}" no v├ílido para {email}. '
                     f'Guardando sin origen.')
                 if existing:
                     update_fields_no_origen = {"Ultima Actividad": now}
@@ -694,13 +671,13 @@ def health_check():
 @app.route('/api/search/contributivo', methods=['GET'])
 def search_contributivo():
     log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/contributivo')
+                    'Recibida petici├│n en /api/search/contributivo')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
     query = request.args.get('query')
     if not query:
-        return jsonify({"error": "El parámetro 'query' es requerido."}), 400
+        return jsonify({"error": "El par├ímetro 'query' es requerido."}), 400
 
     try:
         table = api.table(BASE_ID, CONTRIBUTIVOS_TABLE_ID)
@@ -734,13 +711,13 @@ def search_contributivo():
 @app.route('/api/search/agua', methods=['GET'])
 def search_agua():
     log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/agua')
+                    'Recibida petici├│n en /api/search/agua')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
     query = request.args.get('query')
     if not query:
-        return jsonify({"error": "El parámetro 'query' es requerido."}), 400
+        return jsonify({"error": "El par├ímetro 'query' es requerido."}), 400
 
     try:
         table = api.table(BASE_ID, WATER_TABLE_ID)
@@ -771,128 +748,6 @@ def search_agua():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/hr/payslip/send', methods=['POST'])
-def send_payslip():
-    data = request.json
-    query = data.get('query')
-    email = data.get('email')
-
-    if not query or not email:
-        return jsonify({"error": "Faltan datos requeridos (query y email)."}), 400
-
-    log_to_airtable('INFO', 'HR Payslip', f'Petición de recibo para: {query}, enviar a: {email}')
-
-    try:
-        # Autenticación con Google Drive
-        creds = None
-        if GOOGLE_SERVICE_ACCOUNT_JSON:
-            try:
-                print("Intentando autenticar con GOOGLE_SERVICE_ACCOUNT_JSON")
-                service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-                creds = service_account.Credentials.from_service_account_info(service_account_info)
-                print("Autenticación con JSON exitosa")
-            except Exception as e:
-                print(f"Error parseando GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
-        
-        if not creds and GOOGLE_CREDENTIALS_PATH and os.path.exists(GOOGLE_CREDENTIALS_PATH):
-            print(f"Intentando autenticar con archivo: {GOOGLE_CREDENTIALS_PATH}")
-            creds = service_account.Credentials.from_service_account_file(GOOGLE_CREDENTIALS_PATH)
-            print("Autenticación con archivo exitosa")
-        
-        if not creds:
-            # Intento de autenticación por defecto (útil en entornos GCloud)
-            try:
-                print("Intentando autenticación por defecto de Google")
-                import google.auth
-                creds, _ = google.auth.default()
-                print("Autenticación por defecto exitosa")
-            except Exception as e:
-                print(f"Error en google.auth.default: {e}")
-
-        if not creds:
-            log_to_airtable('ERROR', 'HR Payslip', 'Credenciales de Google no configuradas.')
-            return jsonify({"error": "Credenciales de Google no configuradas."}), 500
-
-        print(f"Iniciando búsqueda en carpeta: {GOOGLE_DRIVE_FOLDER_ID} con query: {query}")
-        service = build('drive', 'v3', credentials=creds)
-
-        # Buscar el archivo en la carpeta específica
-        folder_id = GOOGLE_DRIVE_FOLDER_ID
-        q = f"'{folder_id}' in parents and name contains '{query}' and mimeType = 'application/pdf' and trashed = false"
-        
-        results = service.files().list(
-            q=q,
-            spaces='drive',
-            fields='files(id, name)',
-            pageSize=10
-        ).execute()
-        
-        files = results.get('files', [])
-        print(f"Resultados de búsqueda: {len(files)} archivos encontrados")
-
-        if not files:
-            log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {query}')
-            return jsonify({"error": "Recibo no encontrado."}), 404
-
-        # Seleccionar el mejor archivo (el primero que devuelva la búsqueda con contains)
-        target_file = files[0]
-        file_id = target_file['id']
-        file_name = target_file['name']
-
-        log_to_airtable('INFO', 'HR Payslip', f'Archivo encontrado: {file_name} (ID: {file_id})')
-
-        # Descargar el archivo
-        file_request = service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, file_request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-        
-        fh.seek(0)
-        file_content = fh.read()
-
-        # Enviar email con Resend
-        if not RESEND_API_KEY_FROM_ENV:
-            return jsonify({"error": "Configuración de Resend faltante."}), 500
-
-        attachments = [
-            {
-                "filename": file_name,
-                "content": list(file_content)
-            }
-        ]
-
-        params = {
-            "from": os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com"),
-            "to": [email],
-            "subject": f"Recibo de Sueldo - {query}",
-            "html": f"""
-                <div style="font-family: Arial, sans-serif; color: #333;">
-                    <h2 style="color: #0f4c81;">Hola,</h2>
-                    <p>Adjunto encontrarás tu recibo de sueldo solicitado.</p>
-                    <p><strong>Archivo:</strong> {file_name}</p>
-                    <hr>
-                    <p style="font-size: 0.8em; color: #777;">Este es un mensaje automático de la Comuna de Villa Traful.</p>
-                </div>
-            """,
-            "attachments": attachments
-        }
-
-        email_result = resend.Emails.send(params)
-        
-        log_to_airtable('INFO', 'HR Payslip', f'Email enviado exitosamente a {email} para {query}. Result: {email_result}')
-
-        return jsonify({"message": "Recibo encontrado exitosamente.", "file_name": file_name}), 200
-
-    except Exception as e:
-        error_msg = f"Error en send_payslip: {str(e)}"
-        print(error_msg)
-        print(traceback.format_exc())
-        log_to_airtable('ERROR', 'HR Payslip', error_msg, details={"traceback": traceback.format_exc()})
-        return jsonify({"error": "Ocurrió un error al procesar la solicitud."}), 500
-
-
 def process_payment(payment_id, payment_info, items_context,
                     is_simulation=False):
     log_to_airtable('INFO', 'Payment Process',
@@ -916,7 +771,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
     items_context = {}
     monto_pagado = 0
 
-    # Intentar obtener datos de PostgreSQL si está disponible
+    # Intentar obtener datos de PostgreSQL si est├í disponible
     conn = get_db_connection()
     if conn:
         try:
@@ -943,7 +798,6 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                         'INFO', 'Pago TIC Process',
                         f'Registro de pago {payment_id} actualizado en PostgreSQL a '
                         f'{new_status}.')
-
         except Exception as db_error:
             log_to_airtable(
                 'ERROR', 'Pago TIC Process',
@@ -971,7 +825,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                 details={'items_context': items_context, 'monto': monto_pagado})
 
     try:
-        # 2. Si el pago fue aprobado, ejecutar la lógica de negocio
+        # 2. Si el pago fue aprobado, ejecutar la l├│gica de negocio
         # (actualizar Airtable, enviar email)
         if new_status == 'approved':
             log_to_airtable(
@@ -981,7 +835,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
 
             items_for_pdf = []
 
-            # --- Lógica de actualización de Airtable ---
+            # --- L├│gica de actualizaci├│n de Airtable ---
             if "record_id" in items_context:
                 record_id_to_update = items_context["record_id"]
                 table_id_to_update = ""
@@ -1062,7 +916,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                                 'updates_attempted': fields_to_update_origin
                             })
 
-            # --- Lógica de Historial y PDF ---
+            # --- L├│gica de Historial y PDF ---
             historial_table = api.table(BASE_ID, HISTORIAL_TABLE_ID)
 
             dni_nombre = (items_context.get('dni') or
@@ -1221,10 +1075,10 @@ def create_pagotic_payment():
             f'Creando pago: {title} - Monto: ${unit_price}',
             details={'items': items_to_pay})
 
-        # Generar ID único para el pago
+        # Generar ID ├║nico para el pago
         payment_id = f"PAY-{int(time.time())}-{uuid.uuid4().hex[:8]}"
 
-        # Guardar en PostgreSQL si está disponible
+        # Guardar en PostgreSQL si est├í disponible
         conn = get_db_connection()
         if conn:
             try:
@@ -1255,7 +1109,7 @@ def create_pagotic_payment():
         token = get_pagotic_token()
         if not token:
             return jsonify({
-                "error": "No se pudo obtener token de autenticación de Pago TIC"
+                "error": "No se pudo obtener token de autenticaci├│n de Pago TIC"
             }), 500
 
         # Construir el body para la API de Pago TIC
@@ -1278,7 +1132,7 @@ def create_pagotic_payment():
         # Consultar Airtable para obtener nombre y DNI completos
         if record_id and item_type and api:
             try:
-                # Determinar la tabla según el tipo de item
+                # Determinar la tabla seg├║n el tipo de item
                 table_id = None
                 if item_type == 'lote':
                     table_id = CONTRIBUTIVOS_TABLE_ID
@@ -1309,7 +1163,7 @@ def create_pagotic_payment():
                     details={'record_id': record_id})
 
         # Construir detalles del pago
-        # Por ahora creamos un único detalle con el monto total
+        # Por ahora creamos un ├║nico detalle con el monto total
         payment_details = [{
             "external_reference": payment_id,
             "concept_id": "pago_municipal",
@@ -1412,7 +1266,7 @@ def pagotic_webhook():
             'Webhook recibido de Pago TIC',
             details={'webhook_data': webhook_data})
 
-        # Extraer información del webhook
+        # Extraer informaci├│n del webhook
         payment_id = webhook_data.get('external_transaction_id')
         status = webhook_data.get('status')
         pagotic_id = webhook_data.get('id')
@@ -1425,7 +1279,7 @@ def pagotic_webhook():
             return jsonify({"error": "Missing external_transaction_id"}), 400
 
         # Determinar el nuevo estado del pago
-        # Mapeo según documentación oficial de Pago TIC
+        # Mapeo seg├║n documentaci├│n oficial de Pago TIC
         status_map = {
             'PENDING': 'pending',
             'ISSUED': 'issued',
@@ -1449,7 +1303,7 @@ def pagotic_webhook():
             related_id=payment_id,
             details={'pagotic_id': pagotic_id, 'status': status})
 
-        # Procesar el pago usando la función existente
+        # Procesar el pago usando la funci├│n existente
         process_pagotic_payment(payment_id, new_status, webhook_data)
 
         return jsonify({"status": "ok"}), 200
@@ -1466,7 +1320,7 @@ def pagotic_webhook():
 
 @app.route('/api/admin/stats-login', methods=['POST', 'OPTIONS'])
 def admin_stats_login():
-    """Login de administrador y obtención de estadísticas"""
+    """Login de administrador y obtenci├│n de estad├¡sticas"""
     if request.method == 'OPTIONS':
         return '', 204
 
@@ -1477,9 +1331,9 @@ def admin_stats_login():
 
         # Validar credenciales
         if password != ADMIN_PASSWORD_FROM_ENV:
-            return jsonify({"error": "Credenciales inválidas"}), 401
+            return jsonify({"error": "Credenciales inv├ílidas"}), 401
 
-        # Obtener estadísticas desde PostgreSQL
+        # Obtener estad├¡sticas desde PostgreSQL
         conn = get_db_connection()
         stats = {
             "authenticated": True,
@@ -1534,12 +1388,12 @@ def admin_stats_login():
 
 @app.route('/api/admin/payments', methods=['GET', 'OPTIONS'])
 def admin_get_payments():
-    """Obtener lista de pagos (requiere autenticación)"""
+    """Obtener lista de pagos (requiere autenticaci├│n)"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -1584,12 +1438,12 @@ def admin_get_payments():
 
 @app.route('/api/admin/db/payments', methods=['GET', 'OPTIONS'])
 def admin_db_payments():
-    """Obtener tabla payments con búsqueda y paginación"""
+    """Obtener tabla payments con b├║squeda y paginaci├│n"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -1605,7 +1459,7 @@ def admin_db_payments():
 
         try:
             with conn.cursor() as cur:
-                # Construir query con búsqueda
+                # Construir query con b├║squeda
                 search_query = ""
                 params = []
                 if search:
@@ -1665,12 +1519,12 @@ def admin_db_payments():
 
 @app.route('/api/admin/db/payment-history', methods=['GET', 'OPTIONS'])
 def admin_db_payment_history():
-    """Obtener tabla payment_history con búsqueda y paginación"""
+    """Obtener tabla payment_history con b├║squeda y paginaci├│n"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -1686,7 +1540,7 @@ def admin_db_payment_history():
 
         try:
             with conn.cursor() as cur:
-                # Construir query con búsqueda
+                # Construir query con b├║squeda
                 search_query = ""
                 params = []
                 if search:
@@ -1726,7 +1580,7 @@ def admin_db_payment_history():
                         record['fecha_hora'] = record['fecha_hora'].isoformat()
                     if record.get('created_at'):
                         record['created_at'] = record['created_at'].isoformat()
-                    # Asegurar que monto siempre sea un número (incluso si es 0 o NULL)
+                    # Asegurar que monto siempre sea un n├║mero (incluso si es 0 o NULL)
                     record['monto'] = float(record.get('monto', 0) or 0)
 
                 return jsonify({
@@ -1748,12 +1602,12 @@ def admin_db_payment_history():
 
 @app.route('/api/admin/db/error-logs', methods=['GET', 'OPTIONS'])
 def admin_db_error_logs():
-    """Obtener tabla error_logs con búsqueda y paginación"""
+    """Obtener tabla error_logs con b├║squeda y paginaci├│n"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -1769,7 +1623,7 @@ def admin_db_error_logs():
 
         try:
             with conn.cursor() as cur:
-                # Construir query con búsqueda
+                # Construir query con b├║squeda
                 search_query = ""
                 params = []
                 if search:
@@ -1826,12 +1680,12 @@ def admin_db_error_logs():
 
 @app.route('/api/admin/db/contacts', methods=['GET', 'OPTIONS'])
 def admin_db_contacts():
-    """Obtener tabla contacts con búsqueda y paginación"""
+    """Obtener tabla contacts con b├║squeda y paginaci├│n"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -1847,7 +1701,7 @@ def admin_db_contacts():
 
         try:
             with conn.cursor() as cur:
-                # Construir query con búsqueda
+                # Construir query con b├║squeda
                 search_query = ""
                 params = []
                 if search:
@@ -1904,228 +1758,14 @@ def admin_db_contacts():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/admin/stats-postgres', methods=['GET', 'OPTIONS'])
-def admin_stats_postgres():
-    """Obtener estadísticas agregadas de payments (online/efectivo) desde PostgreSQL"""
-    if request.method == 'OPTIONS':
-        return '', 204
-
-    try:
-        # Verificar autenticación
-        is_valid, error_response = validate_admin_auth()
-        if not is_valid:
-            return error_response
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({"error": "No hay conexión a base de datos"}), 500
-
-        try:
-            with conn.cursor() as cur:
-                # ---------------------------------------------------------
-                # 1. Obtener TODOS los pagos exitosos de 2026 en adelante
-                # ---------------------------------------------------------
-                # Filtramos por fecha >= 2026-01-01.
-                # Estado: 'approved' (online) o 'exitoso' (efectivo/historial).
-                query = """
-                    SELECT 
-                        id, 
-                        monto, 
-                        fecha_hora, 
-                        detalles, 
-                        items_pagados,
-                        payment_id
-                    FROM payment_history
-                    WHERE fecha_hora >= '2026-01-01'
-                      AND (LOWER(estado) = 'approved' OR LOWER(estado) = 'exitoso')
-                    ORDER BY fecha_hora ASC
-                """
-                cur.execute(query)
-                rows = cur.fetchall()
-
-                # Estructuras de acumulación
-                stats = {
-                    "resumen_anual": {
-                        "total_general": {"monto": 0.0, "cantidad": 0},
-                        "online": {"monto": 0.0, "cantidad": 0},
-                        "efectivo": {"monto": 0.0, "cantidad": 0}
-                    },
-                    "por_categoria": {
-                        "tasas": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
-                        "agua": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
-                        "patentes": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
-                        "planes": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0},
-                        "otros": {"monto": 0.0, "cantidad": 0, "online": 0, "efectivo": 0}
-                    },
-                    "graficos": {
-                        "diario_online": {},   # date_str -> amount
-                        "diario_efectivo": {}, # date_str -> amount
-                        "mensual_online": {},  # month_int -> amount
-                        "mensual_efectivo": {} # month_int -> amount
-                    }
-                }
-
-                for row in rows:
-                    p_id = row[0]
-                    monto = float(row[1]) if row[1] else 0.0
-                    fecha = row[2]
-                    detalles = str(row[3]).lower() if row[3] else ""
-                    items_json = row[4]
-                    payment_id_ext = str(row[5]) if row[5] else ""
-                    
-                    # -------------------------------------------------
-                    # A. Determinar ORIGEN (Online vs Efectivo)
-                    # -------------------------------------------------
-                    # Criterio: 
-                    #  - Si payment_id empieza con 'pay-' o 'tr-' (pagotic/payway) -> Online
-                    #  - Si detalles contiene 'pago tic' -> Online
-                    #  - Si items_json tiene estructura de online -> Online
-                    #  - Si detalles contiene 'efectivo' o 'caja' -> Efectivo
-                    #  - Por defecto: Si viene de 'cash_payments' (que guarda en history), es Efectivo.
-                    #    Pero aquí solo leemos history. Asumimos Online salvo evidencia de Efectivo.
-                    
-                    is_online = True
-                    
-                    # Indicadores fuertes de Efectivo
-                    if "efectivo" in detalles or "caja" in detalles or "mostrador" in detalles:
-                        is_online = False
-                    # Indicadores fuertes de Online
-                    elif "pago tic" in detalles or "payway" in detalles or "mercadopago" in detalles:
-                        is_online = True
-                    else:
-                        # Fallback por ID
-                        if payment_id_ext.startswith("PAY-") or payment_id_ext.startswith("TR-"):
-                             is_online = True
-                        # Si el ID parece un UUID o correlativo simple (ej. cobro manual)
-                        elif len(payment_id_ext) < 15 and payment_id_ext.isdigit():
-                             is_online = False
-                        else:
-                             # Default a Online si no estamos seguros (o ajustar según preferencia)
-                             is_online = True
-
-                    # -------------------------------------------------
-                    # B. Determinar CATEGORÍA (Tasas, Agua, Patente, Plan)
-                    # -------------------------------------------------
-                    categoria = "otros"
-                    
-                    # Buscar en detalles primero
-                    if "agua" in detalles or "comercial" in detalles:
-                        categoria = "agua"
-                    elif "tasa" in detalles or "lote" in detalles or "retributiv" in detalles:
-                        categoria = "tasas"
-                    elif "patente" in detalles or "vehiculo" in detalles or "rodado" in detalles:
-                        categoria = "patentes"
-                    elif "plan" in detalles or "deuda" in detalles:
-                        categoria = "planes"
-                    
-                    # Si sigue en otros, buscar en items_json
-                    if categoria == "otros" and items_json:
-                        try:
-                            # items_json puede ser lista o dict
-                            items_str = json.dumps(items_json).lower()
-                            if "agua" in items_str or "comercial" in items_str:
-                                categoria = "agua"
-                            elif "tasa" in items_str or "lote" in items_str or "retributiv" in items_str:
-                                categoria = "tasas"
-                            elif "patente" in items_str or "vehiculo" in items_str:
-                                categoria = "patentes"
-                            elif "plan" in items_str or "deuda" in items_str:
-                                categoria = "planes"
-                        except:
-                            pass
-
-                    # -------------------------------------------------
-                    # C. Acumular Totales
-                    # -------------------------------------------------
-                    # Global
-                    stats["resumen_anual"]["total_general"]["monto"] += monto
-                    stats["resumen_anual"]["total_general"]["cantidad"] += 1
-                    
-                    # Por Origen
-                    origen_key = "online" if is_online else "efectivo"
-                    stats["resumen_anual"][origen_key]["monto"] += monto
-                    stats["resumen_anual"][origen_key]["cantidad"] += 1
-                    
-                    # Por Categoría
-                    stats["por_categoria"][categoria]["monto"] += monto
-                    stats["por_categoria"][categoria]["cantidad"] += 1
-                    stats["por_categoria"][categoria][origen_key] += 1
-                    
-                    # -------------------------------------------------
-                    # D. Acumular Gráficos (Series Temporales)
-                    # -------------------------------------------------
-                    if fecha:
-                        # Diario (YYYY-MM-DD)
-                        date_str = fecha.strftime('%Y-%m-%d')
-                        if date_str not in stats["graficos"][f"diario_{origen_key}"]:
-                            stats["graficos"][f"diario_{origen_key}"][date_str] = 0.0
-                        stats["graficos"][f"diario_{origen_key}"][date_str] += monto
-                        
-                        # Mensual (1-12)
-                        month_int = fecha.month
-                        if month_int not in stats["graficos"][f"mensual_{origen_key}"]:
-                            stats["graficos"][f"mensual_{origen_key}"][month_int] = 0.0
-                        stats["graficos"][f"mensual_{origen_key}"][month_int] += monto
-
-                # -------------------------------------------------
-                # E. Formatear Gráficos para el Frontend
-                # -------------------------------------------------
-                # Convertir dicts a listas ordenadas
-                
-                def format_chart_data(data_dict, is_monthly=False):
-                    chart_list = []
-                    for key, val in data_dict.items():
-                        item = {"total": round(val, 2)}
-                        if is_monthly:
-                            meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-                            item["month"] = meses[key - 1] if 1 <= key <= 12 else str(key)
-                            item["month_index"] = key
-                        else:
-                            item["date"] = key
-                            # Formato DD/MM para mostrar
-                            try:
-                                dt = datetime.strptime(key, '%Y-%m-%d')
-                                item["display_date"] = dt.strftime('%d/%m')
-                            except:
-                                item["display_date"] = key
-                        chart_list.append(item)
-                    
-                    # Ordenar
-                    if is_monthly:
-                        chart_list.sort(key=lambda x: x["month_index"])
-                    else:
-                        chart_list.sort(key=lambda x: x["date"])
-                    return chart_list
-
-                final_response = {
-                    "resumen_anual": stats["resumen_anual"],
-                    "por_categoria": stats["por_categoria"],
-                    "graficos": {
-                        "diario_online": format_chart_data(stats["graficos"]["diario_online"]),
-                        "diario_efectivo": format_chart_data(stats["graficos"]["diario_efectivo"]),
-                        "mensual_online": format_chart_data(stats["graficos"]["mensual_online"], is_monthly=True),
-                        "mensual_efectivo": format_chart_data(stats["graficos"]["mensual_efectivo"], is_monthly=True)
-                    }
-                }
-                
-                return jsonify(final_response)
-
-        finally:
-            conn.close()
-
-    except Exception as e:
-        log_to_airtable('ERROR', 'Admin Stats Postgres', f'Error: {e}')
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route('/api/admin/db/cash-payments', methods=['GET', 'OPTIONS'])
 def admin_db_cash_payments():
-    """Obtener tabla cash_payments con búsqueda y paginación"""
+    """Obtener tabla cash_payments con b├║squeda y paginaci├│n"""
     if request.method == 'OPTIONS':
         return '', 204
 
     try:
-        # Verificar autenticación
+        # Verificar autenticaci├│n
         is_valid, error_response = validate_admin_auth()
         if not is_valid:
             return error_response
@@ -2142,7 +1782,7 @@ def admin_db_cash_payments():
 
         try:
             with conn.cursor() as cur:
-                # Construir query con búsqueda y filtros
+                # Construir query con b├║squeda y filtros
                 where_clauses = []
                 params = []
 
@@ -2199,7 +1839,7 @@ def admin_db_cash_payments():
                     if record.get('monto_total'):
                         record['monto_total'] = float(record['monto_total'])
 
-                # Obtener estadísticas
+                # Obtener estad├¡sticas
                 stats_query = f"""
                     SELECT
                         COUNT(*) as total_registros,
@@ -2268,7 +1908,7 @@ def staff_register_access():
     except Exception as e:
         log_to_airtable('ERROR', 'Staff Access',
                         f'Error registrando acceso: {e}')
-        # No fallar la autenticación por esto
+        # No fallar la autenticaci├│n por esto
         return jsonify({"status": "ok"}), 200
 
 
@@ -2295,7 +1935,7 @@ def recaudacion_efectivo():
         if not nombre or not email:
             return jsonify({"error": "Nombre y email son requeridos"}), 400
 
-        # Generar ID único para el comprobante
+        # Generar ID ├║nico para el comprobante
         comprobante_id = f"REC-{int(time.time())}-{uuid.uuid4().hex[:8]}"
 
         # Construir detalle de items pagados para el PDF y Airtable
@@ -2322,7 +1962,7 @@ def recaudacion_efectivo():
             detalle_completo += f"\n\nDescuento aplicado: {descuento}%"
         detalle_completo += f"\n\nRecibido por: {administrativa}"
 
-        # Guardar en PostgreSQL - Tabla específica de pagos en efectivo
+        # Guardar en PostgreSQL - Tabla espec├¡fica de pagos en efectivo
         save_cash_payment(
             comprobante_id=comprobante_id,
             tipo_pago='recaudacion',
@@ -2336,11 +1976,11 @@ def recaudacion_efectivo():
             detalle=detalle_completo,
             items_json=items_for_pdf,
             transferencia=data.get('transferencia', ''),
-            pdf_enviado=False,  # Se actualizará después
+            pdf_enviado=False,  # Se actualizar├í despu├®s
             email_status='Pendiente'
         )
 
-        # También guardar en payment_history para consistencia
+        # Tambi├®n guardar en payment_history para consistencia
         save_payment_history(
             payment_id=comprobante_id,
             comprobante_numero=comprobante_id,
@@ -2350,7 +1990,7 @@ def recaudacion_efectivo():
             monto=total_final,
             estado='exitoso',
             items_pagados=items_for_pdf,
-            detalles=f"Recaudación efectivo - {detalle_completo}"
+            detalles=f"Recaudaci├│n efectivo - {detalle_completo}"
         )
 
         # Guardar en Airtable
@@ -2373,7 +2013,7 @@ def recaudacion_efectivo():
             except Exception as airtable_error:
                 log_to_airtable('ERROR', 'Recaudacion Efectivo',
                                 f'Error guardando en Airtable: {airtable_error}')
-                # No fallar si Airtable falla, ya está en PostgreSQL
+                # No fallar si Airtable falla, ya est├í en PostgreSQL
 
         # Generar PDF
         pdf_details = {
@@ -2407,7 +2047,7 @@ def recaudacion_efectivo():
                     <h2>Comprobante de Pago en Efectivo</h2>
                     <p>Estimado/a {nombre},</p>
                     <p>Adjuntamos el comprobante de su pago recibido en efectivo.</p>
-                    <p><strong>Número de comprobante:</strong> {comprobante_id}</p>
+                    <p><strong>N├║mero de comprobante:</strong> {comprobante_id}</p>
                     <p><strong>Fecha:</strong> {datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y")}</p>
                     <p><strong>Monto total:</strong> ${total_final}</p>
                     <p>Gracias por su pago.</p>
@@ -2425,7 +2065,7 @@ def recaudacion_efectivo():
                 save_contacto(
                     email=email,
                     nombre=nombre,
-                    origen='Recaudación Efectivo'
+                    origen='Recaudaci├│n Efectivo'
                 )
 
                 log_to_airtable('INFO', 'Recaudacion Efectivo',
@@ -2509,13 +2149,13 @@ def patente_efectivo():
         if not nombre or not email or not patente:
             return jsonify({"error": "Nombre, email y patente son requeridos"}), 400
 
-        # Generar ID único para el comprobante
+        # Generar ID ├║nico para el comprobante
         comprobante_id = f"PAT-{int(time.time())}-{uuid.uuid4().hex[:8]}"
 
         # Construir detalle
         detalle_completo = f"Pago de Patente Automotor\n"
         detalle_completo += f"Patente: {patente}\n"
-        detalle_completo += f"Vehículo: {marca} {modelo} ({anio})\n"
+        detalle_completo += f"Veh├¡culo: {marca} {modelo} ({anio})\n"
         if comentarios:
             detalle_completo += f"Comentarios: {comentarios}\n"
         if descuento > 0:
@@ -2530,7 +2170,7 @@ def patente_efectivo():
             "amount": total_final
         }]
 
-        # Guardar en PostgreSQL - Tabla específica de pagos en efectivo
+        # Guardar en PostgreSQL - Tabla espec├¡fica de pagos en efectivo
         save_cash_payment(
             comprobante_id=comprobante_id,
             tipo_pago='patente',
@@ -2553,7 +2193,7 @@ def patente_efectivo():
             email_status='Pendiente'
         )
 
-        # También guardar en payment_history para consistencia
+        # Tambi├®n guardar en payment_history para consistencia
         save_payment_history(
             payment_id=comprobante_id,
             comprobante_numero=comprobante_id,
@@ -2578,7 +2218,7 @@ def patente_efectivo():
                     'Patente': patente,
                     'Marca': marca,
                     'Modelo': modelo,
-                    'Año': anio,
+                    'A├▒o': anio,
                     'Monto': total_final,
                     'Descuento': descuento,
                     'Detalle': detalle_completo,
@@ -2590,7 +2230,7 @@ def patente_efectivo():
             except Exception as airtable_error:
                 log_to_airtable('ERROR', 'Patente Efectivo',
                                 f'Error guardando en Airtable: {airtable_error}')
-                # No fallar si Airtable falla, ya está en PostgreSQL
+                # No fallar si Airtable falla, ya est├í en PostgreSQL
 
         # Generar PDF
         pdf_details = {
@@ -2624,9 +2264,9 @@ def patente_efectivo():
                     <h2>Comprobante de Pago de Patente</h2>
                     <p>Estimado/a {nombre},</p>
                     <p>Adjuntamos el comprobante de su pago de patente recibido en efectivo.</p>
-                    <p><strong>Número de comprobante:</strong> {comprobante_id}</p>
+                    <p><strong>N├║mero de comprobante:</strong> {comprobante_id}</p>
                     <p><strong>Patente:</strong> {patente}</p>
-                    <p><strong>Vehículo:</strong> {marca} {modelo} ({anio})</p>
+                    <p><strong>Veh├¡culo:</strong> {marca} {modelo} ({anio})</p>
                     <p><strong>Fecha:</strong> {datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y")}</p>
                     <p><strong>Monto total:</strong> ${total_final}</p>
                     <p>Gracias por su pago.</p>
@@ -2701,23 +2341,23 @@ def patente_efectivo():
         return jsonify({"error": str(e)}), 500
 
 
-# --- ENDPOINTS DE ESTADÍSTICAS ---
+# --- ENDPOINTS DE ESTAD├ìSTICAS ---
 @app.route('/api/admin/stats-login', methods=['POST'])
 def stats_login():
-    """Endpoint para autenticar acceso al panel de estadísticas"""
+    """Endpoint para autenticar acceso al panel de estad├¡sticas"""
     try:
         data = request.get_json()
         password = data.get('password')
         
         if not password:
-            return jsonify({"error": "Contraseña requerida"}), 400
+            return jsonify({"error": "Contrase├▒a requerida"}), 400
         
         if password == ADMIN_PASSWORD_FROM_ENV:
-            log_to_airtable('INFO', 'Stats Login', 'Acceso exitoso al panel de estadísticas')
+            log_to_airtable('INFO', 'Stats Login', 'Acceso exitoso al panel de estad├¡sticas')
             return jsonify({"success": True}), 200
         else:
-            log_to_airtable('WARNING', 'Stats Login', 'Intento de acceso fallido al panel de estadísticas')
-            return jsonify({"error": "Contraseña incorrecta"}), 401
+            log_to_airtable('WARNING', 'Stats Login', 'Intento de acceso fallido al panel de estad├¡sticas')
+            return jsonify({"error": "Contrase├▒a incorrecta"}), 401
     except Exception as e:
         log_to_airtable('ERROR', 'Stats Login', f'Error en stats_login: {e}')
         return jsonify({"error": "Error interno del servidor"}), 500
@@ -2725,14 +2365,14 @@ def stats_login():
 
 @app.route('/api/admin/stats', methods=['GET'])
 def get_stats():
-    """Endpoint para obtener estadísticas de recaudación de tasas y derechos"""
+    """Endpoint para obtener estad├¡sticas de recaudaci├│n de tasas y derechos"""
     conn = get_db_connection()
     if not conn:
-        return jsonify({"error": "Error de conexión a la base de datos"}), 500
+        return jsonify({"error": "Error de conexi├│n a la base de datos"}), 500
     
     try:
         with conn.cursor() as cur:
-            # --- CONTADOR: Total de registros de recaudación de tasas y derechos ---
+            # --- CONTADOR: Total de registros de recaudaci├│n de tasas y derechos ---
             cur.execute("""
                 SELECT COUNT(*) 
                 FROM cash_payments
@@ -2741,7 +2381,7 @@ def get_stats():
             """)
             total_registros_recaudacion = cur.fetchone()[0] or 0
             
-            # --- MONTO TOTAL de recaudación de tasas y derechos ---
+            # --- MONTO TOTAL de recaudaci├│n de tasas y derechos ---
             cur.execute("""
                 SELECT COALESCE(SUM(monto_total), 0)
                 FROM cash_payments
@@ -2750,7 +2390,7 @@ def get_stats():
             """)
             monto_total_recaudacion = float(cur.fetchone()[0] or 0)
             
-            # --- GRÁFICO DIARIO: Recaudación de tasas y derechos por día ---
+            # --- GR├üFICO DIARIO: Recaudaci├│n de tasas y derechos por d├¡a ---
             cur.execute("""
                 SELECT 
                     fecha_pago,
@@ -2766,17 +2406,17 @@ def get_stats():
             """)
             daily_recaudacion = cur.fetchall()
             
-            # Formatear datos para el gráfico diario (orden cronológico)
+            # Formatear datos para el gr├ífico diario (orden cronol├│gico)
             daily_chart = [
                 {
                     "date": row[1],  # fecha_formateada
                     "total": round(float(row[2]), 2),  # total_dia
                     "cantidad": int(row[3])  # cantidad_registros
                 } 
-                for row in reversed(daily_recaudacion)  # Invertir para orden cronológico
+                for row in reversed(daily_recaudacion)  # Invertir para orden cronol├│gico
             ]
             
-            # --- GRÁFICO MENSUAL: Recaudación de tasas y derechos por mes ---
+            # --- GR├üFICO MENSUAL: Recaudaci├│n de tasas y derechos por mes ---
             cur.execute("""
                 SELECT 
                     TO_CHAR(fecha_pago, 'Month') as mes_nombre,
@@ -2791,7 +2431,7 @@ def get_stats():
             """)
             monthly_recaudacion = cur.fetchall()
             
-            # Formatear datos para el gráfico mensual
+            # Formatear datos para el gr├ífico mensual
             monthly_chart = [
                 {
                     "month": row[0].strip(),  # mes_nombre
@@ -2821,7 +2461,7 @@ def get_stats():
             """)
             monto_total_patentes = float(cur.fetchone()[0] or 0)
             
-            # --- GRÁFICO DIARIO: Patentes por día ---
+            # --- GR├üFICO DIARIO: Patentes por d├¡a ---
             cur.execute("""
                 SELECT 
                     fecha_pago,
@@ -2837,17 +2477,17 @@ def get_stats():
             """)
             daily_patentes = cur.fetchall()
             
-            # Formatear datos para el gráfico diario de patentes
+            # Formatear datos para el gr├ífico diario de patentes
             daily_chart_patentes = [
                 {
                     "date": row[1],  # fecha_formateada
                     "total": round(float(row[2]), 2),  # total_dia
                     "cantidad": int(row[3])  # cantidad_registros
                 } 
-                for row in reversed(daily_patentes)  # Invertir para orden cronológico
+                for row in reversed(daily_patentes)  # Invertir para orden cronol├│gico
             ]
             
-            # --- GRÁFICO MENSUAL: Patentes por mes ---
+            # --- GR├üFICO MENSUAL: Patentes por mes ---
             cur.execute("""
                 SELECT 
                     TO_CHAR(fecha_pago, 'Month') as mes_nombre,
@@ -2862,7 +2502,7 @@ def get_stats():
             """)
             monthly_patentes = cur.fetchall()
             
-            # Formatear datos para el gráfico mensual de patentes
+            # Formatear datos para el gr├ífico mensual de patentes
             monthly_chart_patentes = [
                 {
                     "month": row[0].strip(),  # mes_nombre
@@ -2892,7 +2532,7 @@ def get_stats():
             """)
             monto_total_planes = float(cur.fetchone()[0] or 0)
             
-            # --- GRÁFICO DIARIO: Planes de pago por día ---
+            # --- GR├üFICO DIARIO: Planes de pago por d├¡a ---
             cur.execute("""
                 SELECT 
                     fecha_pago,
@@ -2908,17 +2548,17 @@ def get_stats():
             """)
             daily_planes = cur.fetchall()
             
-            # Formatear datos para el gráfico diario de planes de pago
+            # Formatear datos para el gr├ífico diario de planes de pago
             daily_chart_planes = [
                 {
                     "date": row[1],  # fecha_formateada
                     "total": round(float(row[2]), 2),  # total_dia
                     "cantidad": int(row[3])  # cantidad_registros
                 } 
-                for row in reversed(daily_planes)  # Invertir para orden cronológico
+                for row in reversed(daily_planes)  # Invertir para orden cronol├│gico
             ]
             
-            # --- GRÁFICO MENSUAL: Planes de pago por mes ---
+            # --- GR├üFICO MENSUAL: Planes de pago por mes ---
             cur.execute("""
                 SELECT 
                     TO_CHAR(fecha_pago, 'Month') as mes_nombre,
@@ -2933,7 +2573,7 @@ def get_stats():
             """)
             monthly_planes = cur.fetchall()
             
-            # Formatear datos para el gráfico mensual de planes de pago
+            # Formatear datos para el gr├ífico mensual de planes de pago
             monthly_chart_planes = [
                 {
                     "month": row[0].strip(),  # mes_nombre
@@ -2949,10 +2589,10 @@ def get_stats():
                 efectivo_table = api.table(BASE_ID, EFECTIVO_TABLE_ID)
                 efectivo_records = efectivo_table.all()
                 
-                # Filtrar por año 2026 y procesar
+                # Filtrar por a├▒o 2026 y procesar
                 from datetime import datetime
                 
-                # Solo procesamos patentes efectivo
+                rec_efectivo_data = []
                 pat_efectivo_data = []
                 
                 for record in efectivo_records:
@@ -2971,7 +2611,7 @@ def get_stats():
                         else:
                             fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
                         
-                        # Filtrar por año 2026
+                        # Filtrar por a├▒o 2026
                         if fecha.year != 2026:
                             continue
                         
@@ -2983,22 +2623,38 @@ def get_stats():
                             'mes_nombre': fecha.strftime('%B')
                         }
                         
-                        # Solo procesamos patentes
-                        if tipo in ['patente', 'patentes']:
+                        # Clasificar por tipo (los valores en Airtable son exactos)
+                        if tipo in ['recaudaci├│n de tasas', 'recaudacion de tasas', 'tasa', 'tasas']:
+                            rec_efectivo_data.append(data_item)
+                        elif tipo in ['patente', 'patentes']:
                             pat_efectivo_data.append(data_item)
                     except:
                         continue
                 
-                # Calcular totales (solo patentes)
+                # Calcular totales
+                total_registros_rec_efectivo = len(rec_efectivo_data)
+                monto_total_rec_efectivo = sum(item['monto'] for item in rec_efectivo_data)
+                
                 total_registros_pat_efectivo = len(pat_efectivo_data)
                 monto_total_pat_efectivo = sum(item['monto'] for item in pat_efectivo_data)
                 
-                # Total efectivo = solo patentes
-                total_registros_efectivo = total_registros_pat_efectivo
-                monto_total_efectivo = monto_total_pat_efectivo
+                total_registros_efectivo = total_registros_rec_efectivo + total_registros_pat_efectivo
+                monto_total_efectivo = monto_total_rec_efectivo + monto_total_pat_efectivo
                 
-                # Gráficos diarios - Patentes
+                # Gr├íficos diarios - Recaudaci├│n
                 from collections import defaultdict
+                daily_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
+                for item in rec_efectivo_data:
+                    daily_rec_dict[item['fecha_str']]['total'] += item['monto']
+                    daily_rec_dict[item['fecha_str']]['cantidad'] += 1
+                
+                daily_chart_rec_efectivo = [
+                    {'date': fecha, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for fecha, data in sorted(daily_rec_dict.items(), key=lambda x: datetime.strptime(x[0], '%d/%m/%Y'), reverse=True)[:60]
+                ]
+                daily_chart_rec_efectivo.reverse()
+                
+                # Gr├íficos diarios - Patentes
                 daily_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
                 for item in pat_efectivo_data:
                     daily_pat_dict[item['fecha_str']]['total'] += item['monto']
@@ -3010,7 +2666,20 @@ def get_stats():
                 ]
                 daily_chart_pat_efectivo.reverse()
                 
-                # Gráficos mensuales - Patentes
+                # Gr├íficos mensuales - Recaudaci├│n
+                monthly_rec_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
+                for item in rec_efectivo_data:
+                    mes_nombre = item['mes_nombre']
+                    monthly_rec_dict[mes_nombre]['total'] += item['monto']
+                    monthly_rec_dict[mes_nombre]['cantidad'] += 1
+                    monthly_rec_dict[mes_nombre]['mes_num'] = item['mes']
+                
+                monthly_chart_rec_efectivo = [
+                    {'month': mes, 'total': round(data['total'], 2), 'cantidad': data['cantidad']}
+                    for mes, data in sorted(monthly_rec_dict.items(), key=lambda x: x[1]['mes_num'])
+                ]
+                
+                # Gr├íficos mensuales - Patentes
                 monthly_pat_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
                 for item in pat_efectivo_data:
                     mes_nombre = item['mes_nombre']
@@ -3025,11 +2694,15 @@ def get_stats():
                 
             except Exception as e:
                 print(f"Error obteniendo datos de efectivo desde Airtable: {e}")
+                total_registros_rec_efectivo = 0
+                monto_total_rec_efectivo = 0
                 total_registros_pat_efectivo = 0
                 monto_total_pat_efectivo = 0
                 total_registros_efectivo = 0
                 monto_total_efectivo = 0
+                daily_chart_rec_efectivo = []
                 daily_chart_pat_efectivo = []
+                monthly_chart_rec_efectivo = []
                 monthly_chart_pat_efectivo = []
             
             # ============= DATOS DE PAGOS AUTOMATIZADOS (desde Airtable - Historial) =============
@@ -3046,7 +2719,7 @@ def get_stats():
                 for record in historial_records:
                     fields = record['fields']
                     estado = fields.get('Estado', '')
-                    fecha_str = fields.get('Fecha de Transacción', '')
+                    fecha_str = fields.get('Fecha de Transacci├│n', '')
                     items_json_str = fields.get('ItemsPagadosJSON', '[]')
                     
                     # Solo pagos exitosos
@@ -3067,7 +2740,7 @@ def get_stats():
                         else:
                             fecha = datetime.strptime(fecha_str, '%d/%m/%Y')
                         
-                        # Filtrar por año 2026
+                        # Filtrar por a├▒o 2026
                         if fecha.year != 2026:
                             continue
                         
@@ -3087,10 +2760,10 @@ def get_stats():
                                 'mes_nombre': fecha.strftime('%B')
                             }
                             
-                            # Clasificar por tipo según descripción
-                            # Tasas Retributivas: incluye Cuota Tasas, Pago Recaudación Manual, Pago Patente
+                            # Clasificar por tipo seg├║n descripci├│n
+                            # Tasas Retributivas: incluye Cuota Tasas, Pago Recaudaci├│n Manual, Pago Patente
                             if ('tasas' in description or 
-                                'recaudación' in description or 
+                                'recaudaci├│n' in description or 
                                 'recaudacion' in description or
                                 'patente' in description):
                                 tasas_data.append(data_item)
@@ -3110,7 +2783,7 @@ def get_stats():
                 total_registros_automatizados = total_registros_tasas_online + total_registros_agua_online
                 monto_total_automatizados = monto_total_tasas_online + monto_total_agua_online
                 
-                # Gráficos diarios - Tasas
+                # Gr├íficos diarios - Tasas
                 daily_tasas_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
                 for item in tasas_data:
                     daily_tasas_dict[item['fecha_str']]['total'] += item['monto']
@@ -3122,7 +2795,7 @@ def get_stats():
                 ]
                 daily_chart_tasas_online.reverse()
                 
-                # Gráficos diarios - Agua
+                # Gr├íficos diarios - Agua
                 daily_agua_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0})
                 for item in agua_data:
                     daily_agua_dict[item['fecha_str']]['total'] += item['monto']
@@ -3134,7 +2807,7 @@ def get_stats():
                 ]
                 daily_chart_agua_online.reverse()
                 
-                # Gráficos mensuales - Tasas
+                # Gr├íficos mensuales - Tasas
                 monthly_tasas_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
                 for item in tasas_data:
                     mes_nombre = item['mes_nombre']
@@ -3147,7 +2820,7 @@ def get_stats():
                     for mes, data in sorted(monthly_tasas_dict.items(), key=lambda x: x[1]['mes_num'])
                 ]
                 
-                # Gráficos mensuales - Agua
+                # Gr├íficos mensuales - Agua
                 monthly_agua_dict = defaultdict(lambda: {'total': 0, 'cantidad': 0, 'mes_num': 0})
                 for item in agua_data:
                     mes_nombre = item['mes_nombre']
@@ -3196,6 +2869,10 @@ def get_stats():
                 "daily_chart_planes": daily_chart_planes,
                 "monthly_chart_planes": monthly_chart_planes,
                 "cobro_efectivo": {
+                    "recaudacion": {
+                        "total_registros": total_registros_rec_efectivo,
+                        "monto_total": round(monto_total_rec_efectivo, 2)
+                    },
                     "patentes": {
                         "total_registros": total_registros_pat_efectivo,
                         "monto_total": round(monto_total_pat_efectivo, 2)
@@ -3205,7 +2882,9 @@ def get_stats():
                         "monto_total": round(monto_total_efectivo, 2)
                     }
                 },
+                "daily_chart_rec_efectivo": daily_chart_rec_efectivo,
                 "daily_chart_pat_efectivo": daily_chart_pat_efectivo,
+                "monthly_chart_rec_efectivo": monthly_chart_rec_efectivo,
                 "monthly_chart_pat_efectivo": monthly_chart_pat_efectivo,
                 "pagos_automatizados": {
                     "tasas_retributivas": {
@@ -3228,15 +2907,15 @@ def get_stats():
             }
             
             log_to_airtable('INFO', 'Stats Dashboard', 
-                          f'Estadísticas - Recaudación: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f}), Efectivo: {total_registros_efectivo} (${monto_total_efectivo:.2f}), Automatizados: {total_registros_automatizados} (${monto_total_automatizados:.2f})')
+                          f'Estad├¡sticas - Recaudaci├│n: {total_registros_recaudacion} (${monto_total_recaudacion:.2f}), Patentes: {total_registros_patentes} (${monto_total_patentes:.2f}), Planes: {total_registros_planes} (${monto_total_planes:.2f}), Efectivo: {total_registros_efectivo} (${monto_total_efectivo:.2f}), Automatizados: {total_registros_automatizados} (${monto_total_automatizados:.2f})')
             
             return jsonify(response_data), 200
             
     except Exception as e:
         log_to_airtable('ERROR', 'Stats Dashboard', 
-                       f'Error generando estadísticas: {e}',
+                       f'Error generando estad├¡sticas: {e}',
                        details={'error': str(e), 'traceback': traceback.format_exc()})
-        return jsonify({"error": f"Error al generar estadísticas: {str(e)}"}), 500
+        return jsonify({"error": f"Error al generar estad├¡sticas: {str(e)}"}), 500
     finally:
         if conn:
             conn.close()
