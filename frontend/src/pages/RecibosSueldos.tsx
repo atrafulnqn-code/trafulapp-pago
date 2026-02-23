@@ -2,6 +2,19 @@ import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
+// Configuración de URL de API robusta
+// @ts-ignore
+const getApiBaseUrl = () => {
+    // @ts-ignore
+    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+        return runtimeUrl;
+    }
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
 const RecibosSueldos: React.FC = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
@@ -13,8 +26,6 @@ const RecibosSueldos: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         setMessage(null);
-
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 
         try {
             const response = await fetch(`${API_BASE_URL}/hr/payslip/send`, {
