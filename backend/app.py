@@ -848,6 +848,57 @@ def search_agua():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/search/deuda', methods=['GET'])
+def search_deuda():
+    log_to_airtable('INFO', 'API Search',
+                    'Recibida petición en /api/search/deuda')
+    if not api:
+        return jsonify({"error": "Airtable no configurado."}), 500
+
+    nombre = request.args.get('nombre')
+    if not nombre:
+        return jsonify({"error": "El parámetro 'nombre' es requerido."}), 400
+
+    try:
+        table = api.table(BASE_ID, DEUDAS_TABLE_ID)
+        # Búsqueda por nombre y apellido
+        formula = SEARCH(nombre.lower(), LOWER(Field('nombre y apellido')))
+        records = table.all(formula=str(formula))
+        return jsonify(records)
+    except Exception as e:
+        log_to_airtable('ERROR', 'API Search',
+                        f'ERROR en search_deuda: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/search/patente', methods=['GET'])
+def search_patente():
+    log_to_airtable('INFO', 'API Search',
+                    'Recibida petición en /api/search/patente')
+    if not api:
+        return jsonify({"error": "Airtable no configurado."}), 500
+
+    dni = request.args.get('dni')
+    if not dni:
+        return jsonify({"error": "El parámetro 'dni' es requerido."}), 400
+
+    try:
+        table = api.table(BASE_ID, PATENTE_TABLE_ID)
+        # Búsqueda por DNI, Patente o Titular
+        lower_dni = dni.lower()
+        formula = OR(
+            SEARCH(lower_dni, LOWER(Field('dni'))),
+            SEARCH(lower_dni, LOWER(Field('patente'))),
+            SEARCH(lower_dni, LOWER(Field('titular')))
+        )
+        records = table.all(formula=str(formula))
+        return jsonify(records)
+    except Exception as e:
+        log_to_airtable('ERROR', 'API Search',
+                        f'ERROR en search_patente: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/hr/payslip/send', methods=['POST'])
 def send_payslip():
     data = request.json
