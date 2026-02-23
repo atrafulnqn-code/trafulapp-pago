@@ -238,6 +238,22 @@ def init_db():
                 EXECUTE FUNCTION update_updated_at_column();
             """)
 
+            # Tabla hr_payslip_requests - Auditoría de búsqueda de recibos
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS hr_payslip_requests (
+                    id SERIAL PRIMARY KEY,
+                    search_query VARCHAR(255) NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    ip_address VARCHAR(50),
+                    success BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_hr_payslip_requests_created ON hr_payslip_requests(created_at);
+                CREATE INDEX IF NOT EXISTS idx_hr_payslip_requests_email ON hr_payslip_requests(email);
+            """)
+
             conn.commit()
             print("✅ Tablas en PostgreSQL inicializadas correctamente:")
             print("   - payments")
@@ -245,6 +261,7 @@ def init_db():
             print("   - error_logs")
             print("   - contacts")
             print("   - cash_payments")
+            print("   - hr_payslip_requests")
     except Exception as e:
         print(f"ERROR al inicializar las tablas: {e}")
         conn.rollback()
@@ -297,6 +314,25 @@ def save_error_log(nivel, tipo, mensaje, payment_id=None, related_id=None,
             conn.commit()
     except Exception as e:
         print(f"ERROR al guardar error_log: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+def log_payslip_request(search_query, email, ip_address, success):
+    """Guarda un registro de auditoría para solicitudes de recibos."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO hr_payslip_requests (search_query, email, ip_address, success)
+                VALUES (%s, %s, %s, %s)
+            """, (search_query, email, ip_address, success))
+            conn.commit()
+    except Exception as e:
+        print(f"ERROR al registrar auditoría de recibo: {e}")
         conn.rollback()
     finally:
         conn.close()
@@ -828,12 +864,13 @@ def send_payslip():
 
         if not files:
             log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {query}')
-            return jsonify({"error": "Recibo no encontrado."}), 404
+            log_payslip_request(query, email, request.remote_addr, False)
+            return jsonify({"error": "No se encontró un recibo para la búsqueda proporcionada."}), 404
 
         # Seleccionar el mejor archivo (el primero que devuelva la búsqueda con contains)
-        target_file = files[0]
-        file_id = target_file['id']
-        file_name = target_file['name']
+        google_file = files[0]
+        file_id = google_file['id']
+        file_name = google_file['name']
 
         log_to_airtable('INFO', 'HR Payslip', f'Archivo encontrado: {file_name} (ID: {file_id})')
 
@@ -848,9 +885,9 @@ def send_payslip():
         fh.seek(0)
         file_content = fh.read()
 
-
         # Enviar email con Resend
         if not RESEND_API_KEY_FROM_ENV:
+            log_payslip_request(query, email, request.remote_addr, False)
             return jsonify({"error": "Configuración de Resend faltante."}), 500
 
         attachments = [
@@ -860,25 +897,20 @@ def send_payslip():
             }
         ]
 
-        params = {
-            "from": os.getenv("RESEND_FROM_EMAIL", "trafulnet@geoarg.com"),
-            "to": [email],
-            "subject": f"Recibo de Sueldo - {query}",
-            "html": f"""
-                <div style="font-family: Arial, sans-serif; color: #333;">
-                    <h2 style="color: #0f4c81;">Hola,</h2>
-                    <p>Adjunto encontrarás tu recibo de sueldo solicitado.</p>
-                    <p><strong>Archivo:</strong> {file_name}</p>
-                    <hr>
-                    <p style="font-size: 0.8em; color: #777;">Este es un mensaje automático de la Comuna de Villa Traful.</p>
-                </div>
-            """,
-            "attachments": attachments
-        }
+        # Obtener el email del remitente de la variable de entorno o usar uno por defecto
+        # Render permite usar el dominio configurado en Resend
+        from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
-        email_result = resend.Emails.send(params)
-        
+        email_result = resend.Emails.send({
+            "from": f"Comuna de Villa Traful <{from_email}>",
+            "to": email,
+            "subject": f"Recibo de Sueldo: {file_name}",
+            "html": f"<p>Hola,</p><p>Adjunto enviamos el recibo de sueldo solicitado para <strong>{query}</strong>.</p><p>Saludos,<br>Comuna de Villa Traful</p>",
+            "attachments": attachments
+        })
+
         log_to_airtable('INFO', 'HR Payslip', f'Email enviado exitosamente a {email} para {query}. Result: {email_result}')
+        log_payslip_request(query, email, request.remote_addr, True)
 
         return jsonify({"message": "Recibo encontrado exitosamente.", "file_name": file_name}), 200
 
@@ -1657,6 +1689,81 @@ def admin_db_payments():
     except Exception as e:
         log_to_airtable('ERROR', 'Admin DB Payments',
                         f'Error obteniendo payments: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/hr-payslip-requests', methods=['GET', 'OPTIONS'])
+def admin_db_hr_payslip_requests():
+    """Obtener tabla hr_payslip_requests con búsqueda y paginación"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        # Verificar autenticación
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
+
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 10, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # Construir query con búsqueda
+                search_query = ""
+                params = []
+                if search:
+                    search_query = """
+                        WHERE search_query ILIKE %s
+                        OR email ILIKE %s
+                        OR ip_address ILIKE %s
+                    """
+                    search_param = f"%{search}%"
+                    params = [search_param] * 3
+
+                # Contar total
+                count_query = f"SELECT COUNT(*) FROM hr_payslip_requests {search_query}"
+                cur.execute(count_query, params)
+                total = cur.fetchone()[0]
+
+                # Obtener datos paginados
+                data_query = f"""
+                    SELECT id, search_query, email, ip_address, success, created_at
+                    FROM hr_payslip_requests
+                    {search_query}
+                    ORDER BY created_at DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(data_query, params + [limit, offset])
+
+                columns = [desc[0] for desc in cur.description]
+                records = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+                # Convertir datetime a string
+                for record in records:
+                    if record.get('created_at'):
+                        record['created_at'] = record['created_at'].isoformat()
+
+                return jsonify({
+                    "data": records,
+                    "total": total,
+                    "page": page,
+                    "limit": limit,
+                    "total_pages": (total + limit - 1) // limit
+                }), 200
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Admin DB HR Payslips',
+                        f'Error obteniendo hr_payslip_requests: {e}')
         return jsonify({"error": str(e)}), 500
 
 

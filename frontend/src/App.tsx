@@ -18,6 +18,7 @@ import AdminDBPaymentHistory from './pages/AdminDBPaymentHistory';
 import AdminDBErrorLogs from './pages/AdminDBErrorLogs';
 import AdminDBContacts from './pages/AdminDBContacts';
 import AdminDBCashPayments from './pages/AdminDBCashPayments';
+import AdminDBHRPayslips from './pages/AdminDBHRPayslips';
 import StaffLogin from './pages/StaffLogin';
 import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
@@ -61,6 +62,7 @@ const AppContent: React.FC = () => {
           <Route path="/admin/db/error-logs" element={<AdminDBErrorLogs />} />
           <Route path="/admin/db/contacts" element={<AdminDBContacts />} />
           <Route path="/admin/db/cash-payments" element={<AdminDBCashPayments />} />
+          <Route path="/admin/db/hr-payslips" element={<AdminDBHRPayslips />} />
           <Route path="/staff/login" element={<StaffLogin />} />
           <Route path="/staff/dashboard" element={<StaffDashboard />} />
           <Route path="/staff/recaudacion" element={<RecaudacionForm />} />
