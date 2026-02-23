@@ -82,7 +82,7 @@ const RecibosSueldos: React.FC = () => {
                                     <Form.Label className="fw-semibold">Nombre y Apellido o DNI</Form.Label>
                                     <Form.Control
                                         type="text"
-                                        placeholder="Ej: Orlando Zannini o 23921087"
+                                        placeholder="Ej: Juan Pérez o 23921087"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         required
