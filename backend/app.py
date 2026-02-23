@@ -848,6 +848,7 @@ def send_payslip():
         fh.seek(0)
         file_content = fh.read()
 
+
         # Enviar email con Resend
         if not RESEND_API_KEY_FROM_ENV:
             return jsonify({"error": "Configuración de Resend faltante."}), 500
