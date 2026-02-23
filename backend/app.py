@@ -772,27 +772,36 @@ def send_payslip():
         creds = None
         if GOOGLE_SERVICE_ACCOUNT_JSON:
             try:
+                print("Intentando autenticar con GOOGLE_SERVICE_ACCOUNT_JSON")
                 service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
                 creds = service_account.Credentials.from_service_account_info(service_account_info)
+                print("Autenticación con JSON exitosa")
             except Exception as e:
                 print(f"Error parseando GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
         
         if not creds and GOOGLE_CREDENTIALS_PATH and os.path.exists(GOOGLE_CREDENTIALS_PATH):
+            print(f"Intentando autenticar con archivo: {GOOGLE_CREDENTIALS_PATH}")
             creds = service_account.Credentials.from_service_account_file(GOOGLE_CREDENTIALS_PATH)
+            print("Autenticación con archivo exitosa")
         
         if not creds:
             # Intento de autenticación por defecto (útil en entornos GCloud)
-            import google.auth
-            creds, _ = google.auth.default()
+            try:
+                print("Intentando autenticación por defecto de Google")
+                import google.auth
+                creds, _ = google.auth.default()
+                print("Autenticación por defecto exitosa")
+            except Exception as e:
+                print(f"Error en google.auth.default: {e}")
 
         if not creds:
+            log_to_airtable('ERROR', 'HR Payslip', 'Credenciales de Google no configuradas.')
             return jsonify({"error": "Credenciales de Google no configuradas."}), 500
 
+        print(f"Iniciando búsqueda en carpeta: {GOOGLE_DRIVE_FOLDER_ID} con query: {query}")
         service = build('drive', 'v3', credentials=creds)
 
         # Buscar el archivo en la carpeta específica
-        # Usamos q para filtrar por nombre y carpeta
-        # La búsqueda es case-insensitive para el nombre en Drive API v3
         folder_id = GOOGLE_DRIVE_FOLDER_ID
         q = f"'{folder_id}' in parents and name contains '{query}' and mimeType = 'application/pdf' and trashed = false"
         
@@ -804,6 +813,7 @@ def send_payslip():
         ).execute()
         
         files = results.get('files', [])
+        print(f"Resultados de búsqueda: {len(files)} archivos encontrados")
 
         if not files:
             log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {query}')
