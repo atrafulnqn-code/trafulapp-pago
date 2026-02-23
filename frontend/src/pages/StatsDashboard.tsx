@@ -4,14 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Configuración de URL de API robusta
-// @ts-ignore
 const getApiBaseUrl = () => {
-  // @ts-ignore
   const runtimeUrl = window._env_?.VITE_API_BASE_URL;
   if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
     return runtimeUrl;
   }
-  // @ts-ignore
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
 };
 

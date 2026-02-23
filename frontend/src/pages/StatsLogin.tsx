@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 
 // Configuración de URL de API robusta
-// @ts-ignore
 const getApiBaseUrl = () => {
-  // @ts-ignore
   const runtimeUrl = window._env_?.VITE_API_BASE_URL;
   if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
     return runtimeUrl;

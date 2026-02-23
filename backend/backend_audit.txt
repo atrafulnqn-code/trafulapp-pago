@@ -1,0 +1,45 @@
+Backend endpoints mapping:
+/api/admin/db/cash-payments
+/api/admin/db/contacts
+/api/admin/db/error-logs
+/api/admin/db/hr-payslip-requests
+/api/admin/db/payment-history
+/api/admin/db/payments
+/api/admin/payments
+/api/admin/stats
+/api/admin/stats-login
+/api/admin/stats-postgres
+/api/create_pagotic_payment
+/api/hr/payslip/send
+/api/pagotic_webhook
+/api/patente_efectivo
+/api/recaudacion_efectivo
+/api/search/agua
+/api/search/contributivo
+/api/staff/register_access
+/healthz
+
+--------------------------
+Frontend fetch mapping:
+AdminAccessLogs.tsx: /admin/staff_access_logs
+AdminLogin.tsx: /admin/stats-login
+AdminLogs.tsx: /admin/access_logs
+AdminPatentes.tsx: /admin/patentes_manuales
+AdminPayments.tsx: /admin/payments_history
+AdminRecaudacion.tsx: /admin/recaudacion
+LinkMPModule.tsx: /send_payment_link
+PatenteEfectivo.tsx: /patente_efectivo
+PatenteForm.tsx: /patente_efectivo
+PaymentFlow.tsx: /${systemConfig.endpoint}
+PaymentFlow.tsx: /create_pagotic_payment
+PaymentFlow.tsx: ${endpoint}
+PlanPagoForm.tsx: /plan_pago
+RecaudacionEfectivo.tsx: /recaudacion_efectivo
+RecaudacionForm.tsx: /recaudacion_efectivo
+RecibosSueldos.tsx: /hr/payslip/send
+StaffLogin.tsx: /admin/stats-login
+StaffLogin.tsx: /staff/register_access
+StatsDashboard.tsx: /admin/stats
+StatsDashboard.tsx: /admin/stats-postgres
+StatsLogin.tsx: /admin/stats-login
+Success.tsx: /get_history_by_payment_id/${paymentId}
