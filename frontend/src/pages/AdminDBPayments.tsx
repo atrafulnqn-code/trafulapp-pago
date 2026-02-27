@@ -113,6 +113,55 @@ const AdminDBPayments: React.FC = () => {
     return statusMap[status] || 'secondary';
   };
 
+  const handleExport = async () => {
+    try {
+      const password = localStorage.getItem('adminPassword') || '';
+      const response = await axios.get<ApiResponse>(`${API_BASE_URL}/admin/db/payments`, {
+        params: { page: 1, limit: 10000, search: search },
+        headers: { Authorization: `Bearer ${password}` }
+      });
+
+      const data = response.data.data;
+      if (data.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+      }
+
+      // Headers del CSV
+      const headers = ['ID', 'Payment ID', 'External ID', 'Status', 'Amount', 'Currency', 'Payer Email', 'Created At'];
+
+      // Filas del CSV (usando punto y coma para mejor compatibilidad con Excel en español)
+      const rows = data.map(p => [
+        p.id,
+        p.payment_id,
+        p.payment_id_external || '',
+        p.status,
+        p.amount,
+        p.currency,
+        p.payer_email || '',
+        p.created_at
+      ]);
+
+      const csvContent = [
+        headers.join(';'),
+        ...rows.map(row => row.join(';'))
+      ].join('\n');
+
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `pagos_db_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error al exportar:', err);
+      alert('Error al exportar los datos');
+    }
+  };
+
   return (
     <Container className="py-5 mt-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -123,7 +172,16 @@ const AdminDBPayments: React.FC = () => {
           <h1 className="fw-bold text-primary">Tabla: Payments</h1>
           <p className="text-muted">Total de registros: {total}</p>
         </div>
-        <Button variant="outline-danger" onClick={handleLogout}>Cerrar Sesión</Button>
+        <div className="d-flex gap-2">
+          <Button variant="success" onClick={handleExport}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-download me-2" viewBox="0 0 16 16">
+              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+            </svg>
+            Exportar a Excel
+          </Button>
+          <Button variant="outline-danger" onClick={handleLogout}>Cerrar Sesión</Button>
+        </div>
       </div>
 
       <Form onSubmit={handleSearch} className="mb-4">
