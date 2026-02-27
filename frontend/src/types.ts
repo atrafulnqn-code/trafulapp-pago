@@ -2,7 +2,8 @@ export enum PaymentSystem {
   TASAS = 'TASAS',
   PATENTE = 'PATENTE',
   OTRAS = 'OTRAS',
-  AGUA = 'AGUA' // Added AGUA enum member
+  AGUA = 'AGUA', // Added AGUA enum member
+  POLIDEPORTIVO = 'POLIDEPORTIVO'
 }
 
 export interface Debt {
