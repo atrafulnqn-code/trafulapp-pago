@@ -1127,6 +1127,10 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
             items_for_pdf = []
 
             # --- Lógica de actualización de Airtable ---
+            log_to_airtable(
+                'DEBUG', 'Pago TIC Process',
+                f'items_context completo para diagnostico: {json.dumps(items_context, default=str)}',
+                related_id=payment_id)
             if "record_id" in items_context:
                 record_id_to_update = items_context["record_id"]
                 table_id_to_update = ""
@@ -1173,7 +1177,9 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                             elif item_type == "lote":
                                 fields_to_update_origin[mes_key] = 0
                             elif item_type == "vehiculo":
-                                # Para patente aseguramos que actulice la columna del mes (en Capitalize) a 0
+                                # Los campos de Patente en Airtable están en minúscula (ej: enero, febrero...)
+                                # Intentamos ambas formas: primero en minúscula, luego capitalizado como fallback
+                                fields_to_update_origin[mes_key] = 0
                                 fields_to_update_origin[mesCapitalized] = 0
 
                             desc = f"Cuota {mes_key.capitalize()}"
