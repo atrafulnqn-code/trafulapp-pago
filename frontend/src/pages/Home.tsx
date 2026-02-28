@@ -11,23 +11,23 @@ const Home: React.FC = () => {
       id: PaymentSystem.TASAS,
       title: 'Tasas Retributivas',
       description: 'Pague sus impuestos retributivos y el agua de forma rápida y segura.',
-      variant: 'primary',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-primary" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" /></svg> // Home icon
+      variant: 'success',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-success" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" /></svg> // Home icon
     },
     // NUEVA TARJETA DE AGUA
     {
       id: PaymentSystem.AGUA,
       title: 'Agua',
       description: 'Pague sus servicios de agua de forma rápida y segura.',
-      variant: 'primary',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-primary" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z" /></svg> // Water droplet icon
+      variant: 'info',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-info" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z" /></svg> // Water droplet icon
     },
     {
       id: PaymentSystem.OTRAS,
       title: 'Plan de Pago',
       description: 'Pague sus cuotas correspondiente al plan de pago solicitado previamente',
-      variant: 'primary',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-journal-check text-primary" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" /><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" /><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z" /></svg> // Journal icon
+      variant: 'warning',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-journal-check text-warning" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" /><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" /><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z" /></svg> // Journal icon
     },
     {
       id: PaymentSystem.PATENTE,
@@ -46,9 +46,23 @@ const Home: React.FC = () => {
     }
   ];
 
+  // Map to soft transparent background colors
+  const softColors: Record<string, string> = {
+    'success': 'rgba(25, 135, 84, 0.1)', // Light soft green
+    'info': 'rgba(13, 202, 240, 0.1)',   // Light softer blue
+    'warning': 'rgba(255, 193, 7, 0.1)', // Light soft yellow
+    'primary': 'rgba(13, 110, 253, 0.1)'  // Light primary blue
+  };
+  const textColors: Record<string, string> = {
+    'success': '#198754',
+    'info': '#0dcaf0',
+    'warning': '#d39e00',
+    'primary': '#0d6efd'
+  };
+
   // Hero Section Corporativo
   const Hero: React.FC = () => (
-    <div className="text-center py-5 mb-5 position-relative overflow-hidden" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', background: 'var(--geist-background)', borderBottom: '1px solid var(--accents-2)' }}>
+    <div className="text-center py-5 mb-5 position-relative overflow-hidden shadow-sm" style={{ minHeight: '500px', display: 'flex', alignItems: 'center', background: '#0f4c81' }}>
       {/* Imagen de fondo sutil */}
       <div style={{
         position: 'absolute',
@@ -56,24 +70,24 @@ const Home: React.FC = () => {
         backgroundImage: 'url(https://images.unsplash.com/photo-1544084944-15269ec7b5a0?q=80&w=2070&auto=format&fit=crop)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        opacity: 0.05, /* Apenas visible para Vercel look */
-        mixBlendMode: 'luminosity',
+        opacity: 0.4,
+        mixBlendMode: 'overlay',
         zIndex: 0,
       }}></div>
 
       <Container style={{ zIndex: 1, position: 'relative' }}>
-        <div className="py-2">
-          <h1 className="display-4 fw-bold mb-3" style={{ color: 'var(--geist-foreground)' }}>
+        <div className="py-4">
+          <h1 className="display-3 fw-bold mb-3 text-white" style={{ letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
             Gestión Tributaria Digital
           </h1>
-          <p className="fs-5 col-md-8 mx-auto mb-5 fw-normal" style={{ color: 'var(--accents-5)' }}>
+          <p className="fs-5 text-white col-md-8 mx-auto mb-5 opacity-90 fw-light">
             Plataforma oficial de la Comuna de Villa Traful. Realice sus pagos y trámites de forma ágil, segura y transparente.
           </p>
           <div className="d-flex justify-content-center gap-3">
-            <Button variant="primary" size="lg" className="px-5 fw-bold" onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>
+            <Button variant="light" size="lg" className="rounded-pill px-5 fw-bold shadow-lg" style={{ color: 'var(--primary-color)' }} onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>
               Comenzar Trámite
             </Button>
-            <Button variant="outline-secondary" size="lg" className="px-4 fw-bold" onClick={() => window.open('https://wa.me/5492944556151', '_blank')}>
+            <Button variant="outline-light" size="lg" className="rounded-pill px-4 fw-bold" onClick={() => window.open('https://wa.me/5492944556151', '_blank')}>
               Contacto Directo
             </Button>
           </div>
@@ -93,9 +107,11 @@ const Home: React.FC = () => {
             <Col key={service.id}>
               <div className={`glass-card p-2 h-100 d-flex flex-column border-0 ${service.disabled ? 'opacity-50' : ''}`}>
                 <div className="p-4 flex-grow-1 text-center">
-                  <div className="mb-4 d-inline-block text-primary" style={{ width: '48px', height: '48px' }}>
-                    {/* The icon now naturally sits above the text without a heavy background circle */}
-                    {service.icon}
+                  <div className={`mb-4 p-3 rounded-circle d-inline-block shadow-sm`} style={{ width: '64px', height: '64px', backgroundColor: softColors[service.variant] || softColors.primary, color: textColors[service.variant] || textColors.primary }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      {/* The icon now naturally sits in a soft background circle matching its variant color */}
+                      {service.icon}
+                    </div>
                   </div>
                   {/* Adjusted font size for title and description */}
                   <h3 className="fw-semibold h6 mb-3 text-dark letter-spacing-1">{service.title}</h3>
@@ -103,9 +119,15 @@ const Home: React.FC = () => {
                 </div>
                 <div className="p-4 pt-0">
                   <Button
-                    variant="outline-primary"
-                    className="w-100 py-2 fw-medium"
-                    style={{ borderRadius: '6px' }}
+                    variant="light"
+                    className="w-100 py-2 fw-bold"
+                    style={{
+                      borderRadius: '8px',
+                      backgroundColor: softColors[service.variant] || softColors.primary,
+                      color: textColors[service.variant] || textColors.primary,
+                      border: 'none',
+                      boxShadow: 'none'
+                    }}
                     onClick={() => {
                       if (service.disabled) return;
                       if (service.externalUrl) {
@@ -117,6 +139,14 @@ const Home: React.FC = () => {
                       }
                     }}
                     disabled={service.disabled}
+                    onMouseOver={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = textColors[service.variant] || textColors.primary;
+                      (e.currentTarget as HTMLButtonElement).style.color = '#ffffff';
+                    }}
+                    onMouseOut={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = softColors[service.variant] || softColors.primary;
+                      (e.currentTarget as HTMLButtonElement).style.color = textColors[service.variant] || textColors.primary;
+                    }}
                   >
                     {service.disabled ? 'Próximamente' : service.id === PaymentSystem.OTRAS ? 'Solicitar' : 'Acceder'}
                   </Button>
