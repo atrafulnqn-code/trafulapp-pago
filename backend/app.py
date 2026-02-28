@@ -1200,10 +1200,10 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                             elif item_type == "lote":
                                 fields_to_update_origin[mes_key] = 0
                             elif item_type == "vehiculo":
-                                # Los campos de Patente en Airtable están en minúscula (ej: enero, febrero...)
-                                # Intentamos ambas formas: primero en minúscula, luego capitalizado como fallback
-                                fields_to_update_origin[mes_key] = 0
-                                fields_to_update_origin[mesCapitalized] = 0
+                                # En la tabla Patente de Airtable los meses son texto en
+                                # minúscula exactamente: "enero", "febrero", etc.
+                                # El valor debe ser "0" (string) porque la columna es de tipo Text
+                                fields_to_update_origin[mes_key] = "0"
 
                             desc = f"Cuota {mes_key.capitalize()}"
                             if item_type == "agua":
