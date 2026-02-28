@@ -29,8 +29,8 @@ const formatCurrency = (amount: number) => {
 };
 
 function validateEmail(email: string) {
-  const re = /\S+@\S+\.\S+/;
-  return re.test(String(email).toLowerCase());
+    const re = /\S+@\S+\.\S+/;
+    return re.test(String(email).toLowerCase());
 }
 
 const transformData = (record: any, system: PaymentSystem, searchTerm: string): SearchResult | null => {
@@ -41,7 +41,7 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
     const debts: Debt[] = [];
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     let originalRecordId = record.id;
-    
+
     console.log("DEBUG_TRANSFORM: Iniciando transformData para sistema:", system); // Debugging
     console.log("DEBUG_TRANSFORM: Record completo:", record); // Debugging
     console.log("DEBUG_TRANSFORM: Campos (fields):", fields); // Debugging
@@ -50,7 +50,7 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
         taxpayerName = fields.titular || fields.contribuyente || 'N/A';
         referenceNumber = fields.patente || fields.lote || searchTerm;
         const deudaField = system === PaymentSystem.PATENTE ? 'Deuda patente' : 'deuda';
-        
+
         // Handle monthly water/commercial debts
         if (system === PaymentSystem.AGUA) {
             console.log("DEBUG_TRANSFORM: Procesando sistema AGUA"); // Debugging
@@ -59,9 +59,9 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
                 const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
                 const aguaField = `${mesCapitalized} agua`;
                 const comercialField = `${mesCapitalized} Comercial`;
-                
+
                 console.log(`DEBUG_TRANSFORM: Buscando campos: '${aguaField}' y '${comercialField}'`); // Debugging
-                
+
                 const valorAgua = fields[aguaField];
                 const valorComercial = fields[comercialField];
 
@@ -96,12 +96,12 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
                 console.log(`DEBUG_TRANSFORM: Añadida deuda acumulada (Patente): ${fields[deudaField]}`); // Debugging
             }
             meses.forEach(mes => { // Para Patente, los meses también deberían ser capitalizados si Airtable los tiene así
-                 const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
-                 if (fields[mesCapitalized] && parseFloat(fields[mesCapitalized]) > 0) {
-                     debts.push({ id: `${mesCapitalized}-${originalRecordId}`, period: mesCapitalized, description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mesCapitalized]), surcharge: 0 });
-                     console.log(`DEBUG_TRANSFORM: Añadida cuota mensual (Patente) para ${mesCapitalized}: ${fields[mesCapitalized]}`); // Debugging
-                 }
-             });
+                const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
+                if (fields[mesCapitalized] && parseFloat(fields[mesCapitalized]) > 0) {
+                    debts.push({ id: `${mesCapitalized}-${originalRecordId}`, period: mesCapitalized, description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mesCapitalized]), surcharge: 0 });
+                    console.log(`DEBUG_TRANSFORM: Añadida cuota mensual (Patente) para ${mesCapitalized}: ${fields[mesCapitalized]}`); // Debugging
+                }
+            });
         }
     } else if (system === PaymentSystem.OTRAS) {
         console.log("DEBUG_TRANSFORM: Procesando sistema OTRAS"); // Debugging
@@ -117,9 +117,9 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
 };
 
 const steps = [
-  { id: 1, name: 'Identificación' },
-  { id: 2, name: 'Deuda' },
-  { id: 3, name: 'Confirmar y Pagar' }
+    { id: 1, name: 'Identificación' },
+    { id: 2, name: 'Deuda' },
+    { id: 3, name: 'Confirmar y Pagar' }
 ];
 
 const PaymentFlow: React.FC = () => {
@@ -136,14 +136,14 @@ const PaymentFlow: React.FC = () => {
     const [multipleResults, setMultipleResults] = useState<any[] | null>(null);
     const [suggestions, setSuggestions] = useState<any[]>([]); // New state for suggestions
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false); // New state to control suggestion visibility
-    
+
     // NUEVO ESTADO: Controla si se muestran todos los meses o solo los adeudados/actuales
     const [showAllMonths, setShowAllMonths] = useState(false);
 
     const systemConfig = useMemo(() => {
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
         switch (systemKey) {
-            case PaymentSystem.PATENTE: return { name: 'Patente Automotor', endpoint: 'search/patente', searchParam: 'dni', inputLabel: 'DNI del Titular', inputPlaceholder: 'Ingrese su DNI sin puntos' };
+            case PaymentSystem.PATENTE: return { name: 'Patente Automotor', endpoint: 'search/patente', searchParam: 'dominio', inputLabel: 'Dominio del Vehículo', inputPlaceholder: 'Ingrese su Dominio (ej: AA123BB)' };
             // MODIFIED: Changed searchParam to 'query' and updated labels for TASAS
             case PaymentSystem.TASAS: return { name: 'Tasas Retributivas', endpoint: 'search/contributivo', searchParam: 'query', inputLabel: 'DNI o Nombre del Contribuyente', inputPlaceholder: 'Ingrese DNI (sin puntos) o nombre completo' };
             case PaymentSystem.AGUA: return { name: 'Agua', endpoint: 'search/agua', searchParam: 'query', inputLabel: 'DNI o Nombre del Contribuyente', inputPlaceholder: 'Ingrese DNI (sin puntos) o nombre completo' }; // NUEVO
@@ -173,7 +173,7 @@ const PaymentFlow: React.FC = () => {
 
             if (data.length === 0) {
                 setError('No se encontraron deudas para los datos ingresados. Verifique la información e intente nuevamente.');
-            } else if (data.length === 1 || systemKey === PaymentSystem.OTRAS ) { // Direct to debt selection if one result or for 'otras'
+            } else if (data.length === 1 || systemKey === PaymentSystem.OTRAS) { // Direct to debt selection if one result or for 'otras'
                 const transformed = transformData(data[0], systemKey, inputValue);
                 if (!transformed || transformed.debts.length === 0) {
                     // console.log("DEBUG: transformData devolvió sin deudas o nulo."); // Debugging
@@ -185,7 +185,7 @@ const PaymentFlow: React.FC = () => {
                         setSelectedDebts(transformed.debts.map(d => d.id));
                     }
                     // Reiniciar showAllMonths al cargar un nuevo resultado
-                    setShowAllMonths(false); 
+                    setShowAllMonths(false);
                     setCurrentStep(2);
                 }
             } else { // Multiple results for patente, tasas or agua
@@ -195,11 +195,11 @@ const PaymentFlow: React.FC = () => {
                 setShowAllMonths(false);
                 setCurrentStep(1.5); // Intermediate step for selection
             }
-        } catch (err: any) { 
+        } catch (err: any) {
             console.error("DEBUG: Error en handleSearch:", err); // Debugging
-            setError(err.message); 
-        } finally { 
-            setLoading(false); 
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -207,14 +207,14 @@ const PaymentFlow: React.FC = () => {
         if (system?.toUpperCase().replace('-', '_') as PaymentSystem === PaymentSystem.OTRAS) return;
         setSelectedDebts(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
-    
+
     // Meses para filtrar y mostrar
     const meses = useMemo(() => ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'], []);
     const currentMonthIndex = useMemo(() => new Date().getMonth(), []); // 0 for Jan, 1 for Feb...
 
     const filteredDebtsByMonth = useMemo(() => {
         if (!result) return [];
-        
+
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
 
         if (systemKey === PaymentSystem.OTRAS) { // "Plan de Pago" siempre muestra todo
@@ -225,7 +225,7 @@ const PaymentFlow: React.FC = () => {
         if (showAllMonths) {
             return result.debts;
         }
-        
+
         // Lógica corregida: Mostrar si es el mes actual O (es un mes pasado Y tiene deuda)
         return result.debts.filter(debt => {
             // "Deuda Acumulada" o "Deuda General" siempre se muestran
@@ -237,8 +237,8 @@ const PaymentFlow: React.FC = () => {
             if (mesIndex === -1) return false; // No es un mes válido, ocultarlo
 
             // Mostrar si es el mes actual O (es un mes pasado Y tiene un monto > 0)
-            return (mesIndex === currentMonthIndex) || 
-                   (mesIndex < currentMonthIndex && debt.amount > 0);
+            return (mesIndex === currentMonthIndex) ||
+                (mesIndex < currentMonthIndex && debt.amount > 0);
         });
     }, [result, showAllMonths, currentMonthIndex, meses, system]);
 
@@ -246,10 +246,10 @@ const PaymentFlow: React.FC = () => {
     const toggleAllDebts = () => {
         if (!result) return;
         // Usar filteredDebtsByMonth en lugar de result.debts directamente para la selección masiva
-        if (selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0) { 
-            setSelectedDebts([]); 
-        } else { 
-            setSelectedDebts(filteredDebtsByMonth.map(d => d.id) || []); 
+        if (selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0) {
+            setSelectedDebts([]);
+        } else {
+            setSelectedDebts(filteredDebtsByMonth.map(d => d.id) || []);
         }
     };
 
@@ -275,132 +275,132 @@ const PaymentFlow: React.FC = () => {
         };
     };
 
-        const handleNewWalletPayment = async () => {
-            if (!isEmailValid) {
-                setError("Por favor, ingrese un email válido para continuar.");
-                return;
+    const handleNewWalletPayment = async () => {
+        if (!isEmailValid) {
+            setError("Por favor, ingrese un email válido para continuar.");
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const itemsToPay = getItemsToPay();
+            const response = await fetch(`${API_BASE_URL}/create_pagotic_payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Falló la creación del pago con la nueva billetera.');
             }
-            setLoading(true);
-            setError(null);
-            try {
-                const itemsToPay = getItemsToPay();
-                const response = await fetch(`${API_BASE_URL}/create_pagotic_payment`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount })
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'Falló la creación del pago con la nueva billetera.');
-                }
+            if (data.init_point) {
+                window.location.href = data.init_point;
+            } else {
+                throw new Error("No se recibió una URL de inicio de pago.");
+            }
+        } catch (err: any) {
+            setError(`Error al procesar el pago: ${err.message}`);
+            setCurrentStep(3);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleFinalPayment = async () => {
+
+        if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
+
+        setLoading(true);
+
+        setError(null);
+
+        try {
+
+            const itemsToPay = getItemsToPay();
+
+            const endpoint = '/create_preference'; // Solo Mercado Pago
+
+
+
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+
+                method: 'POST',
+
+                headers: { 'Content-Type': 'application/json' }, // Corrected: application/json
+
+                body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount })
+
+            });
+
+
+
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || 'Falló la creación del pago.');
+
+
+
+            if (data.preference_id) {
+
+                // Priorizar Producción (init_point) sobre Sandbox
+
                 if (data.init_point) {
+
                     window.location.href = data.init_point;
+
+                } else if (data.sandbox_init_point) {
+
+                    window.location.href = data.sandbox_init_point;
+
                 } else {
-                    throw new Error("No se recibió una URL de inicio de pago.");
+
+                    throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
+
                 }
-            } catch (err: any) {
-                setError(`Error al procesar el pago: ${err.message}`);
-                setCurrentStep(3);
-            } finally {
-                setLoading(false);
-            }
-        };
 
-        const handleFinalPayment = async () => {
+            } else { throw new Error("No se recibió un ID de preferencia de pago.") }
 
-            if (!isEmailValid) { setError("Por favor, ingrese un email válido para continuar."); return; }
 
-            setLoading(true);
 
-            setError(null);
+        } catch (err: any) { setError(`Error al procesar el pago: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
 
-            try {
+    };
 
-                const itemsToPay = getItemsToPay();
 
-                const endpoint = '/create_preference'; // Solo Mercado Pago
-
-                
-
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, { 
-
-                    method: 'POST', 
-
-                    headers: { 'Content-Type': 'application/json' }, // Corrected: application/json
-
-                    body: JSON.stringify({ items_to_pay: itemsToPay, title: `Pago de ${systemConfig?.name}`, unit_price: totalAmount }) 
-
-                });
-
-                
-
-                const data = await response.json();
-
-                if (!response.ok) throw new Error(data.error || 'Falló la creación del pago.');
-
-                
-
-                if (data.preference_id) { 
-
-                    // Priorizar Producción (init_point) sobre Sandbox
-
-                    if (data.init_point) {
-
-                        window.location.href = data.init_point;
-
-                    } else if (data.sandbox_init_point) {
-
-                        window.location.href = data.sandbox_init_point;
-
-                    } else {
-
-                        throw new Error("No se recibió una URL de inicio de pago de Mercado Pago.");
-
-                    }
-
-                } else { throw new Error("No se recibió un ID de preferencia de pago.") }
-
-    
-
-            } catch (err: any) { setError(`Error al procesar el pago: ${err.message}`); setCurrentStep(3); } finally { setLoading(false); }
-
-        };
-
-        
-        const renderStepContent = () => {
+    const renderStepContent = () => {
         const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
 
         return (
             <>
                 {currentStep === 1 && ( // Identification
                     <div className="text-center">
-                      <h3 className="mb-3 fw-bold">Comencemos</h3>
-                      {/* Adjusted font size for the instruction text */}
-                      <p className="text-muted mb-4" style={{fontSize: '0.9rem'}}>Por favor, ingrese su {systemConfig?.inputLabel?.toLowerCase()} para encontrar sus deudas.</p>
-                      <Form onSubmit={handleSearch} className="mx-auto" style={{ maxWidth: '400px' }}>
-                        <Form.Group className="mb-3" controlId="searchInput">
-                          <Form.Control 
-                            type="text" 
-                            value={inputValue} 
-                            onChange={(e) => { 
-                                setInputValue(e.target.value); 
-                                setShowSuggestions(true); // Always show suggestions when typing
-                            }} 
-                            placeholder={systemConfig?.inputPlaceholder} 
-                            // Removed size="lg" to allow placeholder text to fit better
-                            required 
-                            list={systemConfig?.searchParam === 'nombre' ? "suggestions-list" : undefined}
-                          />
-                          {systemConfig?.searchParam === 'nombre' && showSuggestions && suggestions.length > 0 && (
-                            <datalist id="suggestions-list">
-                              {suggestions.map((s) => (
-                                <option key={s.id} value={s.nombre_completo} />
-                              ))}
-                            </datalist>
-                          )}
-                        </Form.Group>
-                        <Button type="submit" /* Changed text here */ disabled={!inputValue || loading} className="w-100">Buscar</Button>
-                      </Form>
+                        <h3 className="mb-3 fw-bold">Comencemos</h3>
+                        {/* Adjusted font size for the instruction text */}
+                        <p className="text-muted mb-4" style={{ fontSize: '0.9rem' }}>Por favor, ingrese su {systemConfig?.inputLabel?.toLowerCase()} para encontrar sus deudas.</p>
+                        <Form onSubmit={handleSearch} className="mx-auto" style={{ maxWidth: '400px' }}>
+                            <Form.Group className="mb-3" controlId="searchInput">
+                                <Form.Control
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => {
+                                        setInputValue(e.target.value);
+                                        setShowSuggestions(true); // Always show suggestions when typing
+                                    }}
+                                    placeholder={systemConfig?.inputPlaceholder}
+                                    // Removed size="lg" to allow placeholder text to fit better
+                                    required
+                                    list={systemConfig?.searchParam === 'nombre' ? "suggestions-list" : undefined}
+                                />
+                                {systemConfig?.searchParam === 'nombre' && showSuggestions && suggestions.length > 0 && (
+                                    <datalist id="suggestions-list">
+                                        {suggestions.map((s) => (
+                                            <option key={s.id} value={s.nombre_completo} />
+                                        ))}
+                                    </datalist>
+                                )}
+                            </Form.Group>
+                            <Button type="submit" /* Changed text here */ disabled={!inputValue || loading} className="w-100">Buscar</Button>
+                        </Form>
                     </div>
                 )}
 
@@ -422,57 +422,57 @@ const PaymentFlow: React.FC = () => {
 
                         return (
                             <>
-                              <h3 className="fw-bold mb-3 text-center">{title}</h3>
-                              <p className="text-muted mb-4 text-center">{instruction}</p>
-                              <ListGroup className="mb-4">
-                                  {multipleResults.map((record, index) => (
-                                      <ListGroup.Item 
-                                        key={record.id} 
-                                        action 
-                                        onClick={() => {
-                                            const transformed = transformData(record, systemKey, inputValue);
-                                            if (!transformed || transformed.debts.length === 0) {
-                                                setError('No se encontraron deudas para la selección. Intente con otra.');
-                                                setMultipleResults(null); // Clear selection
-                                                setCurrentStep(1); // Go back to search
-                                            } else {
-                                                setResult(transformed);
-                                                // Seleccionar automáticamente deudas filtradas por mes
-                                                const defaultSelectedDebts = transformed.debts.filter(debt => {
-                                                    if (debt.period.includes('Deuda Acumulada') || debt.period.includes('General')) return true;
-                                                    const debtMonthName = debt.period.split(' ')[0].toLowerCase();
-                                                    const mesIndex = meses.indexOf(debtMonthName);
-                                                    return (mesIndex === currentMonthIndex) || (mesIndex < currentMonthIndex && debt.amount > 0);
-                                                }).map(d => d.id);
-                                                setSelectedDebts(defaultSelectedDebts);
-                                                setShowAllMonths(false); // Reiniciar estado
-                                                setCurrentStep(2);
-                                            }
-                                        }}
-                                        className="d-flex justify-content-between align-items-center"
-                                      >
-                                        <div>
-                                            <h5 className="mb-1">
-                                                {isPatente ? 
-                                                    (record.fields.patente || 'Patente Desconocida') :
-                                                    (isAgua ? `Conexión: ${record.fields.lote || 'Desconocida'}` : 
-                                                    (record.fields.lote ? `Lote: ${record.fields.lote}` : 'Lote Desconocido'))
+                                <h3 className="fw-bold mb-3 text-center">{title}</h3>
+                                <p className="text-muted mb-4 text-center">{instruction}</p>
+                                <ListGroup className="mb-4">
+                                    {multipleResults.map((record, index) => (
+                                        <ListGroup.Item
+                                            key={record.id}
+                                            action
+                                            onClick={() => {
+                                                const transformed = transformData(record, systemKey, inputValue);
+                                                if (!transformed || transformed.debts.length === 0) {
+                                                    setError('No se encontraron deudas para la selección. Intente con otra.');
+                                                    setMultipleResults(null); // Clear selection
+                                                    setCurrentStep(1); // Go back to search
+                                                } else {
+                                                    setResult(transformed);
+                                                    // Seleccionar automáticamente deudas filtradas por mes
+                                                    const defaultSelectedDebts = transformed.debts.filter(debt => {
+                                                        if (debt.period.includes('Deuda Acumulada') || debt.period.includes('General')) return true;
+                                                        const debtMonthName = debt.period.split(' ')[0].toLowerCase();
+                                                        const mesIndex = meses.indexOf(debtMonthName);
+                                                        return (mesIndex === currentMonthIndex) || (mesIndex < currentMonthIndex && debt.amount > 0);
+                                                    }).map(d => d.id);
+                                                    setSelectedDebts(defaultSelectedDebts);
+                                                    setShowAllMonths(false); // Reiniciar estado
+                                                    setCurrentStep(2);
                                                 }
-                                            </h5>
-                                            <small className="text-muted">
-                                                {isPatente ? 
-                                                    `Titular: ${record.fields.titular || record.fields.contribuyente || 'Desconocido'}` :
-                                                    `Contribuyente: ${record.fields.contribuyente || 'Desconocido'}${record.fields.nomenclatura_catastral ? ` - Nomenclatura Catastral: ${record.fields.nomenclatura_catastral}` : ''}`
-                                                }
-                                            </small>
-                                        </div>
-                                        <div className="btn btn-outline-primary btn-sm">Seleccionar</div>
-                                      </ListGroup.Item>
-                                  ))}
-                              </ListGroup>
-                              <div className="text-center">
-                                  <Button variant="outline-secondary" onClick={() => { setMultipleResults(null); setCurrentStep(1); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
-                              </div>
+                                            }}
+                                            className="d-flex justify-content-between align-items-center"
+                                        >
+                                            <div>
+                                                <h5 className="mb-1">
+                                                    {isPatente ?
+                                                        (record.fields.patente || 'Patente Desconocida') :
+                                                        (isAgua ? `Conexión: ${record.fields.lote || 'Desconocida'}` :
+                                                            (record.fields.lote ? `Lote: ${record.fields.lote}` : 'Lote Desconocido'))
+                                                    }
+                                                </h5>
+                                                <small className="text-muted">
+                                                    {isPatente ?
+                                                        `Titular: ${record.fields.titular || record.fields.contribuyente || 'Desconocido'}` :
+                                                        `Contribuyente: ${record.fields.contribuyente || 'Desconocido'}${record.fields.nomenclatura_catastral ? ` - Nomenclatura Catastral: ${record.fields.nomenclatura_catastral}` : ''}`
+                                                    }
+                                                </small>
+                                            </div>
+                                            <div className="btn btn-outline-primary btn-sm">Seleccionar</div>
+                                        </ListGroup.Item>
+                                    ))}
+                                </ListGroup>
+                                <div className="text-center">
+                                    <Button variant="outline-secondary" onClick={() => { setMultipleResults(null); setCurrentStep(1); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
+                                </div>
                             </>
                         );
                     })() // Cierre de la IIFE
@@ -485,54 +485,54 @@ const PaymentFlow: React.FC = () => {
 
                         return (
                             <>
-                              <div className="d-flex justify-content-between align-items-start mb-4">
-                                <div>
-                                  <h3 className="fw-bold mb-1">Deudas Encontradas</h3>
-                                  <p className="mb-0 text-muted">Contribuyente: <span className="fw-semibold text-dark">{result.taxpayerName}</span></p>
-                                  <p className="text-muted">Referencia: <span className="fw-semibold text-dark">{result.referenceNumber}</span></p>
+                                <div className="d-flex justify-content-between align-items-start mb-4">
+                                    <div>
+                                        <h3 className="fw-bold mb-1">Deudas Encontradas</h3>
+                                        <p className="mb-0 text-muted">Contribuyente: <span className="fw-semibold text-dark">{result.taxpayerName}</span></p>
+                                        <p className="text-muted">Referencia: <span className="fw-semibold text-dark">{result.referenceNumber}</span></p>
+                                    </div>
+                                    <Button variant="outline-secondary" size="sm" onClick={() => { setCurrentStep(1); setResult(null); setError(null); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
                                 </div>
-                                <Button variant="outline-secondary" size="sm" onClick={() => { setCurrentStep(1); setResult(null); setError(null); setShowAllMonths(false); }}>&larr; Volver a buscar</Button>
-                              </div>
 
-                              {/* Botones para mostrar/ocultar meses y seleccionar todo */}
-                              {systemKeyForDebts !== PaymentSystem.OTRAS && ( // No mostrar para Plan de Pago
-                                <div className="d-flex justify-content-end mb-3 gap-2">
-                                    <Button variant="outline-primary" size="sm" onClick={() => setShowAllMonths(!showAllMonths)}>
-                                        {showAllMonths ? 'Ocultar meses futuros' : 'Mostrar todo el año'}
-                                    </Button>
-                                    <Button variant="outline-success" size="sm" onClick={toggleAllDebts}>
-                                        {selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0 ? 'Deseleccionar todo' : 'Seleccionar todo'}
-                                    </Button>
-                                </div>
-                              )}
+                                {/* Botones para mostrar/ocultar meses y seleccionar todo */}
+                                {systemKeyForDebts !== PaymentSystem.OTRAS && ( // No mostrar para Plan de Pago
+                                    <div className="d-flex justify-content-end mb-3 gap-2">
+                                        <Button variant="outline-primary" size="sm" onClick={() => setShowAllMonths(!showAllMonths)}>
+                                            {showAllMonths ? 'Ocultar meses futuros' : 'Mostrar todo el año'}
+                                        </Button>
+                                        <Button variant="outline-success" size="sm" onClick={toggleAllDebts}>
+                                            {selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0 ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                                        </Button>
+                                    </div>
+                                )}
 
-                              <Table striped bordered hover responsive>
-                                <thead>
-                                  <tr>
-                                    <th><Form.Check type="checkbox" checked={selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0} onChange={toggleAllDebts} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></th>
-                                    <th>Período</th>
-                                    <th>Concepto</th>
-                                    <th className="text-end">Monto</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {filteredDebtsByMonth.map((debt) => ( // Usar deudas filtradas aquí
-                                    <tr key={debt.id}>
-                                      <td><Form.Check type="checkbox" checked={selectedDebts.includes(debt.id)} onChange={() => toggleDebt(debt.id)} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></td>
-                                      <td>{debt.period}</td>
-                                      <td>{debt.description}</td>
-                                      <td className="text-end fw-semibold">{formatCurrency(debt.amount)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </Table>
-                              <div className="mt-4 d-flex justify-content-end align-items-center">
-                                <div className="text-end me-4">
-                                  <p className="text-muted mb-0">Total a Pagar</p>
-                                  <p className="h2 fw-bold">{formatCurrency(totalAmount)}</p>
+                                <Table striped bordered hover responsive>
+                                    <thead>
+                                        <tr>
+                                            <th><Form.Check type="checkbox" checked={selectedDebts.length === filteredDebtsByMonth.length && filteredDebtsByMonth.length > 0} onChange={toggleAllDebts} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></th>
+                                            <th>Período</th>
+                                            <th>Concepto</th>
+                                            <th className="text-end">Monto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredDebtsByMonth.map((debt) => ( // Usar deudas filtradas aquí
+                                            <tr key={debt.id}>
+                                                <td><Form.Check type="checkbox" checked={selectedDebts.includes(debt.id)} onChange={() => toggleDebt(debt.id)} disabled={systemKeyForDebts === PaymentSystem.OTRAS} /></td>
+                                                <td>{debt.period}</td>
+                                                <td>{debt.description}</td>
+                                                <td className="text-end fw-semibold">{formatCurrency(debt.amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </Table>
+                                <div className="mt-4 d-flex justify-content-end align-items-center">
+                                    <div className="text-end me-4">
+                                        <p className="text-muted mb-0">Total a Pagar</p>
+                                        <p className="h2 fw-bold">{formatCurrency(totalAmount)}</p>
+                                    </div>
+                                    <Button size="lg" variant="primary" onClick={() => setCurrentStep(3)} disabled={totalAmount === 0}>Continuar al Pago</Button>
                                 </div>
-                                <Button size="lg" variant="primary" onClick={() => setCurrentStep(3)} disabled={totalAmount === 0}>Continuar al Pago</Button>
-                              </div>
                             </>
                         );
                     })() // Cierre de la IIFE
@@ -546,40 +546,40 @@ const PaymentFlow: React.FC = () => {
                             <Card.Header as="h5">Resumen de Pago</Card.Header>
                             <Card.Body>
                                 {result?.debts.filter(d => selectedDebts.includes(d.id)).map(debt => (
-                                   <div key={debt.id} className="d-flex justify-content-between mb-1"><span className="text-muted">{debt.period}</span><span>{formatCurrency(debt.amount)}</span></div>
+                                    <div key={debt.id} className="d-flex justify-content-between mb-1"><span className="text-muted">{debt.period}</span><span>{formatCurrency(debt.amount)}</span></div>
                                 ))}
-                                <hr/>
+                                <hr />
                                 <div className="d-flex justify-content-between h5 fw-bold"><span>Total</span><span>{formatCurrency(totalAmount)}</span></div>
                             </Card.Body>
                         </Card>
                         <Form>
-                           <Form.Group className="mb-3" controlId="emailInput">
-                             <Form.Label>Email para recibir el comprobante <span className="text-danger fw-bold ms-1" style={{fontSize: '0.8rem'}}>(OBLIGATORIO COMPLETAR CON EMAIL)</span></Form.Label>
-                             <Form.Control type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="ejemplo@email.com" isInvalid={!isEmailValid && email.length > 0} required size="lg"/>
-                             <Form.Control.Feedback type="invalid">Por favor, ingrese un email válido.</Form.Control.Feedback>
-                           </Form.Group>
+                            <Form.Group className="mb-3" controlId="emailInput">
+                                <Form.Label>Email para recibir el comprobante <span className="text-danger fw-bold ms-1" style={{ fontSize: '0.8rem' }}>(OBLIGATORIO COMPLETAR CON EMAIL)</span></Form.Label>
+                                <Form.Control type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="ejemplo@email.com" isInvalid={!isEmailValid && email.length > 0} required size="lg" />
+                                <Form.Control.Feedback type="invalid">Por favor, ingrese un email válido.</Form.Control.Feedback>
+                            </Form.Group>
 
-                           <Button 
-                                    size="lg" 
-                                    onClick={handleNewWalletPayment} 
-                                    disabled={!isEmailValid || loading || totalAmount === 0}
-                                    style={{ backgroundColor: '#5a67d8', borderColor: '#5a67d8', color: 'white', fontWeight: 'bold', padding: '15px' }}
-                                    className="d-flex align-items-center justify-content-center gap-2 shadow-sm"
-                                >
-                                    {loading ? (
-                                        <div className="spinner-border spinner-border-sm text-light" role="status"></div>
-                                    ) : (
-                                        <>
-                                            <span>PAGAR</span>
-                                            {/* Icono genérico de billetera */}
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-wallet2" viewBox="0 0 16 16">
-                                                <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5v-8A1.5 1.5 0 0 1 1.5 3H2V1.78a1.5 1.5 0 0 1 1.864-1.454l8.272 1.379ZM13 13V4.5a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5ZM4 3V2.21a.5.5 0 0 0-.5-.49L2.5 2H4Z"/>
-                                            </svg>
-                                        </>
-                                    )}
-                                </Button>
+                            <Button
+                                size="lg"
+                                onClick={handleNewWalletPayment}
+                                disabled={!isEmailValid || loading || totalAmount === 0}
+                                style={{ backgroundColor: '#5a67d8', borderColor: '#5a67d8', color: 'white', fontWeight: 'bold', padding: '15px' }}
+                                className="d-flex align-items-center justify-content-center gap-2 shadow-sm"
+                            >
+                                {loading ? (
+                                    <div className="spinner-border spinner-border-sm text-light" role="status"></div>
+                                ) : (
+                                    <>
+                                        <span>PAGAR</span>
+                                        {/* Icono genérico de billetera */}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-wallet2" viewBox="0 0 16 16">
+                                            <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5v-8A1.5 1.5 0 0 1 1.5 3H2V1.78a1.5 1.5 0 0 1 1.864-1.454l8.272 1.379ZM13 13V4.5a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5ZM4 3V2.21a.5.5 0 0 0-.5-.49L2.5 2H4Z" />
+                                        </svg>
+                                    </>
+                                )}
+                            </Button>
 
-                           <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100 mt-3">&larr; Volver a seleccionar</Button>
+                            <Button variant="outline-secondary" onClick={() => setCurrentStep(2)} className="w-100 mt-3">&larr; Volver a seleccionar</Button>
                         </Form>
                     </div>
                 )}
@@ -596,7 +596,7 @@ const PaymentFlow: React.FC = () => {
                         <p className="lead text-muted mb-4">"{systemConfig?.name}"</p>
                         <Button variant="outline-primary" size="sm" onClick={() => navigate('/')} className="mb-4">&larr; Volver al Inicio</Button>
                     </div>
-                    
+
                     <Breadcrumb>
                         {steps.map(step => (
                             <Breadcrumb.Item key={step.id} active={currentStep === step.id} onClick={() => currentStep > step.id && setCurrentStep(step.id)} linkProps={{ role: 'button' }}>
@@ -604,7 +604,7 @@ const PaymentFlow: React.FC = () => {
                             </Breadcrumb.Item>
                         ))}
                     </Breadcrumb>
-                    
+
                     <Card className="shadow-lg">
                         <Card.Body className="p-4 p-md-5 position-relative" style={{ minHeight: '400px' }}>
                             {loading && <div className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75" style={{ zIndex: 10 }}><Spinner animation="border" variant="primary" /></div>}

@@ -878,20 +878,23 @@ def search_patente():
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
-    dni = request.args.get('dni')
-    if not dni:
-        return jsonify({"error": "El parámetro 'dni' es requerido."}), 400
+    query = request.args.get('dominio')
+    if not query:
+        # Fallback al parámetro antiguo para que no rompa si alguien entra desde URL guardada o similar
+        query = request.args.get('dni')
+        if not query:
+             return jsonify({"error": "El parámetro 'dominio' es requerido."}), 400
 
     try:
         table = api.table(BASE_ID, PATENTE_TABLE_ID)
-        # Búsqueda por DNI, Patente o Titular
-        lower_dni = dni.lower()
-        formula = OR(
-            SEARCH(lower_dni, LOWER(Field('dni'))),
-            SEARCH(lower_dni, LOWER(Field('patente'))),
-            SEARCH(lower_dni, LOWER(Field('titular')))
-        )
-        records = table.all(formula=str(formula))
+        # Búsqueda por Patente de forma estricta pero ignorando espacios y case
+        # Airtable formula: SUBSTITUTE(LOWER({patente}), " ", "") = 'ar656hp'
+        cleaned_query = query.lower().replace(" ", "")
+        
+        # Para que funcione bien la fórmula y sea más robusto:
+        formula = f'SUBSTITUTE(LOWER({{patente}}), " ", "") = "{cleaned_query}"'
+        
+        records = table.all(formula=formula)
         return jsonify(records)
     except Exception as e:
         log_to_airtable('ERROR', 'API Search',
@@ -1152,6 +1155,9 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                                     f"{mesCapitalized} Comercial"] = 0
                             elif item_type == "lote":
                                 fields_to_update_origin[mes_key] = 0
+                            elif item_type == "vehiculo":
+                                # Para patente aseguramos que actulice la columna del mes (en Capitalize) a 0
+                                fields_to_update_origin[mesCapitalized] = 0
 
                             desc = f"Cuota {mes_key.capitalize()}"
                             if item_type == "agua":
@@ -1159,6 +1165,9 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                                         f"{mes_key.capitalize()}")
                             elif item_type == "lote":
                                 desc = f"Cuota Tasas {mes_key.capitalize()}"
+                            elif item_type == "vehiculo":
+                                desc = f"Cuota Patente {mes_key.capitalize()}"
+                                
                             monto = items_context.get(
                                 'meses_montos', {}).get(mes_key, 0)
                             items_for_pdf.append({
