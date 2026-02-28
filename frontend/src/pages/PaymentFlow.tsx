@@ -142,7 +142,7 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
         }
     }
     console.log("DEBUG_TRANSFORM: Array de deudas final en transformData:", debts); // Debugging
-    return { taxpayerName, referenceNumber, debts, originalRecordId };
+    return { taxpayerName, referenceNumber, debts, originalRecordId } as SearchResult;
 };
 
 const steps = [
