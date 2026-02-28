@@ -91,15 +91,34 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
             });
         } else { // PATENTE logic
             console.log("DEBUG_TRANSFORM: Procesando sistema PATENTE"); // Debugging
-            if (fields[deudaField] && parseFloat(fields[deudaField]) > 0) {
-                debts.push({ id: `deuda-${originalRecordId}`, period: 'Deuda Acumulada', description: `Deuda ${system}`, dueDate: 'N/A', amount: parseFloat(fields[deudaField]), surcharge: 0 });
-                console.log(`DEBUG_TRANSFORM: Añadida deuda acumulada (Patente): ${fields[deudaField]}`); // Debugging
+
+            // Función auxiliar para parsear valores de la moneda
+            const parseCurrency = (val: any): number => {
+                if (val === undefined || val === null) return 0;
+                if (typeof val === 'number') return val;
+                // Si es string removemos el signo $, la coma de los miles y parseamos
+                const stringVal = String(val).replace('$', '').replace(/,/g, '');
+                const num = parseFloat(stringVal);
+                return isNaN(num) ? 0 : num;
+            };
+
+            const parsedDeudaField = parseCurrency(fields[deudaField]);
+
+            if (parsedDeudaField > 0) {
+                debts.push({ id: `deuda-${originalRecordId}`, period: 'Deuda Acumulada', description: `Deuda ${system}`, dueDate: 'N/A', amount: parsedDeudaField, surcharge: 0 });
+                console.log(`DEBUG_TRANSFORM: Añadida deuda acumulada (Patente): ${fields[deudaField]} -> ${parsedDeudaField}`); // Debugging
             }
             meses.forEach(mes => { // Para Patente, los meses también deberían ser capitalizados si Airtable los tiene así
                 const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
-                if (fields[mesCapitalized] && parseFloat(fields[mesCapitalized]) > 0) {
-                    debts.push({ id: `${mesCapitalized}-${originalRecordId}`, period: mesCapitalized, description: 'Cuota Mensual', dueDate: 'N/A', amount: parseFloat(fields[mesCapitalized]), surcharge: 0 });
-                    console.log(`DEBUG_TRANSFORM: Añadida cuota mensual (Patente) para ${mesCapitalized}: ${fields[mesCapitalized]}`); // Debugging
+
+                // Airtable puede devolver las keys en minúscula aunque en la UI de Airtable las veamos capitalizadas. Las comprobamos de ambas formas.
+                const valorMes = fields[mesCapitalized] !== undefined ? fields[mesCapitalized] : fields[mes];
+
+                const parsedValue = parseCurrency(valorMes);
+
+                if (parsedValue > 0) {
+                    debts.push({ id: `${mesCapitalized}-${originalRecordId}`, period: mesCapitalized, description: 'Cuota Mensual', dueDate: 'N/A', amount: parsedValue, surcharge: 0 });
+                    console.log(`DEBUG_TRANSFORM: Añadida cuota mensual (Patente) para ${mesCapitalized}: ${valorMes} -> ${parsedValue}`); // Debugging
                 }
             });
         }
