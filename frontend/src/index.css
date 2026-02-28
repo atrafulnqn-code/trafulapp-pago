@@ -2,76 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+}
+
 :root {
-  --glass-border: rgba(255, 255, 255, 0.2);
-  --glass-bg: rgba(255, 255, 255, 0.1); /* Más sutil */
-  --primary-color: #0f4c81; /* Azul Institucional */
+  /* Vercel-like Palette */
+  --geist-background: #ffffff;
+  --geist-foreground: #000000;
+  --accents-1: #fafafa;
+  --accents-2: #eaeaea;
+  --accents-3: #999999;
+  --accents-4: #888888;
+  --accents-5: #666666;
+  --primary-color: #0070f3;      /* Vercel Blue */
+  --primary-hover: #0056b3;
+  --geist-success: #0070f3;    /* Repurposed green for Vercel Blue consistency */
+  --geist-warning: #f5a623;
+  --geist-error: #ee0000;
+  
+  --shadow-small: 0 4px 14px 0 rgba(0, 0, 0, 0.04);
+  --shadow-medium: 0 6px 20px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 14px 28px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.02);
+  --border-radius: 8px;          /* Sharp & modern */
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif; /* Tipografía más limpia */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f1f5f9; /* Fondo gris claro suave para leer mejor */
-  color: #1e293b; /* Texto gris oscuro, no negro */
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--accents-1);
+  color: var(--accents-5);
   min-height: 100vh;
 }
 
-/* Clases Glassmorphism Corporativo */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--geist-foreground);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Clases Vercel-like Cards */
 .glass-card {
-  background: rgba(255, 255, 255, 0.85); /* Blanco casi sólido */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 2rem !important; /* Bordes muy redondeados */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s ease;
+  background: var(--geist-background);
+  border: 1px solid var(--accents-2);
+  border-radius: var(--border-radius) !important;
+  box-shadow: var(--shadow-small);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 .glass-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(0, 112, 243, 0.3); /* Soft blue border on hover */
 }
 
 .glass-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--geist-background);
+  border-bottom: 1px solid var(--accents-2);
 }
 
-/* Botones Corporativos */
+/* Botones Vercel-like */
 .btn-primary {
   background-color: var(--primary-color) !important;
   border-color: var(--primary-color) !important;
-  box-shadow: 0 2px 4px rgba(15, 76, 129, 0.3);
+  color: white !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
+  box-shadow: 0 4px 14px 0 rgba(0, 112, 243, 0.39) !important;
+  transition: background 0.2s ease, box-shadow 0.2s ease !important;
 }
 
 .btn-primary:hover {
-  background-color: #0c3b66 !important;
-  box-shadow: 0 4px 6px rgba(15, 76, 129, 0.4);
+  background-color: var(--primary-hover) !important;
+  box-shadow: 0 6px 20px rgba(0, 112, 243, 0.23) !important;
 }
 
-/* Ajustes de Bootstrap */
+/* Secondary Buttons */
+.btn-outline-primary, .btn-secondary, .btn-outline-secondary {
+  background-color: var(--geist-background) !important;
+  color: var(--accents-5) !important;
+  border: 1px solid var(--accents-2) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: none !important;
+}
+
+.btn-outline-primary:hover, .btn-secondary:hover, .btn-outline-secondary:hover {
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+  background: transparent !important;
+}
+
+/* Ajustes de Inputs */
 .form-control, .form-select {
-  background-color: #fff !important;
-  border-color: #cbd5e1 !important;
-  color: #334155 !important;
+  background-color: var(--geist-background) !important;
+  border: 1px solid var(--accents-2) !important;
+  color: var(--geist-foreground) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease !important;
 }
 
 .form-control:focus, .form-select:focus {
   border-color: var(--primary-color) !important;
-  box-shadow: 0 0 0 0.25rem rgba(15, 76, 129, 0.15) !important;
+  box-shadow: none !important;
 }
 
+/* Tablas Minimalistas */
 .table {
-  color: #334155 !important;
+  color: var(--accents-5) !important;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table thead th {
-  background-color: #f8fafc !important;
-  color: #475569 !important;
-  border-bottom: 2px solid #e2e8f0 !important;
+  background-color: var(--accents-1) !important;
+  color: var(--accents-4) !important;
+  border-bottom: 1px solid var(--accents-2) !important;
   text-transform: uppercase;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   letter-spacing: 0.05em;
+  font-weight: 600;
+  padding: 12px 16px !important;
+}
+
+.table tbody td {
+  border-bottom: 1px solid var(--accents-2) !important;
+  font-size: 0.875rem;
+  padding: 12px 16px !important;
 }

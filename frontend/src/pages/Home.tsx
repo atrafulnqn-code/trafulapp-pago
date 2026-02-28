@@ -11,23 +11,23 @@ const Home: React.FC = () => {
       id: PaymentSystem.TASAS,
       title: 'Tasas Retributivas',
       description: 'Pague sus impuestos retributivos y el agua de forma rápida y segura.',
-      variant: 'success',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-success" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" /></svg> // Home icon
+      variant: 'primary',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-primary" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" /></svg> // Home icon
     },
     // NUEVA TARJETA DE AGUA
     {
       id: PaymentSystem.AGUA,
       title: 'Agua',
       description: 'Pague sus servicios de agua de forma rápida y segura.',
-      variant: 'info',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-info" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z" /></svg> // Water droplet icon
+      variant: 'primary',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-primary" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z" /></svg> // Water droplet icon
     },
     {
       id: PaymentSystem.OTRAS,
       title: 'Plan de Pago',
       description: 'Pague sus cuotas correspondiente al plan de pago solicitado previamente',
-      variant: 'warning',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-journal-check text-warning" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" /><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" /><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z" /></svg> // Journal icon
+      variant: 'primary',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-journal-check text-primary" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" /><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" /><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z" /></svg> // Journal icon
     },
     {
       id: PaymentSystem.PATENTE,
@@ -48,7 +48,7 @@ const Home: React.FC = () => {
 
   // Hero Section Corporativo
   const Hero: React.FC = () => (
-    <div className="text-center py-5 mb-5 position-relative overflow-hidden shadow-sm" style={{ minHeight: '500px', display: 'flex', alignItems: 'center', background: '#0f4c81' }}>
+    <div className="text-center py-5 mb-5 position-relative overflow-hidden" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', background: 'var(--geist-background)', borderBottom: '1px solid var(--accents-2)' }}>
       {/* Imagen de fondo sutil */}
       <div style={{
         position: 'absolute',
@@ -56,22 +56,25 @@ const Home: React.FC = () => {
         backgroundImage: 'url(https://images.unsplash.com/photo-1544084944-15269ec7b5a0?q=80&w=2070&auto=format&fit=crop)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        opacity: 0.4,
-        mixBlendMode: 'overlay',
+        opacity: 0.05, /* Apenas visible para Vercel look */
+        mixBlendMode: 'luminosity',
         zIndex: 0,
       }}></div>
 
       <Container style={{ zIndex: 1, position: 'relative' }}>
-        <div className="py-4">
-          <h1 className="display-3 fw-bold mb-3 text-white" style={{ letterSpacing: '-0.02em', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+        <div className="py-2">
+          <h1 className="display-4 fw-bold mb-3" style={{ color: 'var(--geist-foreground)' }}>
             Gestión Tributaria Digital
           </h1>
-          <p className="fs-5 text-white col-md-8 mx-auto mb-5 opacity-90 fw-light">
+          <p className="fs-5 col-md-8 mx-auto mb-5 fw-normal" style={{ color: 'var(--accents-5)' }}>
             Plataforma oficial de la Comuna de Villa Traful. Realice sus pagos y trámites de forma ágil, segura y transparente.
           </p>
           <div className="d-flex justify-content-center gap-3">
-            <Button variant="light" size="lg" className="rounded-pill px-5 fw-bold shadow-lg text-primary" onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>
+            <Button variant="primary" size="lg" className="px-5 fw-bold" onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}>
               Comenzar Trámite
+            </Button>
+            <Button variant="outline-secondary" size="lg" className="px-4 fw-bold" onClick={() => window.open('https://wa.me/5492944556151', '_blank')}>
+              Contacto Directo
             </Button>
           </div>
         </div>
@@ -83,24 +86,26 @@ const Home: React.FC = () => {
     <>
       <Hero />
 
-      <Container id="services" className="py-5 my-5" style={{ position: 'relative', zIndex: 10 }}>
+      <Container id="services" className="py-2 my-4" style={{ position: 'relative', zIndex: 10 }}>
         {/* Changed column sizing to ensure all cards fit well */}
         <Row xs={1} sm={2} md={3} lg={5} className="g-4 justify-content-center">
           {services.map((service: any) => (
             <Col key={service.id}>
-              <div className={`glass-card p-2 h-100 d-flex flex-column border-0 ${service.disabled ? 'opacity-75' : ''}`}>
+              <div className={`glass-card p-2 h-100 d-flex flex-column border-0 ${service.disabled ? 'opacity-50' : ''}`}>
                 <div className="p-4 flex-grow-1 text-center">
-                  <div className="mb-4 p-4 rounded-circle d-inline-block bg-light shadow-sm text-primary" style={{ width: '80px', height: '80px' }}>
+                  <div className="mb-4 d-inline-block text-primary" style={{ width: '48px', height: '48px' }}>
+                    {/* The icon now naturally sits above the text without a heavy background circle */}
                     {service.icon}
                   </div>
                   {/* Adjusted font size for title and description */}
-                  <h3 className="fw-bold h6 mb-2 text-dark text-uppercase letter-spacing-1">{service.title}</h3> {/* h6 for smaller title */}
-                  <p className="text-secondary" style={{ fontSize: '0.75rem' }}>{service.description}</p> {/* custom smaller font size */}
+                  <h3 className="fw-semibold h6 mb-3 text-dark letter-spacing-1">{service.title}</h3>
+                  <p className="text-secondary" style={{ fontSize: '0.8125rem', lineHeight: '1.5' }}>{service.description}</p>
                 </div>
                 <div className="p-4 pt-0">
                   <Button
-                    variant={service.variant === 'secondary' ? 'secondary' : 'primary'}
-                    className="w-100 rounded-pill py-3 fw-bold shadow-sm"
+                    variant="outline-primary"
+                    className="w-100 py-2 fw-medium"
+                    style={{ borderRadius: '6px' }}
                     onClick={() => {
                       if (service.disabled) return;
                       if (service.externalUrl) {
@@ -113,7 +118,7 @@ const Home: React.FC = () => {
                     }}
                     disabled={service.disabled}
                   >
-                    {service.disabled ? 'Próximamente' : service.id === PaymentSystem.OTRAS ? 'SOLICITAR' : 'ACCEDER'}
+                    {service.disabled ? 'Próximamente' : service.id === PaymentSystem.OTRAS ? 'Solicitar' : 'Acceder'}
                   </Button>
                 </div>
               </div>
@@ -122,29 +127,29 @@ const Home: React.FC = () => {
         </Row>
       </Container>
 
-      <div className="mt-5 py-5 bg-white border-top">
+      <div className="mt-5 py-5 bg-white border-top border-bottom" style={{ background: 'var(--geist-background)' }}>
         <Container>
           <Row className="text-center g-4">
             <Col md={4}>
               <div className="text-primary mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-shield-check" viewBox="0 0 16 16"><path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.06.294-.118.24-.113.545-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.46 9.99a11.775 11.775 0 0 1-2.517 2.453 7.016 7.016 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.015 7.015 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z" /><path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" className="bi bi-shield-check" viewBox="0 0 16 16"><path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.06.294-.118.24-.113.545-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.46 9.99a11.775 11.775 0 0 1-2.517 2.453 7.016 7.016 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.015 7.015 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z" /><path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z" /></svg>
               </div>
-              <h5 className="fw-bold text-dark">Pago Seguro</h5>
-              <p className="text-muted small">Transacciones protegidas con estándares bancarios.</p>
+              <h5 className="fw-semibold text-dark h6">Pago Seguro</h5>
+              <p className="text-muted small" style={{ color: 'var(--accents-4)' }}>Transacciones protegidas con estándares bancarios.</p>
             </Col>
             <Col md={4}>
               <div className="text-primary mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-lightning-charge" viewBox="0 0 16 16"><path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 7.5H13.5a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H2.5a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" className="bi bi-lightning-charge" viewBox="0 0 16 16"><path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 7.5H13.5a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H2.5a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z" /></svg>
               </div>
-              <h5 className="fw-bold text-dark">Gestión Ágil</h5>
-              <p className="text-muted small">Sus trámites se procesan al instante.</p>
+              <h5 className="fw-semibold text-dark h6">Gestión Ágil</h5>
+              <p className="text-muted small" style={{ color: 'var(--accents-4)' }}>Sus trámites se procesan al instante.</p>
             </Col>
             <Col md={4}>
               <div className="text-primary mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-people" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.677-2.041 1.03-2.927h.002c.361-.885.087-1.792-.096-2.793z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" className="bi bi-people" viewBox="0 0 16 16"><path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.677-2.041 1.03-2.927h.002c.361-.885.087-1.792-.096-2.793z" /></svg>
               </div>
-              <h5 className="fw-bold text-dark">Soporte Local</h5>
-              <p className="text-muted small">Atención personalizada en horario de oficina.</p>
+              <h5 className="fw-semibold text-dark h6">Soporte Local</h5>
+              <p className="text-muted small" style={{ color: 'var(--accents-4)' }}>Atención personalizada en horario de oficina.</p>
             </Col>
           </Row>
         </Container>
