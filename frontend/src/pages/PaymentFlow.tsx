@@ -112,7 +112,17 @@ const transformData = (record: any, system: PaymentSystem, searchTerm: string): 
                 const mesCapitalized = mes.charAt(0).toUpperCase() + mes.slice(1);
 
                 // Airtable puede devolver las keys en minúscula aunque en la UI de Airtable las veamos capitalizadas. Las comprobamos de ambas formas.
-                const valorMes = fields[mesCapitalized] !== undefined ? fields[mesCapitalized] : fields[mes];
+                // Además, buscamos de manera insensible a mayúsculas en todas las keys por si acaso.
+                let valorMes = fields[mesCapitalized] !== undefined ? fields[mesCapitalized] : fields[mes];
+
+                // Si aún es undefined, hacer una búsqueda exhaustiva en todas las keys (por las dudas)
+                if (valorMes === undefined) {
+                    const lowerKeys = Object.keys(fields).reduce((acc: any, key) => {
+                        acc[key.toLowerCase().trim()] = fields[key];
+                        return acc;
+                    }, {});
+                    valorMes = lowerKeys[mes.toLowerCase()];
+                }
 
                 const parsedValue = parseCurrency(valorMes);
 
