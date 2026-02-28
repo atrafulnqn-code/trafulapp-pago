@@ -1088,6 +1088,12 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                         'INFO', 'Pago TIC Process',
                         f'Registro de pago {payment_id} actualizado en PostgreSQL a '
                         f'{new_status}.')
+                else:
+                    log_to_airtable(
+                        'WARNING', 'Pago TIC Process',
+                        f'No se encontró registro en PostgreSQL para payment_id={payment_id}. '
+                        f'Intentando recuperar del metadata del webhook...')
+                    conn.commit()
 
         except Exception as db_error:
             log_to_airtable(
@@ -1096,6 +1102,23 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
             conn.rollback()
         finally:
             conn.close()
+
+    # Si items_context sigue vacío (no había fila en PostgreSQL), usar metadata del webhook
+    if not items_context and wallet_response and isinstance(wallet_response, dict):
+        items_context = wallet_response.get('metadata', {})
+        if 'final_amount' in wallet_response:
+            monto_pagado = float(wallet_response.get('final_amount', 0))
+        elif 'amount' in wallet_response:
+            monto_pagado = float(wallet_response.get('amount', 0))
+        elif 'details' in wallet_response and isinstance(wallet_response['details'], list):
+            try:
+                monto_pagado = float(wallet_response['details'][0].get('amount', 0))
+            except Exception:
+                pass
+        log_to_airtable(
+            'INFO', 'Pago TIC Process',
+            f'items_context recuperado del metadata del webhook para {payment_id}',
+            details={'items_context': items_context, 'monto': monto_pagado})
     else:
         log_to_airtable(
             'WARNING', 'Pago TIC Process',
