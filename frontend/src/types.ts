@@ -19,6 +19,7 @@ export interface SearchResult {
   taxpayerName: string;
   referenceNumber: string;
   debts: Debt[];
+  originalRecordId?: string;
 }
 
 export interface PaymentStep {
