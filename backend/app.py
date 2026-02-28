@@ -145,6 +145,23 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_error_logs_fecha_hora ON error_logs(fecha_hora);
             """)
 
+            # Tabla registros_pago_patentes_automatizados
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS registros_pago_patentes_automatizados (
+                    id SERIAL PRIMARY KEY,
+                    payment_id VARCHAR(255) NOT NULL,
+                    fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    monto NUMERIC(10, 2) NOT NULL,
+                    email VARCHAR(255),
+                    estado VARCHAR(50) NOT NULL,
+                    dominio VARCHAR(50)
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_patentes_automatizados_payment_id ON registros_pago_patentes_automatizados(payment_id);
+                CREATE INDEX IF NOT EXISTS idx_patentes_automatizados_dominio ON registros_pago_patentes_automatizados(dominio);
+            """)
+
             # Tabla contacts - Registro de contactos
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS contacts (
@@ -1327,6 +1344,34 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                 items_pagados=items_context,
                 detalles=wallet_response.get('status_detail') if wallet_response else 'Pago rechazado'
             )
+
+        # 3. Guardar en la tabla específica si se trata de un vehículo/patente
+        if items_context.get('item_type') == 'vehiculo':
+            conn_pat = get_db_connection()
+            if conn_pat:
+                try:
+                    dominio_val = items_context.get('record_id', 'N/A')
+                    # 'record_id' a veces almacena el identificador buscado de patente, si no, intentamos buscarlo de los fields
+                    if len(dominio_val) > 20: # Probablemente sea un ID de airtable y no la patente literal
+                        dominio_val = items_context.get('patente', 'N/A')
+                        
+                    with conn_pat.cursor() as cur_pat:
+                         cur_pat.execute(
+                             """
+                             INSERT INTO registros_pago_patentes_automatizados
+                             (payment_id, monto, email, estado, dominio)
+                             VALUES (%s, %s, %s, %s, %s)
+                             """,
+                             (payment_id, monto_pagado, items_context.get('email'), new_status, dominio_val)
+                         )
+                         conn_pat.commit()
+                         log_to_airtable('INFO', 'Pago TIC Process', f'Registro automático de patente guardado para {dominio_val}')
+                except Exception as pat_err:
+                     log_to_airtable('ERROR', 'Pago TIC Process', f'Error registrando en tabla patentes: {pat_err}')
+                     conn_pat.rollback()
+                finally:
+                     conn_pat.close()
+
 
         return {"status": "ok", "historialRecordId": historial_record_id}
     except Exception as e:
