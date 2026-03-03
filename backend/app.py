@@ -1834,7 +1834,7 @@ def admin_db_payments():
                 # Obtener datos paginados
                 data_query = f"""
                     SELECT id, payment_id, payment_id_external, status, amount,
-                           currency, payer_email, created_at, updated_at
+                           currency, payer_email, items_paid, created_at, updated_at
                     FROM payments
                     {search_query}
                     ORDER BY created_at DESC
@@ -1992,7 +1992,7 @@ def admin_db_payment_history():
                 # Obtener datos paginados
                 data_query = f"""
                     SELECT id, payment_id, comprobante_numero, nombre_apellido, dni,
-                           email, monto, estado, fecha_hora, created_at
+                           email, monto, estado, items_pagados, detalles, fecha_hora, created_at
                     FROM payment_history
                     {search_query}
                     ORDER BY fecha_hora DESC

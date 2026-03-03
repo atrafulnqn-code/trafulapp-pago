@@ -25,6 +25,8 @@ interface PaymentHistory {
   email: string | null;
   monto: number;
   estado: string;
+  items_pagados: any;
+  detalles: string | null;
   fecha_hora: string;
   created_at: string;
 }
@@ -144,7 +146,7 @@ const AdminDBPaymentHistory: React.FC = () => {
       }
 
       // Headers del CSV
-      const headers = ['ID', 'Payment ID', 'Comprobante', 'Nombre', 'DNI', 'Email', 'Monto', 'Estado', 'Fecha'];
+      const headers = ['ID', 'Payment ID', 'Comprobante', 'Nombre', 'DNI', 'Email', 'Monto', 'Estado', 'Detalles', 'Fecha'];
 
       // Filas del CSV
       const rows = data.map(r => [
@@ -156,6 +158,7 @@ const AdminDBPaymentHistory: React.FC = () => {
         r.email || '',
         r.monto,
         r.estado,
+        r.detalles ? r.detalles.replace(/\n/g, ' ') : (r.items_pagados ? (typeof r.items_pagados === 'string' ? r.items_pagados : JSON.stringify(r.items_pagados)) : ''),
         r.fecha_hora
       ]);
 
@@ -259,6 +262,7 @@ const AdminDBPaymentHistory: React.FC = () => {
                   <th>Email</th>
                   <th>Monto</th>
                   <th>Estado</th>
+                  <th>Detalles</th>
                   <th>Fecha</th>
                 </tr>
               </thead>
@@ -285,6 +289,11 @@ const AdminDBPaymentHistory: React.FC = () => {
                         <span className={`badge bg-${getEstadoBadge(record.estado)}`}>
                           {record.estado}
                         </span>
+                      </td>
+                      <td>
+                        <small className="text-muted" style={{ maxWidth: '200px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}>
+                          {record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}
+                        </small>
                       </td>
                       <td><small>{formatDate(record.fecha_hora)}</small></td>
                     </tr>

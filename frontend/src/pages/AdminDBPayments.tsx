@@ -24,6 +24,7 @@ interface Payment {
   amount: number;
   currency: string;
   payer_email: string | null;
+  items_paid: any;
   created_at: string;
   updated_at: string;
 }
@@ -128,7 +129,7 @@ const AdminDBPayments: React.FC = () => {
       }
 
       // Headers del CSV
-      const headers = ['ID', 'Payment ID', 'External ID', 'Status', 'Amount', 'Currency', 'Payer Email', 'Created At'];
+      const headers = ['ID', 'Payment ID', 'External ID', 'Status', 'Amount', 'Currency', 'Payer Email', 'Detalles', 'Created At'];
 
       // Filas del CSV (usando punto y coma para mejor compatibilidad con Excel en español)
       const rows = data.map(p => [
@@ -139,6 +140,7 @@ const AdminDBPayments: React.FC = () => {
         p.amount,
         p.currency,
         p.payer_email || '',
+        p.items_paid ? (typeof p.items_paid === 'string' ? p.items_paid : JSON.stringify(p.items_paid)) : '',
         p.created_at
       ]);
 
@@ -230,6 +232,7 @@ const AdminDBPayments: React.FC = () => {
                   <th>Monto</th>
                   <th>Moneda</th>
                   <th>Email</th>
+                  <th>Detalles</th>
                   <th>Creado</th>
                 </tr>
               </thead>
@@ -254,6 +257,11 @@ const AdminDBPayments: React.FC = () => {
                       <td className="text-end">${payment.amount.toFixed(2)}</td>
                       <td>{payment.currency}</td>
                       <td>{payment.payer_email || '-'}</td>
+                      <td>
+                        <small className="text-muted" style={{ maxWidth: '200px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={payment.items_paid ? (typeof payment.items_paid === 'string' ? payment.items_paid : JSON.stringify(payment.items_paid)) : '-'}>
+                          {payment.items_paid ? (typeof payment.items_paid === 'string' ? payment.items_paid : JSON.stringify(payment.items_paid)) : '-'}
+                        </small>
+                      </td>
                       <td><small>{formatDate(payment.created_at)}</small></td>
                     </tr>
                   ))
