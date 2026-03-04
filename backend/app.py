@@ -734,6 +734,8 @@ def create_receipt_pdf(payment_details, pdf_id=None):
         html_filled = html_filled.replace("{{ITEMS_PAGADOS}}", items_html)
         monto_total = str(payment_details.get("MONTO_TOTAL", 0))
         html_filled = html_filled.replace("{{MONTO_TOTAL}}", monto_total)
+        medio_pago = str(payment_details.get("MEDIO_PAGO", "Efectivo"))
+        html_filled = html_filled.replace("{{MEDIO_PAGO}}", medio_pago)
 
         pdf_file = io.BytesIO()
         html_doc = HTML(string=html_filled)
@@ -2899,12 +2901,13 @@ def patente_efectivo():
         # Generar PDF
         pdf_details = {
             "FECHA_PAGO": datetime.strptime(fecha, '%Y-%m-%d').strftime("%d/%m/%Y"),
-            "ESTADO_PAGO": "Pagado en Efectivo",
             "ID_PAGO_MP": comprobante_id,
             "NOMBRE_PAGADOR": nombre,
-            "IDENTIFICADOR_PAGADOR": f"Patente: {patente}",
+            "IDENTIFICADOR_PAGADOR": email,
+            "ESTADO_PAGO": "Completado (Efectivo/Transferencia)",
+            "MEDIO_PAGO": data.get('transferencia', 'Efectivo'),
             "items": items_for_pdf,
-            "MONTO_TOTAL": total_final
+            "MONTO_TOTAL": f"{total_final:,.2f}"
         }
 
         pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=comprobante_id)

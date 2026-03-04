@@ -266,6 +266,19 @@ const RecaudacionForm: React.FC = () => {
               </Col>
             </Row>
 
+            <Row className="mb-3">
+              <Col md={6}>
+                <Form.Group controlId="transferencia">
+                  <Form.Label>Medio de Pago</Form.Label>
+                  <Form.Select name="transferencia" value={formData.transferencia} onChange={handleChange} required>
+                    <option value="">- Seleccionar -</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia CBU">Transferencia CBU</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+
             <Row className="mb-4">
               <Col md={6}>
                 <Form.Group controlId="administrativa">

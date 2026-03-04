@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,50 +11,61 @@
             margin: 20px;
             color: #333;
         }
+
         .container {
             width: 100%;
             max-width: 800px;
             margin: 0 auto;
             border: 1px solid #eee;
             padding: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
         }
+
         .header {
             text-align: center;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
             margin-bottom: 20px;
         }
+
         .header h1 {
             color: #0056b3;
             margin: 0;
             font-size: 24px;
         }
+
         .details {
             margin-bottom: 20px;
         }
+
         .details p {
             margin: 5px 0;
         }
+
         .items {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
-        .items th, .items td {
+
+        .items th,
+        .items td {
             border: 1px solid #eee;
             padding: 8px;
             text-align: left;
         }
+
         .items th {
             background-color: #f8f8f8;
         }
+
         .total {
             text-align: right;
             font-size: 18px;
             font-weight: bold;
             margin-top: 20px;
         }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -62,6 +74,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -76,7 +89,7 @@
             <p><strong>ID de Operación (Mercado Pago):</strong> {{ID_PAGO_MP}}</p>
             <p><strong>Nombre del Pagador:</strong> {{NOMBRE_PAGADOR}}</p>
             <p><strong>Identificador del Pagador:</strong> {{IDENTIFICADOR_PAGADOR}}</p>
-
+            <p><strong>Medio de Pago:</strong> {{MEDIO_PAGO}}</p>
         </div>
         <table class="items">
             <thead>
@@ -99,4 +112,5 @@
         </div>
     </div>
 </body>
+
 </html>
