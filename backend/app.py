@@ -2825,6 +2825,7 @@ def patente_efectivo():
         # Items para PDF
         items_for_pdf = [{
             "description": f"Patente {patente} - {marca} {modelo} ({anio})",
+            "nota": comentarios,
             "amount": total_final
         }]
 
