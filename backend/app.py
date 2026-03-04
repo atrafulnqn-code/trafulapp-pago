@@ -708,8 +708,12 @@ def create_receipt_pdf(payment_details, pdf_id=None):
             html_template = f.read()
         items_html = ""
         for item in payment_details.get("items", []):
+            item_note = item.get('nota', item.get('note', ''))
+            note_html = f"<td>{item_note}</td>" if item_note else "<td style='color: #999; font-style: italic;'>-</td>"
+            
             items_html += (
                 f"<tr><td>{item.get('description', '')}</td>"
+                f"{note_html}"
                 f"<td style='text-align: right;'>"
                 f"${item.get('amount', 0)}</td></tr>")
         html_filled = html_template.replace("{{PDF_ID}}", pdf_id)
@@ -2599,7 +2603,8 @@ def recaudacion_efectivo():
                 nota = notas.get(concepto_id, '')
 
                 items_for_pdf.append({
-                    "description": f"{concepto_label}{(' - ' + nota) if nota else ''}",
+                    "description": f"{concepto_label}",
+                    "nota": nota,
                     "amount": float(monto)
                 })
 
