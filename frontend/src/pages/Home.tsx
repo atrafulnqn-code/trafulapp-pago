@@ -148,7 +148,7 @@ const Home: React.FC = () => {
                       (e.currentTarget as HTMLButtonElement).style.color = textColors[service.variant] || textColors.primary;
                     }}
                   >
-                    {service.disabled ? 'Próximamente' : service.id === PaymentSystem.OTRAS ? 'Solicitar' : 'Acceder'}
+                    {service.disabled ? 'Próximamente' : service.id === PaymentSystem.OTRAS ? 'Ver Plan' : 'Acceder'}
                   </Button>
                 </div>
               </div>

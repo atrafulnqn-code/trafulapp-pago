@@ -547,6 +547,8 @@ PATENTE_MANUAL_TABLE_ID = os.getenv(
     "PATENTE_MANUAL_TABLE_ID", "tblO0nlUQx3isKkXF")
 PLAN_PAGO_TABLE_ID = os.getenv(
     "PLAN_PAGO_TABLE_ID", "tblMNNvOBuqQiCFqC")
+PLAN_PAGOS_NUEVO_TABLE_ID = os.getenv(
+    "PLAN_PAGOS_NUEVO_TABLE_ID", "plandepagos2")
 CONTACTOS_TABLE_ID = os.getenv(
     "CONTACTOS_TABLE_ID", "tbl1ZcfxyaJtXPdPl")
 ACCESOS_PERSONAL_TABLE_ID = os.getenv(
@@ -925,6 +927,92 @@ def search_patente():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/search/plan_pago', methods=['GET'])
+def search_plan_pago():
+    log_to_airtable('INFO', 'API Search',
+                    'Recibida petición en /api/search/plan_pago')
+    if not api:
+        return jsonify({"error": "Airtable no configurado."}), 500
+
+    nombre_apellido = request.args.get('nombre_apellido', '').strip()
+
+    if not nombre_apellido:
+        return jsonify({"error": "Falta el parámetro nombre_apellido"}), 400
+
+    try:
+        table = api.table(BASE_ID, PLAN_PAGOS_NUEVO_TABLE_ID)
+        # Búsqueda insensible a mayúsculas usando FIND y LOWER
+        formula = f"FIND(LOWER('{nombre_apellido}'), LOWER({{Nombre y apellido}})) > 0"
+        
+        # Filtramos para no traer planes donde todas las cuotas estén pagadas
+        records = table.all(formula=formula)
+
+        if not records:
+            return jsonify({
+                "error": ("No se encontraron planes de pago para el "
+                          "nombre ingresado.")
+            }), 404
+
+        resultados = []
+        for r in records:
+            fields = r['fields']
+            
+            # Extraer cuotas
+            cuotas = []
+            for i in range(1, 13):
+                cuota_key = str(i)
+                monto_str = fields.get(cuota_key)
+                if monto_str is not None:
+                    # En Airtable si está pagado podría venir como string "pagado" o 0
+                    try:
+                        monto = float(monto_str)
+                        if monto > 0:
+                            cuotas.append({
+                                "numero": i,
+                                "monto": monto,
+                                "pagada": False
+                            })
+                        else:
+                             cuotas.append({
+                                "numero": i,
+                                "monto": 0,
+                                "pagada": True,
+                                "estado_texto": "Pagado"
+                            })
+                    except ValueError:
+                        # Si no es un número (ej. dice "Pagado")
+                        cuotas.append({
+                            "numero": i,
+                            "monto": 0,
+                            "pagada": True,
+                            "estado_texto": str(monto_str)
+                        })
+
+            resultados.append({
+                "id": r['id'],
+                "nombre_apellido": fields.get('Nombre y apellido', ''),
+                "plan": fields.get('PLAN', ''),
+                "periodo": fields.get('Periodo', ''),
+                "monto_total_cuota": fields.get('Monto total cuota', 0),
+                "cantidad_cuotas": fields.get('Cantidad de cuotas', 0),
+                "cuotas": cuotas
+            })
+
+        return jsonify({"resultados": resultados}), 200
+
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if hasattr(e, 'response') else 500
+        error_msg = f"Error de comunicación con Airtable: {status_code}"
+        log_to_airtable('ERROR', 'API Search', error_msg, details={'error': str(e)})
+        return jsonify({"error": error_msg}), status_code
+    except Exception as e:
+        import traceback
+        error_msg = f"Error interno del servidor: {str(e)}"
+        log_to_airtable('ERROR', 'API Search', error_msg, details={'traceback': traceback.format_exc()})
+        print(f"ERROR en search_plan_pago: {e}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+
 @app.route('/api/hr/payslip/send', methods=['POST'])
 def send_payslip():
     data = request.json
@@ -1175,6 +1263,18 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                         "description": "Deuda General",
                         "amount": items_context.get('total_amount', 0)
                     })
+                elif item_type == "plan_pago":
+                    table_id_to_update = PLAN_PAGOS_NUEVO_TABLE_ID
+                    # Obtener la cuota que se está pagando del metadata
+                    cuota_a_pagar = items_context.get("cuota_numero")
+                    if cuota_a_pagar:
+                        # Convertir a string para que coincida con el nombre de columna en Airtable ('1', '2', etc)
+                        cuota_key = str(cuota_a_pagar)
+                        fields_to_update_origin[cuota_key] = 0 # O se podría poner "Pagado" si la columna lo permite
+                        items_for_pdf.append({
+                            "description": f"Cuota {cuota_key} - Plan de Pago",
+                            "amount": items_context.get('amount', items_context.get('unit_price', 0))
+                        })
                 else:
                     if item_type == "lote":
                         table_id_to_update = CONTRIBUTIVOS_TABLE_ID
@@ -1500,6 +1600,8 @@ def create_pagotic_payment():
                     table_id = WATER_TABLE_ID
                 elif item_type == 'vehiculo':
                     table_id = PATENTE_TABLE_ID
+                elif item_type == 'plan_pago':
+                    table_id = PLAN_PAGOS_NUEVO_TABLE_ID
 
                 if table_id:
                     # Consultar el registro en Airtable
@@ -1507,10 +1609,16 @@ def create_pagotic_payment():
                     fields = record.get('fields', {})
 
                     # Obtener contribuyente y DNI de Airtable
-                    if 'contribuyente' in fields:
-                        contribuyente_nombre = fields['contribuyente']
-                    if 'dni' in fields:
-                        contribuyente_dni = fields['dni']
+                    if item_type == 'plan_pago':
+                        if 'Nombre y apellido' in fields:
+                            contribuyente_nombre = fields['Nombre y apellido']
+                        # Airtable plandepagos no tiene DNI en la estructura compartida por el usuario
+                        # Se utilizará el DNI genérico o el que venga en el frontend.
+                    else:
+                        if 'contribuyente' in fields:
+                            contribuyente_nombre = fields['contribuyente']
+                        if 'dni' in fields:
+                            contribuyente_dni = fields['dni']
 
                     log_to_airtable(
                         'INFO', 'Pago TIC Create',

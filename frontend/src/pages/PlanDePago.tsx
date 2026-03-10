@@ -1,70 +1,243 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Spinner, Alert, Table } from 'react-bootstrap';
+
+// @ts-ignore
+const getApiBaseUrl = () => {
+    // @ts-ignore
+    const runtimeUrl = window._env_?.VITE_API_BASE_URL;
+    if (runtimeUrl && runtimeUrl !== '__VITE_API_BASE_URL__') {
+        return runtimeUrl;
+    }
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+interface Cuota {
+    numero: number;
+    monto: number;
+    pagada: boolean;
+    estado_texto?: string;
+}
+
+interface PlanPagoData {
+    id: string;
+    nombre_apellido: string;
+    plan: string;
+    periodo: string;
+    monto_total_cuota: number;
+    cantidad_cuotas: number;
+    cuotas: Cuota[];
+}
 
 const PlanDePago: React.FC = () => {
     const navigate = useNavigate();
-    const whatsappNumber = '5492944556151'; // Formato internacional sin espacios ni guiones
+    const [nombreBusqueda, setNombreBusqueda] = useState('');
+    const [loadingBusqueda, setLoadingBusqueda] = useState(false);
+    const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
+    const [resultados, setResultados] = useState<PlanPagoData[]>([]);
 
-    const handleWhatsAppClick = () => {
-        const message = encodeURIComponent('Hola, quiero solicitar un plan de pago.');
-        window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+    const [procesandoPago, setProcesandoPago] = useState<string | null>(null); // Guardar ID de la cuota interactuando
+
+    const buscarPlan = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoadingBusqueda(true);
+        setErrorBusqueda(null);
+        setResultados([]);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/search/plan_pago?nombre_apellido=${encodeURIComponent(nombreBusqueda)}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'No se pudo obtener la información.');
+            }
+
+            setResultados(data.resultados);
+        } catch (err: any) {
+            setErrorBusqueda(err.message);
+        } finally {
+            setLoadingBusqueda(false);
+        }
+    };
+
+    const iniciarPagoCuota = async (plan: PlanPagoData, cuota: Cuota) => {
+        setProcesandoPago(`${plan.id}-${cuota.numero}`);
+        setErrorBusqueda(null);
+
+        try {
+            const payoutData = {
+                title: `Plan ${plan.plan} - Cuota ${cuota.numero}`,
+                unit_price: cuota.monto,
+                items_to_pay: {
+                    item_type: 'plan_pago',
+                    record_id: plan.id,
+                    nombre_contribuyente: plan.nombre_apellido,
+                    cuota_numero: cuota.numero,
+                    periodo: plan.periodo,
+                    plan: plan.plan
+                }
+            };
+
+            const response = await fetch(`${API_BASE_URL}/create_pagotic_payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payoutData)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al iniciar el pago.');
+            }
+
+            if (data.init_point) {
+                window.location.href = data.init_point;
+            } else {
+                throw new Error('No se recibió enlace de pago.');
+            }
+
+        } catch (err: any) {
+            setErrorBusqueda(`Error al procesar el pago: ${err.message}`);
+            setProcesandoPago(null);
+        }
     };
 
     return (
         <Container className="py-5 mt-5" style={{ minHeight: '70vh' }}>
             <Row className="justify-content-center">
-                <Col lg={8} xl={6}>
-                    <Card className="shadow-lg border-0">
-                        <Card.Body className="p-5 text-center">
-                            <div className="mb-4">
-                                <div className="d-inline-block p-4 bg-warning bg-opacity-10 rounded-circle">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" className="bi bi-journal-check text-warning" viewBox="0 0 16 16">
-                                        <path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z"/>
-                                        <path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z"/>
-                                        <path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z"/>
+                <Col lg={10} xl={8}>
+                    <Card className="shadow-lg border-0 mb-4">
+                        <Card.Body className="p-4 p-md-5">
+                            <div className="text-center mb-4">
+                                <div className="d-inline-block p-4 bg-primary bg-opacity-10 rounded-circle mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-search text-primary" viewBox="0 0 16 16">
+                                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
                                     </svg>
                                 </div>
+                                <h2 className="fw-bold">Consulta de Plan de Pago</h2>
+                                <p className="text-muted">Ingrese su nombre y apellido para buscar sus planes de pago activos.</p>
                             </div>
 
-                            <h1 className="display-5 fw-bold mb-4">Solicitar Plan de Pago</h1>
+                            <Form onSubmit={buscarPlan} className="mb-4">
+                                <Row className="g-3 justify-content-center">
+                                    <Col md={8}>
+                                        <Form.Control
+                                            type="text"
+                                            size="lg"
+                                            placeholder="Ej: Juan Perez"
+                                            value={nombreBusqueda}
+                                            onChange={(e) => setNombreBusqueda(e.target.value)}
+                                            required
+                                        />
+                                    </Col>
+                                    <Col md={4} className="d-grid">
+                                        <Button variant="primary" size="lg" type="submit" disabled={loadingBusqueda}>
+                                            {loadingBusqueda ? (
+                                                <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" /> Buscando...</>
+                                            ) : (
+                                                'Buscar'
+                                            )}
+                                        </Button>
+                                    </Col>
+                                </Row>
+                            </Form>
 
-                            <p className="lead text-muted mb-4">
-                                Para solicitar un plan de pago personalizado, póngase en contacto con nosotros a través de WhatsApp.
-                            </p>
-
-                            <div className="alert alert-info mb-4" role="alert">
-                                <strong>Horario de atención:</strong> Lunes a Viernes de 8:00 a 14:00 hs
-                            </div>
-
-                            <Button
-                                variant="success"
-                                size="lg"
-                                className="rounded-pill px-5 py-3 fw-bold shadow-lg"
-                                onClick={handleWhatsAppClick}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-whatsapp me-2" viewBox="0 0 16 16">
-                                    <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
-                                </svg>
-                                Contactar por WhatsApp
-                            </Button>
-
-                            <div className="mt-4">
-                                <Button
-                                    variant="outline-secondary"
-                                    onClick={() => navigate('/')}
-                                >
-                                    ← Volver al inicio
-                                </Button>
-                            </div>
-
-                            <div className="mt-5 pt-4 border-top">
-                                <p className="text-muted small mb-0">
-                                    <strong>Teléfono:</strong> +54 9 2944 55-6151
-                                </p>
-                            </div>
+                            {errorBusqueda && (
+                                <Alert variant="danger" className="mt-3">
+                                    {errorBusqueda}
+                                </Alert>
+                            )}
                         </Card.Body>
                     </Card>
+
+                    {resultados.length > 0 && (
+                        <div className="mt-4">
+                            <h3 className="h4 fw-bold mb-3">Resultados encontrados ({resultados.length})</h3>
+                            {resultados.map((plan) => (
+                                <Card key={plan.id} className="shadow-sm border-0 mb-4 border-start border-primary border-4">
+                                    <Card.Header className="bg-white py-3">
+                                        <div className="d-flex justify-content-between align-items-center flex-wrap">
+                                            <div>
+                                                <h4 className="h5 mb-1 text-primary">{plan.nombre_apellido}</h4>
+                                                <span className="badge bg-secondary me-2">Plan: {plan.plan}</span>
+                                                <span className="badge bg-light text-dark border">Periodo: {plan.periodo}</span>
+                                            </div>
+                                            <div className="text-md-end mt-2 mt-md-0">
+                                                <small className="text-muted d-block">Cuotas totales: {plan.cantidad_cuotas}</small>
+                                            </div>
+                                        </div>
+                                    </Card.Header>
+                                    <Card.Body className="p-0">
+                                        <Table responsive className="mb-0 align-middle">
+                                            <thead className="bg-light">
+                                                <tr>
+                                                    <th className="px-4 py-3">Cuota #</th>
+                                                    <th className="py-3">Monto</th>
+                                                    <th className="py-3 text-center">Estado</th>
+                                                    <th className="px-4 py-3 text-end">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {plan.cuotas.length > 0 ? (
+                                                    plan.cuotas.map((cuota) => (
+                                                        <tr key={cuota.numero} className={cuota.pagada ? 'table-light' : ''}>
+                                                            <td className="px-4 fw-bold">Cuota {cuota.numero}</td>
+                                                            <td className={cuota.pagada ? 'text-muted text-decoration-line-through' : 'fw-semibold text-success'}>
+                                                                ${cuota.monto.toFixed(2)}
+                                                            </td>
+                                                            <td className="text-center">
+                                                                {cuota.pagada ? (
+                                                                    <span className="badge bg-success bg-opacity-10 text-success px-2 py-1">
+                                                                        <i className="bi bi-check-circle me-1"></i> {cuota.estado_texto || 'Pagada'}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="badge bg-warning bg-opacity-10 text-warning px-2 py-1">
+                                                                        Pendiente
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 text-end">
+                                                                <Button
+                                                                    variant="primary"
+                                                                    size="sm"
+                                                                    disabled={cuota.pagada || procesandoPago !== null}
+                                                                    onClick={() => iniciarPagoCuota(plan, cuota)}
+                                                                >
+                                                                    {procesandoPago === `${plan.id}-${cuota.numero}` ? (
+                                                                        <><Spinner as="span" animation="border" size="sm" aria-hidden="true" /> Procesando</>
+                                                                    ) : cuota.pagada ? (
+                                                                        'Abonado'
+                                                                    ) : (
+                                                                        'Pagar Ahora'
+                                                                    )}
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={4} className="text-center py-4 text-muted">
+                                                            No se encontraron cuotas registradas para este plan.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </Table>
+                                    </Card.Body>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="text-center mt-4">
+                        <Button variant="outline-secondary" onClick={() => navigate('/')}>
+                            ← Volver al inicio
+                        </Button>
+                    </div>
                 </Col>
             </Row>
         </Container>
