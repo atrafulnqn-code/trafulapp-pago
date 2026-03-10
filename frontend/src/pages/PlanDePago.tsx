@@ -38,7 +38,28 @@ const PlanDePago: React.FC = () => {
     const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
     const [resultados, setResultados] = useState<PlanPagoData[]>([]);
 
-    const [procesandoPago, setProcesandoPago] = useState<string | null>(null); // Guardar ID de la cuota interactuando
+    const [procesandoPago, setProcesandoPago] = useState<string | null>(null);
+    const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState<{[key: string]: number[]}>({});
+
+    const toggleCuota = (planId: string, cuotaNumero: number) => {
+        setCuotasSeleccionadas(prev => {
+            const planCuotas = prev[planId] || [];
+            if (planCuotas.includes(cuotaNumero)) {
+                return { ...prev, [planId]: planCuotas.filter(c => c !== cuotaNumero) };
+            } else {
+                return { ...prev, [planId]: [...planCuotas, cuotaNumero] };
+            }
+        });
+    };
+
+    const seleccionarTodasPendientes = (plan: PlanPagoData) => {
+        const cuotasPendientes = plan.cuotas.filter(c => !c.pagada).map(c => c.numero);
+        setCuotasSeleccionadas(prev => ({ ...prev, [plan.id]: cuotasPendientes }));
+    };
+
+    const limpiarSeleccion = (planId: string) => {
+        setCuotasSeleccionadas(prev => ({ ...prev, [planId]: [] }));
+    };
 
     const buscarPlan = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,6 +96,56 @@ const PlanDePago: React.FC = () => {
                     record_id: plan.id,
                     nombre_contribuyente: plan.nombre_apellido,
                     cuota_numero: cuota.numero,
+                    periodo: plan.periodo,
+                    plan: plan.plan
+                }
+            };
+
+            const response = await fetch(`${API_BASE_URL}/create_pagotic_payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payoutData)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al iniciar el pago.');
+            }
+
+            if (data.init_point) {
+                window.location.href = data.init_point;
+            } else {
+                throw new Error('No se recibió enlace de pago.');
+            }
+
+        } catch (err: any) {
+            setErrorBusqueda(`Error al procesar el pago: ${err.message}`);
+            setProcesandoPago(null);
+        }
+    };
+
+    const iniciarPagoMultiple = async (plan: PlanPagoData) => {
+        const cuotas = cuotasSeleccionadas[plan.id] || [];
+        if (cuotas.length === 0) return;
+
+        const cuotasData = plan.cuotas.filter(c => cuotas.includes(c.numero));
+        const totalMonto = cuotasData.reduce((sum, c) => sum + c.monto, 0);
+
+        setProcesandoPago(`${plan.id}-multiple`);
+        setErrorBusqueda(null);
+
+        try {
+            const payoutData = {
+                title: `Plan ${plan.plan} - ${cuotas.length} Cuotas`,
+                unit_price: totalMonto,
+                items_to_pay: {
+                    item_type: 'plan_pago_multiple',
+                    record_id: plan.id,
+                    nombre_contribuyente: plan.nombre_apellido,
+                    cuota_numeros: cuotas,
                     periodo: plan.periodo,
                     plan: plan.plan
                 }
@@ -172,10 +243,57 @@ const PlanDePago: React.FC = () => {
                                         </div>
                                     </Card.Header>
                                     <Card.Body className="p-0">
+                                        <div className="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <Button 
+                                                    variant="outline-primary" 
+                                                    size="sm" 
+                                                    className="me-2"
+                                                    onClick={() => seleccionarTodasPendientes(plan)}
+                                                >
+                                                    Seleccionar todas pendientes
+                                                </Button>
+                                                <Button 
+                                                    variant="outline-secondary" 
+                                                    size="sm"
+                                                    onClick={() => limpiarSeleccion(plan.id)}
+                                                >
+                                                    Limpiar selección
+                                                </Button>
+                                            </div>
+                                            {(() => {
+                                                const sel = cuotasSeleccionadas[plan.id] || [];
+                                                const pendientes = plan.cuotas.filter(c => !c.pagada);
+                                                const montoTotal = pendientes.filter(c => sel.includes(c.numero)).reduce((sum, c) => sum + c.monto, 0);
+                                                if (sel.length > 0) {
+                                                    return (
+                                                        <div className="text-end">
+                                                            <span className="me-3 fw-semibold">
+                                                                {sel.length} cuota(s): ${montoTotal.toFixed(2)}
+                                                            </span>
+                                                            <Button
+                                                                variant="success"
+                                                                size="sm"
+                                                                disabled={procesandoPago !== null}
+                                                                onClick={() => iniciarPagoMultiple(plan)}
+                                                            >
+                                                                {procesandoPago === `${plan.id}-multiple` ? (
+                                                                    <><Spinner as="span" animation="border" size="sm" aria-hidden="true" /> Procesando</>
+                                                                ) : (
+                                                                    'Pagar Seleccionadas'
+                                                                )}
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </div>
                                         <Table responsive className="mb-0 align-middle">
                                             <thead className="bg-light">
                                                 <tr>
-                                                    <th className="px-4 py-3">Cuota #</th>
+                                                    <th className="px-4 py-3" style={{width: '50px'}}>✓</th>
+                                                    <th className="py-3">Cuota #</th>
                                                     <th className="py-3">Monto</th>
                                                     <th className="py-3 text-center">Estado</th>
                                                     <th className="px-4 py-3 text-end">Acción</th>
@@ -183,44 +301,56 @@ const PlanDePago: React.FC = () => {
                                             </thead>
                                             <tbody>
                                                 {plan.cuotas.length > 0 ? (
-                                                    plan.cuotas.map((cuota) => (
-                                                        <tr key={cuota.numero} className={cuota.pagada ? 'table-light' : ''}>
-                                                            <td className="px-4 fw-bold">Cuota {cuota.numero}</td>
-                                                            <td className={cuota.pagada ? 'text-muted text-decoration-line-through' : 'fw-semibold text-success'}>
-                                                                ${cuota.monto.toFixed(2)}
-                                                            </td>
-                                                            <td className="text-center">
-                                                                {cuota.pagada ? (
-                                                                    <span className="badge bg-success bg-opacity-10 text-success px-2 py-1">
-                                                                        <i className="bi bi-check-circle me-1"></i> {cuota.estado_texto || 'Pagada'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="badge bg-warning bg-opacity-10 text-warning px-2 py-1">
-                                                                        Pendiente
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                            <td className="px-4 text-end">
-                                                                <Button
-                                                                    variant="primary"
-                                                                    size="sm"
-                                                                    disabled={cuota.pagada || procesandoPago !== null}
-                                                                    onClick={() => iniciarPagoCuota(plan, cuota)}
-                                                                >
-                                                                    {procesandoPago === `${plan.id}-${cuota.numero}` ? (
-                                                                        <><Spinner as="span" animation="border" size="sm" aria-hidden="true" /> Procesando</>
-                                                                    ) : cuota.pagada ? (
-                                                                        'Abonado'
-                                                                    ) : (
-                                                                        'Pagar Ahora'
+                                                    plan.cuotas.map((cuota) => {
+                                                        const isSelected = (cuotasSeleccionadas[plan.id] || []).includes(cuota.numero);
+                                                        return (
+                                                            <tr key={cuota.numero} className={`${cuota.pagada ? 'table-light' : ''} ${isSelected ? 'table-primary' : ''}`}>
+                                                                <td className="px-4">
+                                                                    {!cuota.pagada && (
+                                                                        <Form.Check
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={() => toggleCuota(plan.id, cuota.numero)}
+                                                                        />
                                                                     )}
-                                                                </Button>
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                                </td>
+                                                                <td className="fw-bold">Cuota {cuota.numero}</td>
+                                                                <td className={cuota.pagada ? 'text-muted text-decoration-line-through' : 'fw-semibold text-success'}>
+                                                                    ${cuota.monto.toFixed(2)}
+                                                                </td>
+                                                                <td className="text-center">
+                                                                    {cuota.pagada ? (
+                                                                        <span className="badge bg-success bg-opacity-10 text-success px-2 py-1">
+                                                                            <i className="bi bi-check-circle me-1"></i> {cuota.estado_texto || 'Pagada'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="badge bg-warning bg-opacity-10 text-warning px-2 py-1">
+                                                                            Pendiente
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 text-end">
+                                                                    <Button
+                                                                        variant="outline-primary"
+                                                                        size="sm"
+                                                                        disabled={cuota.pagada || procesandoPago !== null}
+                                                                        onClick={() => iniciarPagoCuota(plan, cuota)}
+                                                                    >
+                                                                        {procesandoPago === `${plan.id}-${cuota.numero}` ? (
+                                                                            <><Spinner as="span" animation="border" size="sm" aria-hidden="true" /> Procesando</>
+                                                                        ) : cuota.pagada ? (
+                                                                            'Abonado'
+                                                                        ) : (
+                                                                            'Pagar Ahora'
+                                                                        )}
+                                                                    </Button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
                                                 ) : (
                                                     <tr>
-                                                        <td colSpan={4} className="text-center py-4 text-muted">
+                                                        <td colSpan={5} className="text-center py-4 text-muted">
                                                             No se encontraron cuotas registradas para este plan.
                                                         </td>
                                                     </tr>

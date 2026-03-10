@@ -927,6 +927,22 @@ def search_patente():
         return jsonify({"error": str(e)}), 500
 
 
+def normalize_text(text):
+    """Normaliza texto para búsqueda: elimina acentos y convierte a minúsculas"""
+    if not text:
+        return ""
+    text = text.lower().strip()
+    replacements = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'à': 'a', 'è': 'e', 'ì': 'i', 'ò': 'o', 'ù': 'u',
+        'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', 'ü': 'u',
+        'ñ': 'n', 'ç': 'c'
+    }
+    for accented, plain in replacements.items():
+        text = text.replace(accented, plain)
+    return text
+
+
 @app.route('/api/search/plan_pago', methods=['GET'])
 def search_plan_pago():
     log_to_airtable('INFO', 'API Search',
@@ -941,20 +957,28 @@ def search_plan_pago():
 
     try:
         table = api.table(BASE_ID, PLAN_PAGOS_NUEVO_TABLE_ID)
-        # Búsqueda insensible a mayúsculas usando FIND y LOWER
-        formula = f"FIND(LOWER('{nombre_apellido}'), LOWER({{Nombre y apellido}})) > 0"
         
-        # Filtramos para no traer planes donde todas las cuotas estén pagadas
-        records = table.all(formula=formula)
+        normalized_search = normalize_text(nombre_apellido)
+        
+        # Obtener todos los registros y filtrar manualmente para permitir normalización
+        records = table.all()
+        
+        filtered_records = []
+        for r in records:
+            fields = r.get('fields', {})
+            nombre_en_tabla = fields.get('Nombre y apellido', '')
+            if nombre_en_tabla:
+                if normalized_search in normalize_text(nombre_en_tabla):
+                    filtered_records.append(r)
 
-        if not records:
+        if not filtered_records:
             return jsonify({
                 "error": ("No se encontraron planes de pago para el "
                           "nombre ingresado.")
             }), 404
 
         resultados = []
-        for r in records:
+        for r in filtered_records:
             fields = r['fields']
             
             # Extraer cuotas
@@ -1265,16 +1289,25 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                     })
                 elif item_type == "plan_pago":
                     table_id_to_update = PLAN_PAGOS_NUEVO_TABLE_ID
-                    # Obtener la cuota que se está pagando del metadata
                     cuota_a_pagar = items_context.get("cuota_numero")
                     if cuota_a_pagar:
-                        # Convertir a string para que coincida con el nombre de columna en Airtable ('1', '2', etc)
                         cuota_key = str(cuota_a_pagar)
-                        fields_to_update_origin[cuota_key] = 0 # O se podría poner "Pagado" si la columna lo permite
+                        fields_to_update_origin[cuota_key] = 0
                         items_for_pdf.append({
                             "description": f"Cuota {cuota_key} - Plan de Pago",
                             "amount": items_context.get('amount', items_context.get('unit_price', 0))
                         })
+                elif item_type == "plan_pago_multiple":
+                    table_id_to_update = PLAN_PAGOS_NUEVO_TABLE_ID
+                    cuotas_a_pagar = items_context.get("cuota_numeros", [])
+                    if cuotas_a_pagar and isinstance(cuotas_a_pagar, list):
+                        for cuota_num in cuotas_a_pagar:
+                            cuota_key = str(cuota_num)
+                            fields_to_update_origin[cuota_key] = 0
+                            items_for_pdf.append({
+                                "description": f"Cuota {cuota_key} - Plan de Pago",
+                                "amount": items_context.get(f'cuota_{cuota_num}_monto', items_context.get('unit_price', 0) / len(cuotas_a_pagar))
+                            })
                 else:
                     if item_type == "lote":
                         table_id_to_update = CONTRIBUTIVOS_TABLE_ID
