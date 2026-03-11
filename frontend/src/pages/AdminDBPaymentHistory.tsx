@@ -27,6 +27,7 @@ interface PaymentHistory {
   estado: string;
   items_pagados: any;
   detalles: string | null;
+  observaciones: string | null;
   fecha_hora: string;
   created_at: string;
 }
@@ -48,6 +49,7 @@ const AdminDBPaymentHistory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [savingId, setSavingId] = useState<number | null>(null);
   const limit = 10;
 
   const fetchRecords = async (page: number, searchTerm: string) => {
@@ -117,6 +119,25 @@ const AdminDBPaymentHistory: React.FC = () => {
     navigate('/admin');
   };
 
+  const handleObservacionesChange = async (id: number, paymentId: string, value: string) => {
+    setSavingId(id);
+    try {
+      const password = localStorage.getItem('adminPassword') || '';
+      await axios.put(`${API_BASE_URL}/admin/db/payment-history/observaciones`, {
+        payment_id: paymentId,
+        observaciones: value
+      }, {
+        headers: { Authorization: `Bearer ${password}` }
+      });
+      setRecords(records.map(r => r.id === id ? { ...r, observaciones: value } : r));
+    } catch (err) {
+      console.error('Error guardando observaciones:', err);
+      alert('Error al guardar observaciones');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-AR', {
       year: 'numeric',
@@ -146,7 +167,7 @@ const AdminDBPaymentHistory: React.FC = () => {
       }
 
       // Headers del CSV
-      const headers = ['ID', 'Payment ID', 'Comprobante', 'Nombre', 'DNI', 'Email', 'Monto', 'Estado', 'Detalles', 'Fecha'];
+      const headers = ['ID', 'Payment ID', 'Comprobante', 'Nombre', 'DNI', 'Email', 'Monto', 'Estado', 'Detalles', 'Observaciones', 'Fecha'];
 
       // Filas del CSV
       const rows = data.map(r => [
@@ -159,6 +180,7 @@ const AdminDBPaymentHistory: React.FC = () => {
         r.monto,
         r.estado,
         r.detalles ? r.detalles.replace(/\n/g, ' ') : (r.items_pagados ? (typeof r.items_pagados === 'string' ? r.items_pagados : JSON.stringify(r.items_pagados)) : ''),
+        r.observaciones || '',
         r.fecha_hora
       ]);
 
@@ -263,13 +285,14 @@ const AdminDBPaymentHistory: React.FC = () => {
                   <th>Monto</th>
                   <th>Estado</th>
                   <th>Detalles</th>
+                  <th>Observaciones</th>
                   <th>Fecha</th>
                 </tr>
               </thead>
               <tbody>
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center text-muted">
+                    <td colSpan={11} className="text-center text-muted">
                       No se encontraron registros
                     </td>
                   </tr>
@@ -294,6 +317,18 @@ const AdminDBPaymentHistory: React.FC = () => {
                         <small className="text-muted" style={{ maxWidth: '200px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}>
                           {record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}
                         </small>
+                      </td>
+                      <td style={{ minWidth: '150px' }}>
+                        <Form.Control
+                          as="textarea"
+                          rows={1}
+                          size="sm"
+                          value={record.observaciones || ''}
+                          placeholder="Observaciones..."
+                          onChange={(e) => handleObservacionesChange(record.id, record.payment_id, e.target.value)}
+                          disabled={savingId === record.id}
+                          style={{ resize: 'none' }}
+                        />
                       </td>
                       <td><small>{formatDate(record.fecha_hora)}</small></td>
                     </tr>

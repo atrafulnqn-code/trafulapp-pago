@@ -112,14 +112,15 @@ def init_db():
                     fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     items_pagados JSONB,
                     detalles TEXT,
+                    observaciones TEXT,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
             cur.execute("""
-                CREATE INDEX IF NOT EXISTS idx_payment_history_payment_id ON payment_history(payment_id);
-                CREATE INDEX IF NOT EXISTS idx_payment_history_dni ON payment_history(dni);
-                CREATE INDEX IF NOT EXISTS idx_payment_history_fecha_hora ON payment_history(fecha_hora);
                 CREATE INDEX IF NOT EXISTS idx_payment_history_estado ON payment_history(estado);
+            """)
+            cur.execute("""
+                ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS observaciones TEXT;
             """)
 
             # Tabla error_logs - Registro de errores y logs
@@ -2139,7 +2140,7 @@ def admin_db_payment_history():
                 # Obtener datos paginados
                 data_query = f"""
                     SELECT id, payment_id, comprobante_numero, nombre_apellido, dni,
-                           email, monto, estado, items_pagados, detalles, fecha_hora, created_at
+                           email, monto, estado, items_pagados, detalles, observaciones, fecha_hora, created_at
                     FROM payment_history
                     {search_query}
                     ORDER BY fecha_hora DESC
@@ -2173,6 +2174,49 @@ def admin_db_payment_history():
     except Exception as e:
         log_to_airtable('ERROR', 'Admin DB Payment History',
                         f'Error obteniendo payment_history: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/db/payment-history/observaciones', methods=['PUT', 'OPTIONS'])
+def update_payment_observaciones():
+    """Actualizar observaciones de un pago en payment_history"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
+
+        data = request.get_json()
+        payment_id = data.get('payment_id')
+        observaciones = data.get('observaciones', '')
+
+        if not payment_id:
+            return jsonify({"error": "payment_id es requerido"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE payment_history SET observaciones = %s WHERE payment_id = %s",
+                    (observaciones, payment_id)
+                )
+                conn.commit()
+
+                if cur.rowcount == 0:
+                    return jsonify({"error": "No se encontró el registro"}), 404
+
+                return jsonify({"success": True, "payment_id": payment_id, "observaciones": observaciones}), 200
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Update Payment Observaciones',
+                        f'Error actualizando observaciones: {e}')
         return jsonify({"error": str(e)}), 500
 
 
