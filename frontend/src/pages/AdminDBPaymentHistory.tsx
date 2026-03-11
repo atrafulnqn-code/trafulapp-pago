@@ -50,6 +50,8 @@ const AdminDBPaymentHistory: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValues, setEditValues] = useState<Record<number, string>>({});
   const limit = 10;
 
   const fetchRecords = async (page: number, searchTerm: string) => {
@@ -119,7 +121,12 @@ const AdminDBPaymentHistory: React.FC = () => {
     navigate('/admin');
   };
 
-  const handleObservacionesChange = async (id: number, paymentId: string, value: string) => {
+  const handleObservacionesChange = (id: number, value: string) => {
+    setEditValues(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSaveObservaciones = async (id: number, paymentId: string) => {
+    const value = editValues[id] ?? '';
     setSavingId(id);
     try {
       const password = localStorage.getItem('adminPassword') || '';
@@ -130,12 +137,18 @@ const AdminDBPaymentHistory: React.FC = () => {
         headers: { Authorization: `Bearer ${password}` }
       });
       setRecords(records.map(r => r.id === id ? { ...r, observaciones: value } : r));
+      setEditingId(null);
     } catch (err) {
       console.error('Error guardando observaciones:', err);
       alert('Error al guardar observaciones');
     } finally {
       setSavingId(null);
     }
+  };
+
+  const handleStartEdit = (id: number, currentValue: string) => {
+    setEditingId(id);
+    setEditValues(prev => ({ ...prev, [id]: currentValue || '' }));
   };
 
   const formatDate = (dateString: string) => {
@@ -318,17 +331,40 @@ const AdminDBPaymentHistory: React.FC = () => {
                           {record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}
                         </small>
                       </td>
-                      <td style={{ minWidth: '150px' }}>
-                        <Form.Control
-                          as="textarea"
-                          rows={1}
-                          size="sm"
-                          value={record.observaciones || ''}
-                          placeholder="Observaciones..."
-                          onChange={(e) => handleObservacionesChange(record.id, record.payment_id, e.target.value)}
-                          disabled={savingId === record.id}
-                          style={{ resize: 'none' }}
-                        />
+                      <td style={{ minWidth: '180px' }}>
+                        {editingId === record.id ? (
+                          <div className="d-flex gap-1">
+                            <Form.Control
+                              as="textarea"
+                              rows={1}
+                              size="sm"
+                              value={editValues[record.id] ?? record.observaciones ?? ''}
+                              placeholder="Observaciones..."
+                              onChange={(e) => handleObservacionesChange(record.id, e.target.value)}
+                              disabled={savingId === record.id}
+                              style={{ resize: 'none' }}
+                              autoFocus
+                            />
+                            <Button
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleSaveObservaciones(record.id, record.payment_id)}
+                              disabled={savingId === record.id}
+                            >
+                              {savingId === record.id ? '...' : '✓'}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => handleStartEdit(record.id, record.observaciones || '')}
+                            style={{ cursor: 'pointer', minHeight: '30px', padding: '6px', border: '1px solid #dee2e6', borderRadius: '4px' }}
+                            title="Click para editar"
+                          >
+                            <small className="text-muted">
+                              {record.observaciones || <em className="text-secondary">Click para agregar...</em>}
+                            </small>
+                          </div>
+                        )}
                       </td>
                       <td><small>{formatDate(record.fecha_hora)}</small></td>
                     </tr>
