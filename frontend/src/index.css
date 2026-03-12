@@ -3,134 +3,164 @@
 @tailwind utilities;
 
 @layer base {
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap');
 }
 
 :root {
-  /* Vercel-like Palette */
-  --geist-background: #ffffff;
-  --geist-foreground: #000000;
-  --accents-1: #fafafa;
-  --accents-2: #eaeaea;
-  --accents-3: #999999;
-  --accents-4: #888888;
-  --accents-5: #666666;
-  --primary-color: #0070f3;      /* Vercel Blue */
-  --primary-hover: #0056b3;
-  --geist-success: #0070f3;    /* Repurposed green for Vercel Blue consistency */
-  --geist-warning: #f5a623;
-  --geist-error: #ee0000;
+  /* Web3 / Deep Space Palette */
+  --geist-background: #030712; /* Darker Slate/Grey */
+  --geist-foreground: #f9fafb;
+  --accents-1: #111827;
+  --accents-2: #1f2937;
+  --accents-3: #4b5563;
+  --accents-4: #9ca3af;
+  --accents-5: #e5e7eb;
   
-  --shadow-small: 0 4px 14px 0 rgba(0, 0, 0, 0.04);
-  --shadow-medium: 0 6px 20px rgba(0, 0, 0, 0.08);
-  --shadow-hover: 0 14px 28px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.02);
-  --border-radius: 8px;          /* Sharp & modern */
+  --primary-color: #3b82f6;      /* Modern Blue */
+  --primary-hover: #2563eb;
+  
+  /* Glow Colors */
+  --glow-success: rgba(34, 197, 94, 0.5);
+  --glow-info: rgba(6, 182, 212, 0.5);
+  --glow-warning: rgba(234, 179, 8, 0.5);
+  --glow-primary: rgba(59, 130, 246, 0.5);
+
+  --shadow-small: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-medium: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --border-radius: 12px;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--accents-1);
-  color: var(--accents-5);
+  background-color: var(--geist-background);
+  color: var(--geist-foreground);
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Base Mesh Gradient Background */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: 
+    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.1) 0px, transparent 50%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
   color: var(--geist-foreground);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
-/* Clases Vercel-like Cards */
+/* Glassmorphism Pro Cards */
 .glass-card {
-  background: var(--geist-background);
-  border: 1px solid var(--accents-2);
+  background: rgba(17, 24, 39, 0.6) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: var(--border-radius) !important;
-  box-shadow: var(--shadow-small);
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(600px circle at var(--x, 0) var(--y, 0), rgba(255, 255, 255, 0.05), transparent 40%);
+  z-index: 1;
+  pointer-events: none;
 }
 
 .glass-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
-  border-color: rgba(0, 112, 243, 0.3); /* Soft blue border on hover */
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+}
+
+/* Text Gradient Utilities */
+.text-gradient {
+  background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .glass-header {
-  background: var(--geist-background);
-  border-bottom: 1px solid var(--accents-2);
+  background: rgba(3, 7, 18, 0.8) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Botones Vercel-like */
+/* Enhanced Buttons */
 .btn-primary {
-  background-color: var(--primary-color) !important;
-  border-color: var(--primary-color) !important;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  border: none !important;
   color: white !important;
-  border-radius: 6px !important;
-  font-weight: 500 !important;
-  letter-spacing: normal !important;
-  box-shadow: 0 4px 14px 0 rgba(0, 112, 243, 0.39) !important;
-  transition: background 0.2s ease, box-shadow 0.2s ease !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  padding: 10px 24px !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 10px 20px -5px rgba(59, 130, 246, 0.4) !important;
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-hover) !important;
-  box-shadow: 0 6px 20px rgba(0, 112, 243, 0.23) !important;
+  transform: scale(1.05);
+  box-shadow: 0 15px 30px -5px rgba(59, 130, 246, 0.6) !important;
 }
 
-/* Secondary Buttons */
-.btn-outline-primary, .btn-secondary, .btn-outline-secondary {
-  background-color: var(--geist-background) !important;
-  color: var(--accents-5) !important;
-  border: 1px solid var(--accents-2) !important;
-  border-radius: 6px !important;
-  transition: all 0.2s ease !important;
-  box-shadow: none !important;
+.btn-light {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: none !important;
+  color: #030712 !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+  transition: all 0.3s ease !important;
 }
 
-.btn-outline-primary:hover, .btn-secondary:hover, .btn-outline-secondary:hover {
-  border-color: var(--primary-color) !important;
-  color: var(--primary-color) !important;
-  background: transparent !important;
+.btn-light:hover {
+  background: #ffffff !important;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
 }
 
-/* Ajustes de Inputs */
-.form-control, .form-select {
-  background-color: var(--geist-background) !important;
-  border: 1px solid var(--accents-2) !important;
-  color: var(--geist-foreground) !important;
-  border-radius: 6px !important;
-  box-shadow: none !important;
-  transition: border-color 0.15s ease !important;
-}
-
-.form-control:focus, .form-select:focus {
-  border-color: var(--primary-color) !important;
-  box-shadow: none !important;
-}
-
-/* Tablas Minimalistas */
+/* Table Enhancements for Dark Mode */
 .table {
   color: var(--accents-5) !important;
-  border-collapse: separate;
-  border-spacing: 0;
+  border: none !important;
 }
 
 .table thead th {
-  background-color: var(--accents-1) !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
   color: var(--accents-4) !important;
-  border-bottom: 1px solid var(--accents-2) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-family: 'Outfit', sans-serif;
   text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  padding: 12px 16px !important;
+  font-size: 0.7rem;
+  padding: 16px !important;
 }
 
 .table tbody td {
-  border-bottom: 1px solid var(--accents-2) !important;
-  font-size: 0.875rem;
-  padding: 12px 16px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  padding: 16px !important;
+  background: transparent !important;
+}
+
+/* Glow Utility */
+.glow-on-hover:hover {
+  box-shadow: 0 0 30px var(--glow-color, rgba(59, 130, 246, 0.4));
 }
