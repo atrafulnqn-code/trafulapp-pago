@@ -67,7 +67,7 @@ const Home: React.FC = () => {
 
   // Hero Section Web3
   const Hero: React.FC = () => (
-    <div className="text-center py-5 mb-5 position-relative overflow-hidden" style={{ minHeight: '600px', display: 'flex', alignItems: 'center' }}>
+    <div className="text-center py-5 position-relative overflow-hidden" style={{ minHeight: '650px', display: 'flex', alignItems: 'center' }}>
       {/* Background Image with Mesh Blend */}
       <div style={{
         position: 'absolute',
@@ -75,7 +75,7 @@ const Home: React.FC = () => {
         backgroundImage: 'url(https://images.unsplash.com/photo-1544084944-15269ec7b5a0?q=80&w=2070&auto=format&fit=crop)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        opacity: 0.2,
+        opacity: 0.15,
         mixBlendMode: 'luminosity',
         zIndex: 0,
       }}></div>
@@ -83,26 +83,30 @@ const Home: React.FC = () => {
       {/* Dynamic Glow Sphere */}
       <div style={{
         position: 'absolute',
-        top: '20%',
+        top: '30%',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '400px',
-        height: '400px',
-        background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)',
-        filter: 'blur(60px)',
+        width: '500px',
+        height: '500px',
+        background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+        filter: 'blur(80px)',
         zIndex: 0
       }}></div>
 
-      <Container style={{ zIndex: 1, position: 'relative' }}>
+      <Container style={{ zIndex: 1, position: 'relative', marginTop: '40px' }}>
         <div className="py-4">
-          <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary mb-4 px-3 py-2 border border-primary border-opacity-20">
-            Oficina Virtual 2026
-          </div>
-          <h1 className="display-2 fw-bold mb-3 text-white" style={{ letterSpacing: '-0.04em' }}>
+          <h1 className="display-1 fw-bold mb-4 text-white" style={{ letterSpacing: '-0.04em', lineHeight: '1.1' }}>
             <span className="text-gradient">Gestión Tributaria</span> <br />
             <span style={{ color: '#60a5fa' }}>Digital</span>
           </h1>
-          <p className="fs-5 text-secondary col-md-8 mx-auto mb-5 fw-light" style={{ lineHeight: '1.6' }}>
+
+          <div className="d-flex justify-content-center mb-5">
+            <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary px-4 py-2 border border-primary border-opacity-20" style={{ letterSpacing: '0.05em', fontWeight: 600 }}>
+              Oficina Virtual 2026
+            </div>
+          </div>
+
+          <p className="fs-5 text-secondary col-md-8 mx-auto mb-5 fw-light opacity-90" style={{ lineHeight: '1.8', maxWidth: '700px' }}>
             Plataforma oficial de la Comuna de Villa Traful. Realice sus pagos y trámites de forma ágil, segura y transparente bajo estándares de nueva generación.
           </p>
           <div className="d-flex justify-content-center gap-3">

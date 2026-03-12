@@ -8,17 +8,19 @@
 
 :root {
   /* Web3 / Deep Space Palette */
-  --geist-background: #030712; /* Darker Slate/Grey */
+  --geist-background: #030712;
+  /* Darker Slate/Grey */
   --geist-foreground: #f9fafb;
   --accents-1: #111827;
   --accents-2: #1f2937;
   --accents-3: #4b5563;
   --accents-4: #9ca3af;
   --accents-5: #e5e7eb;
-  
-  --primary-color: #3b82f6;      /* Modern Blue */
+
+  --primary-color: #3b82f6;
+  /* Modern Blue */
   --primary-hover: #2563eb;
-  
+
   /* Glow Colors */
   --glow-success: rgba(34, 197, 94, 0.5);
   --glow-info: rgba(6, 182, 212, 0.5);
@@ -47,8 +49,11 @@ body {
 body::before {
   content: "";
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: 
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
     radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.15) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
@@ -57,38 +62,61 @@ body::before {
   pointer-events: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--geist-foreground);
   font-family: 'Outfit', sans-serif;
   font-weight: 700;
   letter-spacing: -0.03em;
 }
 
-/* Glassmorphism Pro Cards */
+/* Glassmorphism Pro Cards & Headers */
 .glass-card {
   background: rgba(17, 24, 39, 0.6) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: var(--border-radius) !important;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
-.glass-card::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(600px circle at var(--x, 0) var(--y, 0), rgba(255, 255, 255, 0.05), transparent 40%);
-  z-index: 1;
-  pointer-events: none;
+.glass-header {
+  background: rgba(3, 7, 18, 0.7) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.3s ease;
 }
 
-.glass-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+.nav-link-glass {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-link-glass:hover {
+  color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.btn-glass {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px);
 }
 
 /* Text Gradient Utilities */
