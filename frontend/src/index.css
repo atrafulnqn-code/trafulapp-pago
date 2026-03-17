@@ -7,15 +7,15 @@
 }
 
 :root {
-  /* Web3 / Deep Space Palette */
-  --geist-background: #030712;
-  /* Darker Slate/Grey */
-  --geist-foreground: #f9fafb;
-  --accents-1: #111827;
-  --accents-2: #1f2937;
-  --accents-3: #4b5563;
-  --accents-4: #9ca3af;
-  --accents-5: #e5e7eb;
+  /* Light Theme */
+  --geist-background: #ffffff;
+  /* White */
+  --geist-foreground: #000000;
+  --accents-1: #f3f4f6;
+  --accents-2: #e5e7eb;
+  --accents-3: #9ca3af;
+  --accents-4: #4b5563;
+  --accents-5: #1f2937;
 
   --primary-color: #3b82f6;
   /* Modern Blue */
@@ -53,11 +53,7 @@ body::before {
   left: 0;
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(147, 51, 234, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.1) 0px, transparent 50%);
+  background: #ffffff;
   z-index: -1;
   pointer-events: none;
 }
@@ -76,10 +72,10 @@ h6 {
 
 /* Glassmorphism Pro Cards & Headers */
 .glass-card {
-  background: rgba(17, 24, 39, 0.6) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: var(--border-radius) !important;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -87,51 +83,51 @@ h6 {
 }
 
 .glass-header {
-  background: rgba(3, 7, 18, 0.7) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
   transition: all 0.3s ease;
 }
 
 .nav-link-glass {
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(0, 0, 0, 0.7) !important;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .nav-link-glass:hover {
-  color: #ffffff !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  color: #000000 !important;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
 .btn-glass {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(0, 0, 0, 0.05) !important;
   backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  color: white !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
   transition: all 0.3s ease !important;
 }
 
 .btn-glass:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(0, 0, 0, 0.3) !important;
   transform: translateY(-1px);
 }
 
 /* Text Gradient Utilities */
 .text-gradient {
-  background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+  background: linear-gradient(135deg, #000000 0%, #4b5563 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .glass-header {
-  background: rgba(3, 7, 18, 0.8) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Enhanced Buttons */
@@ -153,8 +149,8 @@ h6 {
 
 .btn-light {
   background: rgba(255, 255, 255, 0.9) !important;
-  border: none !important;
-  color: #030712 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
   border-radius: 10px !important;
   font-weight: 700 !important;
   transition: all 0.3s ease !important;
@@ -163,19 +159,19 @@ h6 {
 .btn-light:hover {
   background: #ffffff !important;
   transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Table Enhancements for Dark Mode */
+/* Table Enhancements for Light Mode */
 .table {
   color: var(--accents-5) !important;
   border: none !important;
 }
 
 .table thead th {
-  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
   color: var(--accents-4) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
   font-family: 'Outfit', sans-serif;
   text-transform: uppercase;
   font-size: 0.7rem;
@@ -183,7 +179,7 @@ h6 {
 }
 
 .table tbody td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
   padding: 16px !important;
   background: transparent !important;
 }
