@@ -147,6 +147,25 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_error_logs_fecha_hora ON error_logs(fecha_hora);
             """)
 
+            # Tabla polideportivo_comprobantes - Comprobantes de pagos del polideportivo
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS polideportivo_comprobantes (
+                    id SERIAL PRIMARY KEY,
+                    row_index VARCHAR(50) NOT NULL,
+                    nombre VARCHAR(255),
+                    documento VARCHAR(50),
+                    comprobante_data TEXT,
+                    comprobante_filename VARCHAR(255),
+                    tiene_comprobante BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(row_index)
+                );
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_polideportivo_row ON polideportivo_comprobantes(row_index);
+            """)
+
             # Tabla registros_pago_patentes_automatizados
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS registros_pago_patentes_automatizados (
@@ -2022,11 +2041,16 @@ def admin_db_payments():
 
 @app.route('/api/admin/polideportivo/data', methods=['GET', 'OPTIONS'])
 def get_polideportivo_data():
-    """Obtener datos del polideportivo desde Google Sheets"""
+    """Obtener datos del polideportivo desde Google Sheets con paginación y búsqueda"""
     if request.method == 'OPTIONS':
         return '', 204
     
     try:
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        search = request.args.get('search', '', type=str)
+        offset = (page - 1) * limit
+        
         spreadsheet_id = '1Wnkvuux22wWLiUzk2x781xVRMaIp7U-uZeRw3tg-cnI'
         
         url = f'https://docs.google.com/spreadsheets/d/e/2PACX-1vS2BLtkuWuTk8Tht6jzAd5HKNgYkbDfRo2wVVZfBboSj_hGLzs2l4NTjrtICNeXy1U18HsQS3NqEeAU/pub?gid=0&single=true&output=csv'
@@ -2050,12 +2074,167 @@ def get_polideportivo_data():
             return jsonify({"error": "No hay suficientes filas de datos", "data": []}), 200
         
         reader = csv.DictReader(lines)
-        records = list(reader)
+        all_records = list(reader)
         
-        return jsonify({"data": records, "total": len(records)}), 200
+        conn = get_db_connection()
+        comprobantes_data = {}
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT row_index, tiene_comprobante, comprobante_filename FROM polideportivo_comprobantes")
+                    for row in cur.fetchall():
+                        comprobantes_data[row[0]] = {
+                            'tiene_comprobante': row[1],
+                            'comprobante_filename': row[2]
+                        }
+            finally:
+                conn.close()
+        
+        for i, record in enumerate(all_records):
+            row_key = str(i + 2)
+            if row_key in comprobantes_data:
+                record['tiene_comprobante'] = comprobantes_data[row_key]['tiene_comprobante']
+                record['comprobante_filename'] = comprobantes_data[row_key]['comprobante_filename']
+            else:
+                record['tiene_comprobante'] = False
+                record['comprobante_filename'] = ''
+            record['row_index'] = row_key
+        
+        if search:
+            search_lower = search.lower()
+            filtered = [r for r in all_records if any(search_lower in str(v).lower() for v in r.values())]
+        else:
+            filtered = all_records
+        
+        total = len(filtered)
+        paginated = filtered[offset:offset + limit]
+        
+        total_recaudacion = total * 15000
+        
+        return jsonify({
+            "data": paginated,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total + limit - 1) // limit if limit > 0 else 1,
+            "total_recaudacion": total_recaudacion,
+            "precio_por_pago": 15000
+        }), 200
         
     except Exception as e:
         print(f"Error en get_polideportivo_data: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/polideportivo/upload/<row_index>', methods=['POST', 'OPTIONS'])
+def upload_polideportivo_comprobante(row_index):
+    """Subir comprobante para un registro del polideportivo"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No se envió ningún archivo"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "Nombre de archivo vacío"}), 400
+        
+        file_content = base64.b64encode(file.read()).decode('utf-8')
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+        
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO polideportivo_comprobantes (row_index, comprobante_data, comprobante_filename, tiene_comprobante)
+                    VALUES (%s, %s, %s, TRUE)
+                    ON CONFLICT (row_index) 
+                    DO UPDATE SET 
+                        comprobante_data = EXCLUDED.comprobante_data,
+                        comprobante_filename = EXCLUDED.comprobante_filename,
+                        tiene_comprobante = TRUE,
+                        updated_at = CURRENT_TIMESTAMP
+                """, (row_index, file_content, file.filename))
+                conn.commit()
+            
+            return jsonify({"success": True, "filename": file.filename}), 200
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Error en upload_polideportivo_comprobante: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/polideportivo/download/<row_index>', methods=['GET', 'OPTIONS'])
+def download_polideportivo_comprobante(row_index):
+    """Descargar comprobante de un registro del polideportivo"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+        
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT comprobante_data, comprobante_filename 
+                    FROM polideportivo_comprobantes 
+                    WHERE row_index = %s AND tiene_comprobante = TRUE
+                """, (row_index,))
+                
+                row = cur.fetchone()
+                if not row:
+                    return jsonify({"error": "Comprobante no encontrado"}), 404
+                
+                file_content = base64.b64decode(row[0])
+                filename = row[1] or 'comprobante.pdf'
+                
+                return send_file(
+                    io.BytesIO(file_content),
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=filename
+                )
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Error en download_polideportivo_comprobante: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/admin/polideportivo/delete/<row_index>', methods=['DELETE', 'OPTIONS'])
+def delete_polideportivo_comprobante(row_index):
+    """Eliminar comprobante de un registro del polideportivo"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+        
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE polideportivo_comprobantes 
+                    SET tiene_comprobante = FALSE, comprobante_data = NULL, updated_at = CURRENT_TIMESTAMP
+                    WHERE row_index = %s
+                """, (row_index,))
+                conn.commit()
+            
+            return jsonify({"success": True}), 200
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Error en delete_polideportivo_comprobante: {e}")
         return jsonify({"error": str(e)}), 500
 
 
