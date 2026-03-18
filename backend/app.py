@@ -2025,10 +2025,6 @@ def get_polideportivo_data():
     """Obtener datos del polideportivo desde Google Sheets"""
     if request.method == 'OPTIONS':
         return '', 204
-        
-    is_valid, error_response = validate_admin_auth()
-    if not is_valid:
-        return error_response
     
     try:
         spreadsheet_id = '1Wnkvuux22wWLiUzk2x781xVRMaIp7U-uZeRw3tg-cnI'
@@ -3451,10 +3447,6 @@ def get_payments_receipt(record_id):
     """Generar PDF para un pago de la tabla payments"""
     if request.method == 'OPTIONS':
         return '', 204
-        
-    is_valid, error_response = validate_admin_auth()
-    if not is_valid:
-        return error_response
     
     conn = get_db_connection()
     if not conn:
@@ -3536,11 +3528,7 @@ def get_payments_receipt(record_id):
 def get_receipt_pdf(record_id):
     if request.method == 'OPTIONS':
         return '', 204
-        
-    is_valid, error_response = validate_admin_auth()
-    if not is_valid:
-        return error_response
-    
+
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "No database connection"}), 500
@@ -3610,11 +3598,7 @@ def get_receipt_pdf(record_id):
 def get_recaudacion_receipt(record_id):
     if request.method == 'OPTIONS':
         return '', 204
-        
-    is_valid, error_response = validate_admin_auth()
-    if not is_valid:
-        return error_response
-    
+
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "No database connection"}), 500
