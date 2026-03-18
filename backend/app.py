@@ -3628,9 +3628,9 @@ def get_payments_history():
         conn.close()
 
 
-@app.route('/api/admin/payments/<int:record_id>/receipt', methods=['GET', 'OPTIONS'])
-def get_payments_receipt(record_id):
-    """Generar PDF para un pago de la tabla payments"""
+@app.route('/api/admin/payments/<path:payment_id>/receipt', methods=['GET', 'OPTIONS'])
+def get_payments_receipt(payment_id):
+    """Generar PDF para un pago de la tabla payments (PagoTIC)"""
     if request.method == 'OPTIONS':
         return '', 204
     
@@ -3641,11 +3641,14 @@ def get_payments_receipt(record_id):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, payment_id, status, amount, currency, payer_email, 
-                       items_paid, wallet_response, created_at
+                SELECT id, payment_id, status, amount, payer_email, 
+                       items_paid, wallet_response, created_at,
+                       COALESCE(nombre, payer_email, 'N/A') as nombre,
+                       COALESCE(tipo_impuesto, 'N/A') as tipo_impuesto,
+                       COALESCE(detalle, 'N/A') as detalle
                 FROM payments 
-                WHERE id = %s
-            """, (record_id,))
+                WHERE payment_id = %s
+            """, (payment_id,))
             
             row = cur.fetchone()
             if not row:
@@ -3671,21 +3674,18 @@ def get_payments_receipt(record_id):
             if isinstance(items, list):
                 for item in items:
                     items_for_pdf.append({
-                        "description": item.get('description', item.get('descripcion', 'N/A')),
-                        "note": item.get('note', item.get('nota', item.get('descripcion', ''))),
+                        "description": item.get('description', item.get('descripcion', row[10])),
+                        "note": item.get('note', item.get('nota', '')),
                         "amount": item.get('amount', item.get('monto', 0))
                     })
             
-            nombre_pagador = wallet.get('payer_name', wallet.get('nombre', 'N/A'))
-            identificador = wallet.get('payer_id', wallet.get('dni', wallet.get('identification', 'N/A')))
-            
             pdf_details = {
                 "FECHA_PAGO": row[8].strftime("%d/%m/%Y %H:%M:%S") if row[8] else datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "ESTADO_PAGO": row[2].upper() if row[2] else "N/A",
+                "ESTADO_PAGO": row[2].upper() if row[2] else "APROBADO",
                 "ID_PAGO_MP": row[1] if row[1] else "N/A",
-                "NOMBRE_PAGADOR": nombre_pagador,
-                "IDENTIFICADOR_PAGADOR": identificador,
-                "MEDIO_PAGO": "PagoTIC",
+                "NOMBRE_PAGADOR": row[9] if row[9] else "N/A",
+                "IDENTIFICADOR_PAGADOR": row[4] if row[4] else "N/A",
+                "MEDIO_PAGO": row[10] if row[10] else "PagoTIC",
                 "items": items_for_pdf,
                 "MONTO_TOTAL": str(total_monto)
             }
@@ -3698,7 +3698,7 @@ def get_payments_receipt(record_id):
                     io.BytesIO(pdf_file.read()),
                     mimetype='application/pdf',
                     as_attachment=True,
-                    download_name=f'comprobante_pagotIC_{row[0]}.pdf'
+                    download_name=f'comprobante_pagotIC_{row[1]}.pdf'
                 )
             else:
                 return jsonify({"error": "Error generando PDF"}), 500
