@@ -227,12 +227,11 @@ const AdminDBPayments: React.FC = () => {
                 <tr>
                   <th>ID</th>
                   <th>Payment ID</th>
-                  <th>External ID</th>
+                  <th>Nombre</th>
+                  <th>Tipo Impuesto</th>
                   <th>Estado</th>
                   <th>Monto</th>
-                  <th>Moneda</th>
                   <th>Email</th>
-                  <th>Detalles</th>
                   <th>Creado</th>
                   <th>Acción</th>
                 </tr>
@@ -249,20 +248,15 @@ const AdminDBPayments: React.FC = () => {
                     <tr key={payment.id}>
                       <td>{payment.id}</td>
                       <td><small className="font-monospace">{payment.payment_id}</small></td>
-                      <td><small className="font-monospace">{payment.payment_id_external || '-'}</small></td>
+                      <td>{payment.nombre || payment.payer_email || '-'}</td>
+                      <td><span className="badge bg-info">{payment.tipo_impuesto || 'PagoTIC'}</span></td>
                       <td>
                         <span className={`badge bg-${getStatusBadge(payment.status)}`}>
                           {payment.status}
                         </span>
                       </td>
-                      <td className="text-end">${payment.amount.toFixed(2)}</td>
-                      <td>{payment.currency}</td>
+                      <td className="text-end fw-bold">${payment.amount.toFixed(2)}</td>
                       <td>{payment.payer_email || '-'}</td>
-                      <td>
-                        <small className="text-muted" style={{ maxWidth: '200px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={payment.items_paid ? (typeof payment.items_paid === 'string' ? payment.items_paid : JSON.stringify(payment.items_paid)) : '-'}>
-                          {payment.items_paid ? (typeof payment.items_paid === 'string' ? payment.items_paid : JSON.stringify(payment.items_paid)) : '-'}
-                        </small>
-                      </td>
                       <td><small>{formatDate(payment.created_at)}</small></td>
                       <td>
                         <Button

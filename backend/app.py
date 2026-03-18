@@ -1987,12 +1987,14 @@ def admin_db_payments():
                 if search:
                     search_query = """
                         WHERE payment_id ILIKE %s
-                        OR payment_id_external ILIKE %s
                         OR payer_email ILIKE %s
+                        OR nombre ILIKE %s
+                        OR tipo_impuesto ILIKE %s
+                        OR detalle ILIKE %s
                         OR status ILIKE %s
                     """
                     search_param = f"%{search}%"
-                    params = [search_param, search_param, search_param, search_param]
+                    params = [search_param, search_param, search_param, search_param, search_param, search_param]
 
                 # Contar total
                 count_query = f"SELECT COUNT(*) FROM payments {search_query}"
@@ -2001,8 +2003,8 @@ def admin_db_payments():
 
                 # Obtener datos paginados
                 data_query = f"""
-                    SELECT id, payment_id, payment_id_external, status, amount,
-                           currency, payer_email, items_paid, created_at, updated_at
+                    SELECT id, payment_id, status, amount, payer_email, created_at,
+                           nombre, tipo_impuesto, detalle
                     FROM payments
                     {search_query}
                     ORDER BY created_at DESC
@@ -2017,8 +2019,6 @@ def admin_db_payments():
                 for record in records:
                     if record.get('created_at'):
                         record['created_at'] = record['created_at'].isoformat()
-                    if record.get('updated_at'):
-                        record['updated_at'] = record['updated_at'].isoformat()
                     if record.get('amount'):
                         record['amount'] = float(record['amount'])
 
@@ -3654,38 +3654,44 @@ def get_payments_receipt(payment_id):
             if not row:
                 return jsonify({"error": "Registro no encontrado"}), 404
             
-            items = row[6] if row[6] else []
+            items = row[5] if row[5] else []
             if isinstance(items, str):
                 try:
                     items = json.loads(items)
                 except:
                     items = []
             
-            wallet = row[7] if row[7] else {}
-            if isinstance(wallet, str):
-                try:
-                    wallet = json.loads(wallet)
-                except:
-                    wallet = {}
-            
             items_for_pdf = []
             total_monto = float(row[3]) if row[3] else 0
             
-            if isinstance(items, list):
+            # Usar tipo_impuesto y detalle
+            tipo_impuesto = row[9] if row[9] else "PagoTIC"
+            detalle_pago = row[10] if row[10] else ""
+            
+            if items and isinstance(items, list):
                 for item in items:
                     items_for_pdf.append({
-                        "description": item.get('description', item.get('descripcion', row[10])),
+                        "description": item.get('description', item.get('descripcion', detalle_pago or tipo_impuesto)),
                         "note": item.get('note', item.get('nota', '')),
                         "amount": item.get('amount', item.get('monto', 0))
                     })
             
+            # Formatear fecha
+            fecha_pago = row[7]
+            if isinstance(fecha_pago, str):
+                fecha_str = fecha_pago
+            elif hasattr(fecha_pago, 'strftime'):
+                fecha_str = fecha_pago.strftime("%d/%m/%Y %H:%M:%S")
+            else:
+                fecha_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            
             pdf_details = {
-                "FECHA_PAGO": row[8].strftime("%d/%m/%Y %H:%M:%S") if row[8] else datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "FECHA_PAGO": fecha_str,
                 "ESTADO_PAGO": row[2].upper() if row[2] else "APROBADO",
                 "ID_PAGO_MP": row[1] if row[1] else "N/A",
-                "NOMBRE_PAGADOR": row[9] if row[9] else "N/A",
+                "NOMBRE_PAGADOR": row[8] if row[8] else "N/A",
                 "IDENTIFICADOR_PAGADOR": row[4] if row[4] else "N/A",
-                "MEDIO_PAGO": row[10] if row[10] else "PagoTIC",
+                "MEDIO_PAGO": tipo_impuesto,
                 "items": items_for_pdf,
                 "MONTO_TOTAL": str(total_monto)
             }
@@ -3698,7 +3704,7 @@ def get_payments_receipt(payment_id):
                     io.BytesIO(pdf_file.read()),
                     mimetype='application/pdf',
                     as_attachment=True,
-                    download_name=f'comprobante_pagotIC_{row[1]}.pdf'
+                    download_name=f'comprobante_{row[1]}.pdf'
                 )
             else:
                 return jsonify({"error": "Error generando PDF"}), 500
