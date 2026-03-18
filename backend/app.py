@@ -13,7 +13,7 @@ import mercadopago
 import psycopg2
 import resend
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from pyairtable import Api
 from pyairtable.formulas import AND, LOWER, OR, SEARCH, Field, match
