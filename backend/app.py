@@ -4,6 +4,7 @@ import base64
 import uuid
 import traceback
 import io
+import csv
 import requests
 import time
 from datetime import datetime
@@ -2032,45 +2033,21 @@ def get_polideportivo_data():
     try:
         spreadsheet_id = '1Wnkvuux22wWLiUzk2x781xVRMaIp7U-uZeRw3tg-cnI'
         
-        url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:json&tq=select *'
+        csv_url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}/pub?output=csv'
         
-        response = requests.get(url, timeout=30)
+        response = requests.get(csv_url, timeout=30)
         
         if response.status_code != 200:
-            return jsonify({"error": "Error conectando con Google Sheets"}), 500
+            return jsonify({"error": f"Error conectando con Google Sheets (status: {response.status_code})"}), 500
         
-        text = response.text
-        json_str = text.replace('google.visualization.Query.setResponse(', '').rstrip(');')
-        data = json.loads(json_str)
+        csv_content = response.text
         
-        if 'table' not in data or 'rows' not in data['table']:
+        lines = csv_content.strip().split('\n')
+        if len(lines) < 2:
             return jsonify({"data": [], "total": 0})
         
-        cols = data['table']['cols']
-        rows = data['table']['rows']
-        
-        headers = []
-        for col in cols:
-            if 'label' in col:
-                headers.append(col['label'])
-            elif 'id' in col:
-                headers.append(col['id'])
-            else:
-                headers.append('Columna')
-        
-        records = []
-        for row in rows:
-            record = {}
-            for idx, cell in enumerate(row.get('c', [])):
-                header = headers[idx] if idx < len(headers) else f'Columna_{idx}'
-                if cell and 'v' in cell:
-                    val = cell['v']
-                    if isinstance(val, float) and val == int(val):
-                        val = int(val)
-                    record[header] = val
-                else:
-                    record[header] = ''
-            records.append(record)
+        reader = csv.DictReader(lines)
+        records = list(reader)
         
         return jsonify({"data": records, "total": len(records)}), 200
         
