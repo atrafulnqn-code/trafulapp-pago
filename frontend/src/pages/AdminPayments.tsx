@@ -208,17 +208,19 @@ const AdminPayments: React.FC = () => {
                                                             <td className="small">{payment.comprobante_status !== 'N/A' ? payment.comprobante_status : '-'}</td>
                                                             <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                             <td>
-                                                                {payment.link_comprobante && payment.link_comprobante !== 'N/A' && (
+                                                                <div className="d-flex gap-2">
                                                                     <Button
                                                                         variant="outline-primary"
                                                                         size="sm"
                                                                         className="py-0"
-                                                                        href={payment.link_comprobante}
-                                                                        target="_blank"
+                                                                        onClick={() => {
+                                                                            const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+                                                                            window.open(`${apiUrl}/admin/receipt/${payment.id}`, '_blank');
+                                                                        }}
                                                                     >
-                                                                        Ver Comprobante
+                                                                        📄 Ver PDF
                                                                     </Button>
-                                                                )}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ))

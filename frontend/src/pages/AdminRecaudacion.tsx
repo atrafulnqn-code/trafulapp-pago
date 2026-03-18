@@ -64,25 +64,26 @@ const AdminRecaudacion: React.FC = () => {
       <Card className="shadow-sm border-0">
         <Card.Body className="p-0">
           <Table responsive hover striped className="mb-0">
-            <thead className="bg-light">
-              <tr>
-                <th>Fecha</th>
-                <th>Contribuyente</th>
-                <th>Estado</th>
-                <th>Administrativa</th>
-                <th>Email</th>
-                <th>Subtotal</th>
-                <th>Desc.</th>
-                <th>Total</th>
-                <th>Transferencia</th>
-                <th>Conceptos</th>
-              </tr>
-            </thead>
+              <thead className="bg-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Contribuyente</th>
+                  <th>Estado</th>
+                  <th>Administrativa</th>
+                  <th>Email</th>
+                  <th>Subtotal</th>
+                  <th>Desc.</th>
+                  <th>Total</th>
+                  <th>Transferencia</th>
+                  <th>Conceptos</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={10} className="text-center py-5"><Spinner animation="border" /></td></tr>
+                <tr><td colSpan={11} className="text-center py-5"><Spinner animation="border" /></td></tr>
               ) : records.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-5">No hay registros encontrados.</td></tr>
+                <tr><td colSpan={11} className="text-center py-5">No hay registros encontrados.</td></tr>
               ) : (
                 records.map((rec) => (
                   <tr key={rec.id}>
@@ -101,6 +102,17 @@ const AdminRecaudacion: React.FC = () => {
                     <td>{rec.transferencia || '-'}</td>
                     <td>
                       <small className="text-muted" title={rec.detalle}>Ver Detalle</small>
+                    </td>
+                    <td>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => {
+                          window.open(`${API_BASE_URL}/admin/recaudacion/${rec.id}/receipt`, '_blank');
+                        }}
+                      >
+                        📄 PDF
+                      </Button>
                     </td>
                   </tr>
                 ))

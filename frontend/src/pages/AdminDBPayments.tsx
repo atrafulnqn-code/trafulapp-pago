@@ -234,6 +234,7 @@ const AdminDBPayments: React.FC = () => {
                   <th>Email</th>
                   <th>Detalles</th>
                   <th>Creado</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,6 +264,17 @@ const AdminDBPayments: React.FC = () => {
                         </small>
                       </td>
                       <td><small>{formatDate(payment.created_at)}</small></td>
+                      <td>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => {
+                            window.open(`${API_BASE_URL}/admin/receipt/${payment.id}`, '_blank');
+                          }}
+                        >
+                          📄 PDF
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}

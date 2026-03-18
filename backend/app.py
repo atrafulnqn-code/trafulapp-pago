@@ -3409,7 +3409,155 @@ def get_payments_history():
         conn.close()
 
 
-@app.route('/api/admin/recaudacion', methods=['GET', 'OPTIONS'])
+@app.route('/api/admin/receipt/<int:record_id>', methods=['GET', 'OPTIONS'])
+def get_receipt_pdf(record_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+        
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, payment_id, comprobante_numero, nombre_apellido, dni, email, monto, estado, fecha_hora, items_pagados
+                FROM payment_history 
+                WHERE id = %s
+            """, (record_id,))
+            
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Registro no encontrado"}), 404
+            
+            items = row[9] if row[9] else []
+            if isinstance(items, str):
+                try:
+                    items = json.loads(items)
+                except:
+                    items = []
+            
+            items_for_pdf = []
+            total_monto = float(row[6]) if row[6] else 0
+            
+            if isinstance(items, list):
+                for item in items:
+                    items_for_pdf.append({
+                        "description": item.get('description', item.get('descripcion', 'N/A')),
+                        "note": item.get('note', item.get('nota', item.get('descripcion', ''))),
+                        "amount": item.get('amount', item.get('monto', 0))
+                    })
+            
+            pdf_details = {
+                "FECHA_PAGO": row[8].strftime("%d/%m/%Y %H:%M:%S") if row[8] else datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "ESTADO_PAGO": row[7] if row[7] else "N/A",
+                "ID_PAGO_MP": row[1] if row[1] else "N/A",
+                "NOMBRE_PAGADOR": row[3] if row[3] else "N/A",
+                "IDENTIFICADOR_PAGADOR": row[4] if row[4] else "N/A",
+                "MEDIO_PAGO": "Mercado Pago",
+                "items": items_for_pdf,
+                "MONTO_TOTAL": str(total_monto)
+            }
+            
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=str(row[0]))
+            
+            if pdf_file:
+                pdf_file.seek(0)
+                return send_file(
+                    io.BytesIO(pdf_file.read()),
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=f'comprobante_{row[0]}.pdf'
+                )
+            else:
+                return jsonify({"error": "Error generando PDF"}), 500
+                
+    except Exception as e:
+        print(f"Error en get_receipt_pdf: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/recaudacion/<int:record_id>/receipt', methods=['GET', 'OPTIONS'])
+def get_recaudacion_receipt(record_id):
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "No database connection"}), 500
+        
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, fecha_pago, nombre, email, monto_total, tipo_pago, detalle, administrativo
+                FROM cash_payments 
+                WHERE id = %s
+            """, (record_id,))
+            
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Registro no encontrado"}), 404
+            
+            detalle_json = row[6] if row[6] else '{}'
+            try:
+                if isinstance(detalle_json, str):
+                    detalle = json.loads(detalle_json)
+                else:
+                    detalle = detalle_json
+            except:
+                detalle = {}
+            
+            items_for_pdf = []
+            importes = detalle.get('importes', {})
+            for concepto, monto in importes.items():
+                items_for_pdf.append({
+                    "description": concepto.replace('_', ' ').title(),
+                    "note": detalle.get('notas', {}).get(concepto, ''),
+                    "amount": float(monto) if monto else 0
+                })
+            
+            pdf_details = {
+                "FECHA_PAGO": row[1].strftime("%d/%m/%Y") if row[1] else datetime.now().strftime("%d/%m/%Y"),
+                "ESTADO_PAGO": "Pagado",
+                "ID_PAGO_MP": "-",
+                "NOMBRE_PAGADOR": row[2] if row[2] else "N/A",
+                "IDENTIFICADOR_PAGADOR": row[3] if row[3] else "N/A",
+                "MEDIO_PAGO": row[5].replace('_', ' ').title() if row[5] else "Efectivo",
+                "items": items_for_pdf,
+                "MONTO_TOTAL": str(float(row[4]) if row[4] else 0)
+            }
+            
+            pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=str(row[0]))
+            
+            if pdf_file:
+                pdf_file.seek(0)
+                return send_file(
+                    io.BytesIO(pdf_file.read()),
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=f'comprobante_recaudacion_{row[0]}.pdf'
+                )
+            else:
+                return jsonify({"error": "Error generando PDF"}), 500
+                
+    except Exception as e:
+        print(f"Error en get_recaudacion_receipt: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/admin/payments_history', methods=['GET', 'OPTIONS'])
 def get_recaudacion():
     if request.method == 'OPTIONS':
         return '', 204
