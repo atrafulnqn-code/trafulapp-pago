@@ -2029,11 +2029,10 @@ def get_polideportivo_data():
     try:
         spreadsheet_id = '1Wnkvuux22wWLiUzk2x781xVRMaIp7U-uZeRw3tg-cnI'
         
-        url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:json'
+        url = f'https://docs.google.com/spreadsheets/d/e/2PACX-1vS2BLtkuWuTk8Tht6jzAd5HKNgYkbDfRo2wVVZfBboSj_hGLzs2l4NTjrtICNeXy1U18HsQS3NqEeAU/pub?gid=0&single=true&output=csv'
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         response = requests.get(url, headers=headers, timeout=30)
@@ -2041,46 +2040,20 @@ def get_polideportivo_data():
         if response.status_code != 200:
             return jsonify({"error": f"Error conectando con Google Sheets (status: {response.status_code})"}), 500
         
-        text = response.text
+        csv_content = response.text
         
-        if 'google.visualization' not in text:
-            return jsonify({"error": "La respuesta no es válida. Verificá que el spreadsheet esté publicado.", "debug": text[:200]}), 500
+        if not csv_content or len(csv_content.strip()) < 10:
+            return jsonify({"error": "La respuesta está vacía", "data": []}), 200
         
-        json_str = text.replace('google.visualization.Query.setResponse(', '').rstrip(');')
-        data = json.loads(json_str)
+        lines = csv_content.strip().split('\n')
+        if len(lines) < 2:
+            return jsonify({"error": "No hay suficientes filas de datos", "data": []}), 200
         
-        if 'table' not in data:
-            return jsonify({"error": "No se encontraron datos en la tabla", "data": []}), 200
-        
-        cols = data['table'].get('cols', [])
-        rows = data['table'].get('rows', [])
-        
-        headers_list = []
-        for col in cols:
-            header = col.get('label') or col.get('id', 'Columna')
-            headers_list.append(header)
-        
-        records = []
-        for row in rows:
-            record = {}
-            cells = row.get('c', [])
-            for idx, cell in enumerate(cells):
-                header = headers_list[idx] if idx < len(headers_list) else f'Columna_{idx}'
-                if cell and 'v' in cell:
-                    val = cell['v']
-                    if isinstance(val, float) and val == int(val):
-                        val = int(val)
-                    record[header] = val
-                else:
-                    record[header] = ''
-            if record:
-                records.append(record)
+        reader = csv.DictReader(lines)
+        records = list(reader)
         
         return jsonify({"data": records, "total": len(records)}), 200
         
-    except json.JSONDecodeError as e:
-        print(f"JSON error: {e}")
-        return jsonify({"error": "Error parseando respuesta de Google Sheets"}), 500
     except Exception as e:
         print(f"Error en get_polideportivo_data: {e}")
         return jsonify({"error": str(e)}), 500
