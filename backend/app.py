@@ -2019,6 +2019,66 @@ def admin_db_payments():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/polideportivo/data', methods=['GET', 'OPTIONS'])
+def get_polideportivo_data():
+    """Obtener datos del polideportivo desde Google Sheets"""
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+    
+    try:
+        spreadsheet_id = '1Wnkvuux22wWLiUzk2x781xVRMaIp7U-uZeRw3tg-cnI'
+        
+        url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:json&tq=select *'
+        
+        response = requests.get(url, timeout=30)
+        
+        if response.status_code != 200:
+            return jsonify({"error": "Error conectando con Google Sheets"}), 500
+        
+        text = response.text
+        json_str = text.replace('google.visualization.Query.setResponse(', '').rstrip(');')
+        data = json.loads(json_str)
+        
+        if 'table' not in data or 'rows' not in data['table']:
+            return jsonify({"data": [], "total": 0})
+        
+        cols = data['table']['cols']
+        rows = data['table']['rows']
+        
+        headers = []
+        for col in cols:
+            if 'label' in col:
+                headers.append(col['label'])
+            elif 'id' in col:
+                headers.append(col['id'])
+            else:
+                headers.append('Columna')
+        
+        records = []
+        for row in rows:
+            record = {}
+            for idx, cell in enumerate(row.get('c', [])):
+                header = headers[idx] if idx < len(headers) else f'Columna_{idx}'
+                if cell and 'v' in cell:
+                    val = cell['v']
+                    if isinstance(val, float) and val == int(val):
+                        val = int(val)
+                    record[header] = val
+                else:
+                    record[header] = ''
+            records.append(record)
+        
+        return jsonify({"data": records, "total": len(records)}), 200
+        
+    except Exception as e:
+        print(f"Error en get_polideportivo_data: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/db/hr-payslip-requests', methods=['GET', 'OPTIONS'])
 def admin_db_hr_payslip_requests():
     """Obtener tabla hr_payslip_requests con búsqueda y paginación"""

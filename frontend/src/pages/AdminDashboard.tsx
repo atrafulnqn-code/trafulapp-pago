@@ -135,6 +135,24 @@ const AdminDashboard: React.FC = () => {
             </Card.Body>
           </Card>
         </Col>
+
+        {/* Módulo Pagos Polideportivo */}
+        <Col>
+          <Card className="h-100 shadow-sm border-0 hover-shadow transition-all" style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/db/polideportivo')}>
+            <Card.Body className="text-center p-4">
+              <div className="text-warning mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-person-walking" viewBox="0 0 16 16">
+                  <path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.193 0 .38.074.52.206l2.365 2.22a.25.25 0 0 1 .01.353s-.308.342-.315.348l-1.815 1.63a.4.4 0 0 1-.54 0L7.433 7.218 5.755 11.2a.5.5 0 0 1-.916-.4l1.633-3.872a.4.4 0 0 1 .158-.19l.716-.474-.833-2.4a.4.4 0 0 1 .056-.328l.85-1.428a.4.4 0 0 1 .022-.032zM3.834 8.7a.5.5 0 0 1 .553.433l.4 4a.5.5 0 0 1-.986.098l-.4-4a.5.5 0 0 1 .433-.531m9.366-2.583a.4.4 0 0 1 .4.4V11.5a.5.5 0 0 1-1 0V6.517a.4.4 0 0 1 .4-.4z" />
+                  <path d="M7.42 14.73a.5.5 0 0 1-.42-.56l.4-4a.5.5 0 1 1 .99.1l-.4 4a.5.5 0 0 1-.57.46z" />
+                </svg>
+              </div>
+              <Card.Title className="fw-bold">Pagos Polideportivo</Card.Title>
+              <Card.Text className="text-muted small">
+                Registro de pagos y actividades del polideportivo municipal.
+              </Card.Text>
+            </Card.Body>
+          </Card>
+        </Col>
       </Row>
     </Container>
   );
