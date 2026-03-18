@@ -269,7 +269,7 @@ const AdminDBPayments: React.FC = () => {
                           variant="outline-primary"
                           size="sm"
                           onClick={() => {
-                            window.open(`${API_BASE_URL}/admin/receipt/${payment.id}`, '_blank');
+                            window.open(`${API_BASE_URL}/admin/payments/${payment.id}/receipt`, '_blank');
                           }}
                         >
                           📄 PDF

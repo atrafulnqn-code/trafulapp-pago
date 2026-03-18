@@ -214,8 +214,7 @@ const AdminPayments: React.FC = () => {
                                                                         size="sm"
                                                                         className="py-0"
                                                                         onClick={() => {
-                                                                            const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
-                                                                            window.open(`${apiUrl}/admin/receipt/${payment.id}`, '_blank');
+                                                                            window.open(`${API_BASE_URL}/admin/receipt/${payment.id}`, '_blank');
                                                                         }}
                                                                     >
                                                                         📄 Ver PDF
