@@ -2453,6 +2453,99 @@ def update_payment_observaciones():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/admin/db/payment-history/<int:record_id>/pdf', methods=['GET', 'OPTIONS'])
+def get_payment_history_pdf(record_id):
+    """Generar y descargar PDF de un pago en payment_history"""
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        is_valid, error_response = validate_admin_auth()
+        if not is_valid:
+            return error_response
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, payment_id, comprobante_numero, nombre_apellido, dni, email, monto, estado, items_pagados, detalles, fecha_hora FROM payment_history WHERE id = %s",
+                    (record_id,)
+                )
+                row = cur.fetchone()
+
+                if not row:
+                    return jsonify({"error": "Registro no encontrado"}), 404
+
+                # row indexes: 0:id, 1:payment_id, 2:comprobante_numero, 3:nombre_apellido, 4:dni, 5:email, 6:monto, 7:estado, 8:items_pagados, 9:detalles, 10:fecha_hora
+                payment_id = row[1]
+                comprobante_numero = row[2] or payment_id
+                nombre_apellido = row[3]
+                dni = row[4]
+                email = row[5]
+                monto = float(row[6])
+                estado = row[7]
+                items_pagados = row[8]
+                detalles = row[9]
+                
+                fecha_hora = "N/A"
+                if row[10]:
+                    try:
+                        fecha_hora = row[10].strftime("%d/%m/%Y %H:%M")
+                    except Exception:
+                        fecha_hora = str(row[10])
+
+                # Parsear items_pagados
+                items_list = []
+                if items_pagados:
+                    try:
+                        if isinstance(items_pagados, str):
+                            items_list = json.loads(items_pagados)
+                        elif isinstance(items_pagados, list):
+                            items_list = items_pagados
+                    except Exception:
+                        pass
+
+                if not items_list:
+                    items_list = [{
+                        "description": detalles or "Pago Registrado en Historial",
+                        "amount": monto
+                    }]
+
+                # Construir pdf_details
+                pdf_details = {
+                    "FECHA_PAGO": fecha_hora,
+                    "ESTADO_PAGO": estado.capitalize(),
+                    "ID_PAGO_MP": comprobante_numero,
+                    "NOMBRE_PAGADOR": nombre_apellido,
+                    "IDENTIFICADOR_PAGADOR": dni if dni and dni != "N/A" else (email or "N/A"),
+                    "MONTO_TOTAL": str(monto),
+                    "MEDIO_PAGO": "Pago TIC" if payment_id.startswith("PAY") else "Efectivo",
+                    "items": items_list
+                }
+
+                pdf_file, pdf_id = create_receipt_pdf(pdf_details, pdf_id=str(row[0]))
+
+                if not pdf_file:
+                     return jsonify({"error": "No se pudo generar el PDF"}), 500
+
+                return send_file(
+                    pdf_file,
+                    mimetype='application/pdf',
+                    as_attachment=True,
+                    download_name=f'comprobante_{comprobante_numero}.pdf'
+                )
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        log_to_airtable('ERROR', 'Get Receipt PDF', f'Error generando PDF para ID {record_id}: {e}')
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/db/error-logs', methods=['GET', 'OPTIONS'])
 def admin_db_error_logs():
     """Obtener tabla error_logs con búsqueda y paginación"""

@@ -146,6 +146,27 @@ const AdminDBPaymentHistory: React.FC = () => {
     }
   };
 
+  const handleDownloadPdf = async (id: number) => {
+    try {
+      const password = localStorage.getItem('adminPassword') || '';
+      const response = await axios.get(`${API_BASE_URL}/admin/db/payment-history/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${password}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `comprobante_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error al descargar PDF:', err);
+      alert('Error al descargar el comprobante PDF');
+    }
+  };
+
   const handleStartEdit = (id: number, currentValue: string) => {
     setEditingId(id);
     setEditValues(prev => ({ ...prev, [id]: currentValue || '' }));
@@ -289,47 +310,41 @@ const AdminDBPaymentHistory: React.FC = () => {
             <Table striped bordered hover>
               <thead className="table-dark">
                 <tr>
-                  <th>ID</th>
-                  <th>Payment ID</th>
-                  <th>Comprobante</th>
-                  <th>Nombre</th>
-                  <th>DNI</th>
-                  <th>Email</th>
-                  <th>Monto</th>
-                  <th>Estado</th>
-                  <th>Detalles</th>
-                  <th>Observaciones</th>
                   <th>Fecha</th>
+                  <th>Nombre</th>
+                  <th>Monto</th>
+                  <th>Detalles</th>
+                  <th>Email</th>
+                  <th>Estado</th>
+                  <th>Observaciones</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center text-muted">
+                    <td colSpan={8} className="text-center text-muted">
                       No se encontraron registros
                     </td>
                   </tr>
                 ) : (
                   records.map((record) => (
                     <tr key={record.id}>
-                      <td>{record.id}</td>
-                      <td><small className="font-monospace">{record.payment_id}</small></td>
-                      <td>{record.comprobante_numero || '-'}</td>
+                      <td><small>{formatDate(record.fecha_hora)}</small></td>
                       <td>{record.nombre_apellido}</td>
-                      <td>{record.dni}</td>
-                      <td>{record.email || '-'}</td>
-                      <td className="text-end">
+                      <td className="text-end fw-bold">
                         ${record.monto != null && !isNaN(record.monto) ? Number(record.monto).toFixed(2) : '0.00'}
                       </td>
+                      <td>
+                        <small className="text-muted" style={{ maxWidth: '250px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}>
+                          {record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}
+                        </small>
+                      </td>
+                      <td>{record.email || '-'}</td>
                       <td>
                         <span className={`badge bg-${getEstadoBadge(record.estado)}`}>
                           {record.estado}
                         </span>
-                      </td>
-                      <td>
-                        <small className="text-muted" style={{ maxWidth: '200px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}>
-                          {record.detalles || (record.items_pagados ? (typeof record.items_pagados === 'string' ? record.items_pagados : JSON.stringify(record.items_pagados)) : '-')}
-                        </small>
                       </td>
                       <td style={{ minWidth: '180px' }}>
                         {editingId === record.id ? (
@@ -366,7 +381,20 @@ const AdminDBPaymentHistory: React.FC = () => {
                           </div>
                         )}
                       </td>
-                      <td><small>{formatDate(record.fecha_hora)}</small></td>
+                      <td>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => handleDownloadPdf(record.id)}
+                          className="d-flex align-items-center gap-1"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="bi bi-file-earmark-pdf" viewBox="0 0 16 16">
+                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
+                            <path d="M4.603 12.087a.81.81 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.166-.257.433-.418.756-.472.305-.052.786-.066 1.175-.026.113.012.217.025.32.039a10.761 10.761 0 0 1 .997-.906 19.135 19.135 0 0 1 1.147-1.157c.182-.227.38-.433.56-.617.073-.074.14-.142.202-.204.086-.23.16-.453.212-.653.074-.29.094-.555.034-.787-.058-.226-.22-.441-.444-.543a.622.622 0 0 0-.622.012c-.21.134-.366.38-.478.675-.11.289-.16.6-.145.897.01.2.044.382.09.54l-.04.03a6.407 6.407 0 0 0-.432.417 19.155 19.155 0 0 0-1.397 1.638c-.139.183-.27.345-.39.489a10.781 10.781 0 0 0-1.214.911 2.327 2.327 0 0 0-.317.311c-.1.114-.188.211-.26.305zm1.758-1.12c.382.023.639.055.856.108.176.043.277.094.341.156.09-.071.18-.163.26-.26.21-.252.34-.52.413-.778a10.755 10.755 0 0 0-1.137.937 2.333 2.333 0 0 0-.733.837zm2.46-3.716c-.03-.133-.042-.257-.033-.372.016-.2.072-.372.162-.48a.222.222 0 0 1 .157-.042c.07.009.136.059.186.136.054.083.08.195.074.34a1.889 1.889 0 0 1-.094.514 4.302 4.302 0 0 1-.452.836 1.64 1.64 0 0 1-.044-.044 4.414 4.414 0 0 1-.166-.2c-.04-.055-.078-.114-.114-.176zm.575 2.056c-.086.107-.171.211-.253.313a19.135 19.135 0 0 0-1.168 1.56c-.087.13-.17.259-.25.385a10.835 10.835 0 0 0 1.258-.851 16.594 16.594 0 0 0 .584-.668c-.056-.252-.1-.497-.13-.733l-.041-.006z"/>
+                          </svg>
+                          Ver PDF
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 )}
