@@ -18,18 +18,17 @@ const API_BASE_URL = getApiBaseUrl();
 
 interface PaymentRecord {
     id: string;
-    fecha_transaccion: string;
+    payment_id: string;
+    comprobante: string;
     timestamp: string;
     estado: string;
-    mp_payment_id: string;
     items_pagados_json: string;
-    comprobante_status: string;
-    link_comprobante: string;
     contribuyente: string;
-    contribuyente_dni: string;
+    nombre: string;
+    email: string;
     monto: number;
     detalle: string;
-    payment_type: string;
+    observaciones: string;
 }
 
 const AdminPayments: React.FC = () => {
@@ -161,9 +160,11 @@ const AdminPayments: React.FC = () => {
                                             <thead className="bg-light">
                                                 <tr>
                                                     <th>Fecha</th>
+                                                    <th>Comprobante</th>
+                                                    <th>Nombre</th>
+                                                    <th>Email</th>
                                                     <th>Estado</th>
-                                                    <th>Contribuyente</th>
-                                                    <th>Conceptos</th>
+                                                    <th>Detalles</th>
                                                     <th className="text-end">Monto</th>
                                                     <th>Acción</th>
                                                 </tr>
@@ -171,12 +172,12 @@ const AdminPayments: React.FC = () => {
                                             <tbody>
                                                 {payments.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={6} className="text-center py-3">No se encontraron registros.</td>
+                                                        <td colSpan={8} className="text-center py-3">No se encontraron registros.</td>
                                                     </tr>
                                                 ) : (
                                                     payments.map((payment) => (
                                                         <tr key={payment.id}>
-                                                            <td>
+                                                            <td className="small">
                                                                 {payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
                                                                     year: 'numeric',
                                                                     month: '2-digit',
@@ -185,14 +186,16 @@ const AdminPayments: React.FC = () => {
                                                                     minute: '2-digit'
                                                                 }) : '-'}
                                                             </td>
+                                                            <td className="font-monospace small" style={{maxWidth: '150px'}}>{payment.comprobante || payment.payment_id || '-'}</td>
+                                                            <td>{payment.nombre || payment.contribuyente || '-'}</td>
+                                                            <td className="small">{payment.email || '-'}</td>
                                                             <td>
                                                                 <span className={`badge bg-${payment.estado === 'approved' || payment.estado === 'exitoso' ? 'success' : payment.estado === 'fallido' ? 'danger' : 'secondary'}`}>
                                                                     {payment.estado}
                                                                 </span>
                                                             </td>
-                                                            <td>{payment.contribuyente !== 'N/A' ? payment.contribuyente : '-'}</td>
-                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={parseItemsPagados(payment.items_pagados_json)}>
-                                                                {parseItemsPagados(payment.items_pagados_json) || '-'}
+                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={payment.detalle || payment.items_pagados_json}>
+                                                                {payment.detalle || parseItemsPagados(payment.items_pagados_json) || '-'}
                                                             </td>
                                                             <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                             <td>
