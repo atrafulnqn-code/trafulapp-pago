@@ -3602,18 +3602,27 @@ def get_payments_history():
             
             payments = []
             for row in cur.fetchall():
+                items_pagados_str = json.dumps(row[9]) if row[9] else '[]'
+                detalles_str = ""
+                if row[9]:
+                    try:
+                        items = row[9] if isinstance(row[9], list) else json.loads(row[9])
+                        if isinstance(items, list):
+                            detalles_str = ", ".join([item.get('description', item.get('descripcion', '')) for item in items if item])
+                    except:
+                        detalles_str = str(row[9])
+                
                 payments.append({
                     "id": row[0],
-                    "mp_payment_id": row[1],
-                    "comprobante_status": "Generado" if row[2] else "N/A",
-                    "link_comprobante": f"{BACKEND_URL}/api/receipt/{row[0]}" if row[2] else None,
-                    "contribuyente": row[3],
-                    "contribuyente_dni": row[4],
+                    "payment_id": row[1],
+                    "comprobante": row[2],
+                    "nombre": row[3],
                     "email": row[5],
                     "monto": float(row[6]) if row[6] else 0,
                     "estado": row[7],
                     "timestamp": row[8].isoformat() if row[8] else None,
-                    "items_pagados_json": json.dumps(row[9]) if row[9] else '[]'
+                    "detalle": detalles_str,
+                    "observaciones": None
                 })
             
             return jsonify({

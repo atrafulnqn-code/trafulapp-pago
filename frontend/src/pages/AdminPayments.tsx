@@ -22,8 +22,6 @@ interface PaymentRecord {
     comprobante: string;
     timestamp: string;
     estado: string;
-    items_pagados_json: string;
-    contribuyente: string;
     nombre: string;
     email: string;
     monto: number;
@@ -117,18 +115,6 @@ const AdminPayments: React.FC = () => {
         return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
     };
 
-    const parseItemsPagados = (jsonString: string) => {
-        try {
-            const items = JSON.parse(jsonString);
-            if (Array.isArray(items)) {
-                return items.map(item => item.description).join(', ');
-            }
-        } catch (e) {
-            console.error("Error parsing ItemsPagadosJSON:", e);
-        }
-        return jsonString; // Fallback
-    }
-
     return (
         <Container className="py-5 mt-5">
             <Row className="justify-content-center">
@@ -187,15 +173,15 @@ const AdminPayments: React.FC = () => {
                                                                 }) : '-'}
                                                             </td>
                                                             <td className="font-monospace small" style={{maxWidth: '150px'}}>{payment.comprobante || payment.payment_id || '-'}</td>
-                                                            <td>{payment.nombre || payment.contribuyente || '-'}</td>
+                                                            <td>{payment.nombre || '-'}</td>
                                                             <td className="small">{payment.email || '-'}</td>
                                                             <td>
                                                                 <span className={`badge bg-${payment.estado === 'approved' || payment.estado === 'exitoso' ? 'success' : payment.estado === 'fallido' ? 'danger' : 'secondary'}`}>
                                                                     {payment.estado}
                                                                 </span>
                                                             </td>
-                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={payment.detalle || payment.items_pagados_json}>
-                                                                {payment.detalle || parseItemsPagados(payment.items_pagados_json) || '-'}
+                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={payment.detalle || '-'}>
+                                                                {payment.detalle || '-'}
                                                             </td>
                                                             <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                             <td>
