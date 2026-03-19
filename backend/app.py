@@ -1352,34 +1352,48 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                     for mes_key, sel in meses_a_actualizar.items():
                         if sel:
                             mesCapitalized = mes_key.capitalize()
+                            
                             if item_type == "agua":
-                                fields_to_update_origin[
-                                    f"{mesCapitalized} agua"] = 0
-                                fields_to_update_origin[
-                                    f"{mesCapitalized} Comercial"] = 0
-                            elif item_type == "lote":
-                                fields_to_update_origin[mes_key] = 0
-                            elif item_type == "vehiculo":
-                                # En la tabla Patente de Airtable los meses son texto en
-                                # minúscula exactamente: "enero", "febrero", etc.
-                                # El valor debe ser "0" (string) porque la columna es de tipo Text
-                                fields_to_update_origin[mes_key] = "0"
-
-                            desc = f"Cuota {mes_key.capitalize()}"
-                            if item_type == "agua":
-                                desc = (f"Cuota Agua/Comercial "
-                                        f"{mes_key.capitalize()}")
-                            elif item_type == "lote":
-                                desc = f"Cuota Tasas {mes_key.capitalize()}"
-                            elif item_type == "vehiculo":
-                                desc = f"Cuota Patente {mes_key.capitalize()}"
-                                
-                            monto = items_context.get(
-                                'meses_montos', {}).get(mes_key, 0)
-                            items_for_pdf.append({
-                                "description": desc,
-                                "amount": monto
-                            })
+                                monto_data = items_context.get('meses_montos', {}).get(mes_key, 0)
+                                if isinstance(sel, dict):
+                                    if sel.get("agua"):
+                                        fields_to_update_origin[f"{mesCapitalized} agua"] = 0
+                                        monto = monto_data.get("agua", 0) if isinstance(monto_data, dict) else monto_data
+                                        items_for_pdf.append({
+                                            "description": f"Cuota Agua {mesCapitalized}",
+                                            "amount": monto
+                                        })
+                                    if sel.get("comercial"):
+                                        fields_to_update_origin[f"{mesCapitalized} Comercial"] = 0
+                                        monto = monto_data.get("comercial", 0) if isinstance(monto_data, dict) else monto_data
+                                        items_for_pdf.append({
+                                            "description": f"Cuota Comercial {mesCapitalized}",
+                                            "amount": monto
+                                        })
+                                else:
+                                    # Fallback/Compatibilidad
+                                    fields_to_update_origin[f"{mesCapitalized} agua"] = 0
+                                    fields_to_update_origin[f"{mesCapitalized} Comercial"] = 0
+                                    monto = monto_data
+                                    items_for_pdf.append({
+                                        "description": f"Cuota Agua/Comercial {mesCapitalized}",
+                                        "amount": monto
+                                    })
+                            else:
+                                if item_type == "lote":
+                                    fields_to_update_origin[mes_key] = 0
+                                    desc = f"Cuota Tasas {mesCapitalized}"
+                                elif item_type == "vehiculo":
+                                    fields_to_update_origin[mes_key] = "0"
+                                    desc = f"Cuota Patente {mesCapitalized}"
+                                else:
+                                    desc = f"Cuota {mesCapitalized}"
+                                    
+                                monto = items_context.get('meses_montos', {}).get(mes_key, 0)
+                                items_for_pdf.append({
+                                    "description": desc,
+                                    "amount": monto
+                                })
 
                 if fields_to_update_origin and api:
                     try:

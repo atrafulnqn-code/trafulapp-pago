@@ -298,9 +298,30 @@ const PaymentFlow: React.FC = () => {
             nombre_contribuyente: systemConfig?.searchParam === 'nombre' ? inputValue : undefined,
             email: email, total_amount: totalAmount,
             deuda: selectedDebts.some(id => id.includes('deuda')), deuda_monto: result?.debts.find(d => d.id.includes('deuda'))?.amount || 0,
-            // Los meses enviados al backend deben reflejar los meses seleccionados, no necesariamente solo los filtrados
-            meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.split(' ')[0].toLowerCase()]: true }), {}), // "Enero (Agua)" -> "enero"
-            meses_montos: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc, d) => ({ ...acc, [d.period.split(' ')[0].toLowerCase()]: d.amount }), {})
+            meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc: any, d: any) => {
+                const month = d.period.split(' ')[0].toLowerCase();
+                const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
+                if (systemKey === PaymentSystem.AGUA) {
+                    if (!acc[month] || typeof acc[month] !== 'object') acc[month] = {};
+                    if (d.id.includes('agua')) acc[month].agua = true;
+                    if (d.id.includes('comercial')) acc[month].comercial = true;
+                } else {
+                    acc[month] = true;
+                }
+                return acc;
+            }, {}),
+            meses_montos: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc: any, d: any) => {
+                const month = d.period.split(' ')[0].toLowerCase();
+                const systemKey = system?.toUpperCase().replace('-', '_') as PaymentSystem;
+                if (systemKey === PaymentSystem.AGUA) {
+                    if (!acc[month] || typeof acc[month] !== 'object') acc[month] = {};
+                    if (d.id.includes('agua')) acc[month].agua = d.amount;
+                    if (d.id.includes('comercial')) acc[month].comercial = d.amount;
+                } else {
+                    acc[month] = d.amount;
+                }
+                return acc;
+            }, {}),
         };
     };
 
