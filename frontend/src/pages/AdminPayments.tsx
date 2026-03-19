@@ -160,13 +160,10 @@ const AdminPayments: React.FC = () => {
                                         <Table striped bordered hover size="sm" className="text-nowrap small mb-0">
                                             <thead className="bg-light">
                                                 <tr>
-                                                    <th>Fecha de Transacción</th>
+                                                    <th>Fecha</th>
                                                     <th>Estado</th>
-                                                    <th>MP Payment ID</th>
                                                     <th>Contribuyente</th>
-                                                    <th>DNI</th>
-                                                    <th>Conceptos Pagados</th>
-                                                    <th>Comprobante Status</th>
+                                                    <th>Conceptos</th>
                                                     <th className="text-end">Monto</th>
                                                     <th>Acción</th>
                                                 </tr>
@@ -174,52 +171,41 @@ const AdminPayments: React.FC = () => {
                                             <tbody>
                                                 {payments.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan={9} className="text-center py-3">No se encontraron registros.</td>
+                                                        <td colSpan={6} className="text-center py-3">No se encontraron registros.</td>
                                                     </tr>
                                                 ) : (
                                                     payments.map((payment) => (
                                                         <tr key={payment.id}>
                                                             <td>
-                                                                {payment.fecha_transaccion ? new Date(payment.fecha_transaccion).toLocaleString('es-AR', {
+                                                                {payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
                                                                     year: 'numeric',
                                                                     month: '2-digit',
                                                                     day: '2-digit',
                                                                     hour: '2-digit',
                                                                     minute: '2-digit'
-                                                                }) : (payment.timestamp ? new Date(payment.timestamp).toLocaleString('es-AR', {
-                                                                    year: 'numeric',
-                                                                    month: '2-digit',
-                                                                    day: '2-digit',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                }) : '-')}
+                                                                }) : '-'}
                                                             </td>
                                                             <td>
-                                                                <span className={`badge bg-${payment.estado === 'approved' || payment.estado.includes('Exitoso') ? 'success' : payment.estado.includes('Fallido') ? 'danger' : 'secondary'}`}>
+                                                                <span className={`badge bg-${payment.estado === 'approved' || payment.estado === 'exitoso' ? 'success' : payment.estado === 'fallido' ? 'danger' : 'secondary'}`}>
                                                                     {payment.estado}
                                                                 </span>
                                                             </td>
-                                                            <td className="font-monospace small">{payment.mp_payment_id}</td>
                                                             <td>{payment.contribuyente !== 'N/A' ? payment.contribuyente : '-'}</td>
-                                                            <td>{payment.contribuyente_dni !== 'N/A' ? payment.contribuyente_dni : '-'}</td>
-                                                            <td className="text-truncate" style={{ maxWidth: '250px' }} title={parseItemsPagados(payment.items_pagados_json)}>
+                                                            <td className="text-truncate" style={{ maxWidth: '300px' }} title={parseItemsPagados(payment.items_pagados_json)}>
                                                                 {parseItemsPagados(payment.items_pagados_json) || '-'}
                                                             </td>
-                                                            <td className="small">{payment.comprobante_status !== 'N/A' ? payment.comprobante_status : '-'}</td>
                                                             <td className="text-end fw-bold">{formatCurrency(payment.monto)}</td>
                                                             <td>
-                                                                <div className="d-flex gap-2">
-                                                                    <Button
-                                                                        variant="outline-primary"
-                                                                        size="sm"
-                                                                        className="py-0"
-                                                                        onClick={() => {
-                                                                            window.open(`${API_BASE_URL}/admin/receipt/${payment.id}`, '_blank');
-                                                                        }}
-                                                                    >
-                                                                        📄 Ver PDF
-                                                                    </Button>
-                                                                </div>
+                                                                <Button
+                                                                    variant="outline-primary"
+                                                                    size="sm"
+                                                                    className="py-0"
+                                                                    onClick={() => {
+                                                                        window.open(`${API_BASE_URL}/admin/receipt/${payment.id}`, '_blank');
+                                                                    }}
+                                                                >
+                                                                    📄 PDF
+                                                                </Button>
                                                             </td>
                                                         </tr>
                                                     ))
