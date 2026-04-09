@@ -118,6 +118,29 @@ const AdminPolideportivo: React.FC = () => {
     }
   };
 
+  const handleGenerateReceipt = async (rowIndex: string) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:10000/api';
+      const response = await fetch(`${apiUrl}/admin/polideportivo/receipt/${rowIndex}`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `comprobante_traful_${rowIndex}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        alert('Error al generar el comprobante');
+      }
+    } catch (err) {
+      alert('Error de conexión al generar comprobante');
+    }
+  };
+
   const getHeaders = () => {
     if (data.length === 0) return [];
     return Object.keys(data[0]).filter(k => !['row_index', 'tiene_comprobante', 'comprobante_filename'].includes(k));
@@ -329,6 +352,7 @@ const AdminPolideportivo: React.FC = () => {
                         {getHeaders().map((header, idx) => (
                           <th key={idx}>{header}</th>
                         ))}
+                        <th className="text-center">PDF</th>
                         <th>Comprobante</th>
                         <th>Adjuntar</th>
                       </tr>
@@ -349,6 +373,16 @@ const AdminPolideportivo: React.FC = () => {
                                 {formatValue(row[header])}
                               </td>
                             ))}
+                            <td className="text-center">
+                              <Button 
+                                variant="outline-primary" 
+                                size="sm"
+                                onClick={() => handleGenerateReceipt(row.row_index)}
+                                title="Generar Comprobante PDF de la Comuna"
+                              >
+                                📄 Ver PDF
+                              </Button>
+                            </td>
                             <td>
                               {row.tiene_comprobante ? (
                                 <Button 

@@ -2252,6 +2252,104 @@ def delete_polideportivo_comprobante(row_index):
         return jsonify({"error": str(e)}), 500
 
 
+def create_polideportivo_receipt(record):
+    """Genera un PDF de comprobante para un registro del Polideportivo."""
+    try:
+        pdf_id = f"POLI-{record.get('row_index', 'N/A')}-{str(uuid.uuid4())[:8].upper()}"
+        
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(base_dir, 'comprobante_template.html')
+        
+        if not os.path.exists(template_path):
+            return None, None
+            
+        with open(template_path, 'r', encoding='utf-8') as f:
+            html_template = f.read()
+            
+        # Preparar datos
+        nombre_completo = f"{record.get('name', '')} {record.get('apellido', '')}".strip() or "N/A"
+        fecha = record.get('fecha', datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        id_pago = record.get('id', 'N/A')
+        email = record.get('email', 'N/A')
+        monto = "15000"
+        
+        # Generar HTML de items
+        items_html = (
+            f"<tr><td>Derecho de Uso Polideportivo Municipal</td>"
+            f"<td>Reserva / Actividad</td>"
+            f"<td style='text-align: right;'>${monto}</td></tr>"
+        )
+        
+        # Reemplazar placeholders en el template
+        html_filled = html_template.replace("{{PDF_ID}}", pdf_id)
+        html_filled = html_filled.replace("{{FECHA_PAGO}}", fecha)
+        html_filled = html_filled.replace("{{ESTADO_PAGO}}", "Aprobado")
+        html_filled = html_filled.replace("{{ID_PAGO_MP}}", id_pago)
+        html_filled = html_filled.replace("{{NOMBRE_PAGADOR}}", nombre_completo)
+        html_filled = html_filled.replace("{{IDENTIFICADOR_PAGADOR}}", email)
+        html_filled = html_filled.replace("{{ITEMS_PAGADOS}}", items_html)
+        html_filled = html_filled.replace("{{MONTO_TOTAL}}", monto)
+        html_filled = html_filled.replace("{{MEDIO_PAGO}}", "Transferencia / Pago Directo")
+        
+        pdf_file = io.BytesIO()
+        html_doc = HTML(string=html_filled)
+        html_doc.write_pdf(target=pdf_file)
+        pdf_file.seek(0)
+        return pdf_file, pdf_id
+        
+    except Exception as e:
+        print(f"ERROR generando PDF Polideportivo: {e}\n{traceback.format_exc()}")
+        return None, None
+
+
+@app.route('/api/admin/polideportivo/receipt/<row_index>', methods=['GET', 'OPTIONS'])
+def get_polideportivo_receipt(row_index):
+    """Generar y descargar comprobante PDF para un registro del polideportivo"""
+    if request.method == 'OPTIONS':
+        return '', 204
+        
+    try:
+        # 1. Obtener la data desde el CSV de Google
+        url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS2BLtkuWuTk8Tht6jzAd5HKNgYkbDfRo2wVVZfBboSj_hGLzs2l4NTjrtICNeXy1U18HsQS3NqEeAU/pub?gid=0&single=true&output=csv'
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=20)
+        
+        if response.status_code != 200:
+            return jsonify({"error": "No se pudo conectar con el listado de pagos"}), 500
+            
+        lines = response.text.strip().split('\n')
+        reader = csv.DictReader(lines)
+        all_records = list(reader)
+        
+        # 2. Buscar el registro por row_index (nuestro index local es i+2)
+        target_record = None
+        for i, record in enumerate(all_records):
+            if str(i + 2) == str(row_index):
+                target_record = record
+                target_record['row_index'] = str(i + 2)
+                break
+                
+        if not target_record:
+            return jsonify({"error": "Registro no encontrado"}), 404
+            
+        # 3. Generar PDF
+        pdf_file, pdf_id = create_polideportivo_receipt(target_record)
+        
+        if not pdf_file:
+            return jsonify({"error": "No se pudo generar el PDF"}), 500
+            
+        return send_file(
+            pdf_file,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"comprobante_traful_{row_index}.pdf"
+        )
+        
+    except Exception as e:
+        print(f"Error en get_polideportivo_receipt: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/admin/db/hr-payslip-requests', methods=['GET', 'OPTIONS'])
 def admin_db_hr_payslip_requests():
     """Obtener tabla hr_payslip_requests con búsqueda y paginación"""

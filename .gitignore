@@ -26,3 +26,18 @@ logs/
 
 # Docker
 docker-compose.override.yml
+
+# Airtable and local data
+airtable_data.json
+datos_completos.json
+*.csv
+*.txt
+check_airtable.js
+export_airtable.js
+get_airtable_data.js
+check_db.js
+regenerar_comprobantes.js
+restore_payments.js
+update_payments.js
+tmp_search*.py
+ver_comprobantes.html
