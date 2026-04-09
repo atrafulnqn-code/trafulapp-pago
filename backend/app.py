@@ -2285,6 +2285,7 @@ def create_polideportivo_receipt(record):
         html_filled = html_filled.replace("{{FECHA_PAGO}}", fecha)
         html_filled = html_filled.replace("{{ESTADO_PAGO}}", "Aprobado")
         html_filled = html_filled.replace("{{ID_PAGO_MP}}", id_pago)
+        html_filled = html_filled.replace("ID de Operación (Mercado Pago):", "ID de Operación:")
         html_filled = html_filled.replace("{{NOMBRE_PAGADOR}}", nombre_completo)
         html_filled = html_filled.replace("{{IDENTIFICADOR_PAGADOR}}", email)
         html_filled = html_filled.replace("{{ITEMS_PAGADOS}}", items_html)
