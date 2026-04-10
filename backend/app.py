@@ -4171,88 +4171,93 @@ def send_payment_link():
 
 @app.route('/api/plan_pago', methods=['POST', 'OPTIONS'])
 def plan_pago():
+    """Registrar un nuevo Plan de Pago (Triple Registro: Plan, Historial, Dashboard)"""
     if request.method == 'OPTIONS':
         return '', 204
-    
-    data = request.json or {}
-    fecha = data.get('fecha')
-    nombre = data.get('nombre')
-    cuota_plan = data.get('cuota_plan')
-    monto_total = data.get('monto_total')
-    email = data.get('email')
-    administrativo = data.get('administrativo')
-    
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"error": "No DB connection"}), 500
-        
-    pdf_generated = False
-    pdf_base64 = None
-    email_sent = False
-    mp_link = "https://link.mercadopago.com.ar/comunavillatraful"
-    
     try:
-        # 1. Generar un supuesto PDF
-        pdf_details = {
-            "FECHA_PAGO": fecha,
-            "ESTADO_PAGO": "Plan de Pago - Pendiente",
-            "NOMBRE_PAGADOR": nombre,
-            "MONTO_TOTAL": monto_total,
-            "items": [{"description": f"Cuota Plan: {cuota_plan}", "amount": monto_total}]
-        }
-        pdf_file, _ = create_receipt_pdf(pdf_details)
-        if pdf_file:
-            pdf_generated = True
-            pdf_base64 = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
-            
-        # 2. Enviar email (simulado) si resend está configurado
-        if resend.api_key and email:
-            html = f"""
-            <h2>Plan de Pago - Comuna Traful</h2>
-            <p>Hola {nombre},</p>
-            <p>Se ha registrado su plan de pago. Cuota: {cuota_plan}. Monto: ${monto_total}</p>
-            <p>Puede pagar a través del siguiente botón:</p>
-            <a href="{mp_link}">Pagar Cuota</a>
-            """
-            try:
-                # Optionally attach PDF if supported
-                mail_data = {
-                    "from": "Pagos Traful <pagos@comunatraful.ar>",
-                    "to": [email],
-                    "subject": "Plan de Pago - Comuna Traful",
-                    "html": html
+        data = request.get_json() or {}
+        fecha = data.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+        nombre = data.get('nombre')
+        cuota_plan = data.get('cuota_plan')
+        monto_total = data.get('monto_total')
+        email = data.get('email')
+        administrativo = data.get('administrativo')
+
+        if not all([nombre, cuota_plan, monto_total]):
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database not available"}), 500
+
+        try:
+            with conn.cursor() as cur:
+                # 1. Registrar en tabla de planes
+                cur.execute("""
+                    INSERT INTO plan_pago (fecha, nombre, cuota_plan, monto_total, email, administrativo)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (fecha, nombre, cuota_plan, monto_total, email, administrativo))
+
+                # 2. Registrar en Historial Global (Super Admin)
+                pid = f"PLAN-{uuid.uuid4().hex[:6].upper()}"
+                items = [{"description": f"Plan de Pago - Cuota {cuota_plan}", "amount": monto_total}]
+                
+                # Usar la función helper para mantener consistencia
+                save_payment_history(
+                    payment_id=pid,
+                    comprobante_numero=pid,
+                    nombre_apellido=nombre,
+                    dni='N/A',
+                    email=email,
+                    monto=monto_total,
+                    estado='exitoso',
+                    items_pagados=items,
+                    detalles=f"Cuota Plan {cuota_plan}"
+                )
+
+                # 3. Registrar en Estadísticas Dashboard 2026
+                save_cash_payment(
+                    comprobante_id=pid,
+                    tipo_pago='plan_pago',
+                    fecha_pago=fecha,
+                    nombre=nombre,
+                    email=email or 'N/A',
+                    monto_total=monto_total,
+                    monto_original=monto_total,
+                    administrativo=administrativo,
+                    detalle=f"Plan de Pago - Cuota {cuota_plan}",
+                    items_json=items
+                )
+
+                conn.commit()
+
+                # Generar PDF limpio y base64 para el frontend si es necesario
+                pdf_details = {
+                    "FECHA_PAGO": datetime.strptime(fecha, '%Y-%m-%d').strftime('%d/%m/%Y'),
+                    "ESTADO_PAGO": "Plan de Pago Registrado",
+                    "ID_PAGO_MP": pid, # Usamos el ID interno neutral
+                    "NOMBRE_PAGADOR": nombre,
+                    "IDENTIFICADOR_PAGADOR": email or "N/A",
+                    "items": items,
+                    "MONTO_TOTAL": monto_total
                 }
-                if pdf_file:
-                    mail_data["attachments"] = [
-                        {"filename": f"PlanPago_{cuota_plan}.pdf", "content": list(pdf_file.getvalue())}
-                    ]
-                resend.Emails.send(mail_data)
-                email_sent = True
-            except Exception as e:
-                print(f"Error Email Plan Pago: {e}")
-        
-        # 3. Guardar en Base de Datos
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO plan_pago 
-                (fecha, nombre, cuota_plan, monto_total, email, administrativo, mp_link)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (fecha, nombre, cuota_plan, monto_total, email, administrativo, mp_link))
-            conn.commit()
-            
-        return jsonify({
-            "success": True,
-            "mp_link": mp_link,
-            "pdf_generated": pdf_generated,
-            "pdf_base64": pdf_base64,
-            "email_sent": email_sent
-        }), 200
-        
+                pdf_file, _ = create_receipt_pdf(pdf_details, pdf_id=pid)
+                pdf_base64 = base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
+
+                return jsonify({
+                    "success": True, 
+                    "message": "Plan registrado con éxito",
+                    "mp_link": "https://link.mercadopago.com.ar/comunavillatraful",
+                    "pdf_generated": bool(pdf_base64),
+                    "pdf_base64": pdf_base64
+                }), 200
+
+        finally:
+            conn.close()
+
     except Exception as e:
-        print(f"Error en Plan Pago: {e}")
+        print(f"Error registrando plan de pago: {e}")
         return jsonify({"error": str(e)}), 500
-    finally:
-        conn.close()
 
 
 @app.route('/api/get_history_by_payment_id/<payment_id>', methods=['GET'])
@@ -4834,94 +4839,7 @@ def get_stats():
             conn.close()
 
 
-@app.route('/api/plan_pago', methods=['POST', 'OPTIONS'])
-def plan_pago():
-    """Registrar un nuevo Plan de Pago (Triple Registro: Plan, Historial, Dashboard)"""
-    if request.method == 'OPTIONS':
-        return '', 204
-    try:
-        data = request.get_json() or {}
-        fecha = data.get('fecha', datetime.now().strftime('%Y-%m-%d'))
-        nombre = data.get('nombre')
-        cuota_plan = data.get('cuota_plan')
-        monto_total = data.get('monto_total')
-        email = data.get('email')
-        administrativo = data.get('administrativo')
 
-        if not all([nombre, cuota_plan, monto_total]):
-            return jsonify({"error": "Datos incompletos"}), 400
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({"error": "Database not available"}), 500
-
-        try:
-            with conn.cursor() as cur:
-                # 1. Registrar en tabla de planes
-                cur.execute("""
-                    INSERT INTO plan_pago (fecha, nombre, cuota_plan, monto_total, email, administrativo)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (fecha, nombre, cuota_plan, monto_total, email, administrativo))
-
-                # 2. Registrar en Historial Global (Super Admin)
-                pid = f"PLAN-{uuid.uuid4().hex[:6].upper()}"
-                items = [{"description": f"Plan de Pago - Cuota {cuota_plan}", "amount": monto_total}]
-                
-                # Usar la función helper para mantener consistencia
-                save_payment_history(
-                    payment_id=pid,
-                    comprobante_numero=pid,
-                    nombre_apellido=nombre,
-                    dni='N/A',
-                    email=email,
-                    monto=monto_total,
-                    estado='exitoso',
-                    items_pagados=items,
-                    detalles=f"Cuota Plan {cuota_plan}",
-                    # Nota: 'origen' column was removed but some previous versions used it. We'll pass it as a comment or adjust the function.
-                )
-
-                # 3. Registrar en Estadísticas Dashboard 2026
-                save_cash_payment(
-                    comprobante_id=pid,
-                    tipo_pago='plan_pago',
-                    fecha_pago=fecha,
-                    nombre=nombre,
-                    email=email or 'N/A',
-                    monto_total=monto_total,
-                    monto_original=monto_total,
-                    administrativo=administrativo,
-                    detalle=f"Plan de Pago - Cuota {cuota_plan}",
-                    items_json=items
-                )
-
-                conn.commit()
-
-                # Generar PDF limpio y base64 para el frontend si es necesario
-                pdf_details = {
-                    "FECHA_PAGO": datetime.strptime(fecha, '%Y-%m-%d').strftime('%d/%m/%Y'),
-                    "ESTADO_PAGO": "Plan de Pago Registrado",
-                    "ID_PAGO_MP": pid, # Usamos el ID interno neutral
-                    "NOMBRE_PAGADOR": nombre,
-                    "IDENTIFICADOR_PAGADOR": email or "N/A",
-                    "items": items,
-                    "MONTO_TOTAL": monto_total
-                }
-                pdf_file, _ = create_receipt_pdf(pdf_details, pdf_id=pid)
-                pdf_base64 = base64.b64encode(pdf_file.getvalue()).decode('utf-8') if pdf_file else None
-
-                return jsonify({
-                    "success": True, 
-                    "message": "Plan registrado con éxito", 
-                    "pdf_base64": pdf_base64
-                }), 200
-
-        finally:
-            conn.close()
-
-    except Exception as e:
-        print(f"Error registrando plan de pago: {e}")
-        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':
