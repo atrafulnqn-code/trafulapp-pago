@@ -1067,6 +1067,47 @@ def send_payslip():
     if not query or not email:
         return jsonify({"error": "Faltan datos requeridos (query y email)."}), 400
 
+    # --- Validación contra Padrón de RRHH en Google Sheets ---
+    try:
+        url_padron = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeft4L11UT32SF1gu8fwyNLR-0aMIzv19yTK1dUlk92QzdJkLMt_Q7s38YWabtIdixXYHvrwKfzXDu/pub?output=csv"
+        headers_req = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url_padron, headers=headers_req, timeout=15)
+        
+        if response.status_code == 200 and response.text.strip():
+            lines = response.text.strip().split('\n')
+            if len(lines) > 1:
+                import csv
+                reader = csv.reader(lines)
+                headers_csv = next(reader)
+                
+                autorizado = False
+                query_lower = query.lower().strip()
+                email_lower = email.lower().strip()
+                
+                for row in reader:
+                    if len(row) >= 2:
+                        col_busqueda = row[0].lower().strip()
+                        col_email = row[1].lower().strip()
+                        
+                        # Si ambas celdas no están vacías
+                        if col_busqueda and col_email:
+                            # Flexibilidad si la búsqueda está contenida en el padrón o viceversa, pero email debe ser exacto
+                            if (query_lower in col_busqueda or col_busqueda in query_lower) and col_email == email_lower:
+                                autorizado = True
+                                break
+                
+                if not autorizado:
+                    log_to_airtable('WARNING', 'HR Payslip', f'Acceso bloqueado: {email} buscó {query} sin estar en padrón')
+                    log_payslip_request(query, email, request.remote_addr, False)
+                    return jsonify({"error": "El correo ingresado no está autorizado para este empleado. Contacte a Recursos Humanos para actualizar el padrón."}), 403
+        else:
+            print(f"Padrón no accesible, status: {response.status_code}")
+            return jsonify({"error": "Sistema de validación offline. Reporte este error a RRHH."}), 500
+    except Exception as e:
+        print(f"Error verificando padrón: {e}")
+        return jsonify({"error": "Error interno verificando la autorización de RRHH."}), 500
+    # --- Fin Validación Padrón ---
+
     log_to_airtable('INFO', 'HR Payslip', f'Petición de recibo para: {query}, enviar a: {email}')
 
     try:
