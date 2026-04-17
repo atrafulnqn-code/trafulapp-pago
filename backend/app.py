@@ -8,6 +8,7 @@ import csv
 import requests
 import time
 from datetime import datetime
+from urllib3.util.retry import Retry
 
 import mercadopago
 import psycopg2
@@ -588,8 +589,15 @@ BACKEND_URL = (os.getenv("RENDER_EXTERNAL_URL") or
 api = None
 try:
     if AIRTABLE_PAT_FROM_ENV:
-        api = Api(AIRTABLE_PAT_FROM_ENV)
-        print("SDK de Airtable inicializada con éxito.")
+        # Configurar estrategia de reintentos para manejar límites de velocidad (429)
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"]
+        )
+        api = Api(AIRTABLE_PAT_FROM_ENV, retry_strategy=retry_strategy)
+        print("SDK de Airtable inicializada con éxito (con reintentos configurados).")
 except Exception as e:
     print(f"ERROR: Falló la inicialización de la SDK de Airtable: {e}")
 
@@ -611,7 +619,7 @@ except Exception as e:
 
 # --- Funciones Auxiliares ---
 def log_to_airtable(level, source, message, related_id=None, details=None):
-    # Guardar en PostgreSQL
+    # Guardar en PostgreSQL siempre (Base de datos local segura)
     save_error_log(
         nivel=level,
         tipo=source,
@@ -621,10 +629,14 @@ def log_to_airtable(level, source, message, related_id=None, details=None):
         detalles=details
     )
 
-    # Guardar en Airtable (legacy)
+    # NO enviar logs de tipo INFO a Airtable para evitar errores 429 (Rate Limit)
+    # Solo enviamos ERROR y WARNING para mantener la base de logs limpia y rápida.
+    if level == 'INFO':
+        # Ya está guardado en PostgreSQL, no necesitamos saturar Airtable.
+        return
+
+    # Guardar en Airtable (solo para errores o advertencias críticas)
     if not api:
-        print(f"ERROR: Airtable API no inicializada. "
-              f"No se pudo escribir log: {message}")
         return
 
     try:
@@ -632,16 +644,16 @@ def log_to_airtable(level, source, message, related_id=None, details=None):
         log_entry = {
             'Level': level,
             'Source': source,
-            'Message': message
+            'Message': str(message)[:1000] # Limitar longitud para evitar errores de Airtable
         }
         if related_id:
             log_entry['Related ID'] = str(related_id)
         if details:
-            log_entry['Details'] = json.dumps(details)
+            log_entry['Details'] = json.dumps(details)[:5000]
         logs_table.create(log_entry)
     except Exception as e:
-        print(f"ERROR: Falló la escritura de log en Airtable: {e} - "
-              f"Mensaje original: {message}")
+        # Solo loguear el fallo de escritura en consola para no crear un bucle infinito
+        print(f"AVISO: No se pudo escribir log CRÍTICO en Airtable: {e}")
 
 
 def save_contacto(email, nombre=None, origen=None, dni=None, celular=None):
@@ -816,8 +828,6 @@ def health_check():
 
 @app.route('/api/search/contributivo', methods=['GET'])
 def search_contributivo():
-    log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/contributivo')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
@@ -856,8 +866,6 @@ def search_contributivo():
 
 @app.route('/api/search/agua', methods=['GET'])
 def search_agua():
-    log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/agua')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
@@ -896,8 +904,6 @@ def search_agua():
 
 @app.route('/api/search/deuda', methods=['GET'])
 def search_deuda():
-    log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/deuda')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
@@ -919,8 +925,6 @@ def search_deuda():
 
 @app.route('/api/search/patente', methods=['GET'])
 def search_patente():
-    log_to_airtable('INFO', 'API Search',
-                    'Recibida petición en /api/search/patente')
     if not api:
         return jsonify({"error": "Airtable no configurado."}), 500
 
