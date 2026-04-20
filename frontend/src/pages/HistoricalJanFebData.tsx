@@ -237,4 +237,4 @@ const HistoricalJanFebData: React.FC = () => {
   );
 };
 
-export default HistoricalJanFebData;icalJanFebData;
+export default HistoricalJanFebData;
