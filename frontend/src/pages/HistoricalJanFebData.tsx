@@ -59,85 +59,95 @@ const HistoricalJanFebData: React.FC = () => {
     localStorage.removeItem('adminPassword');
     navigate('/admin');
   };
-
   const generatePDF = (record: HistoricalRecord) => {
-    // Generar un PDF usando la función de impresión nativa del navegador para mayor robustez
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert("Por favor habilita las ventanas emergentes para ver el PDF.");
       return;
     }
 
-    let detalleRows = '';
     const details = typeof record.datos_adicionales === 'string' 
       ? JSON.parse(record.datos_adicionales) 
       : record.datos_adicionales;
 
-    for (const [key, value] of Object.entries(details)) {
-        if (typeof value === 'object' && value !== null) {
-            detalleRows += `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${key}</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;"><pre style="margin:0; font-size:10px;">${JSON.stringify(value, null, 2)}</pre></td></tr>`;
-        } else {
-            detalleRows += `<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${key}</strong></td><td style="padding: 8px; border-bottom: 1px solid #ddd;">${value}</td></tr>`;
-        }
+    // Build items HTML for the table
+    let itemsHtml = '';
+    const montoDisplay = record.monto ? `$${record.monto}` : '-';
+    
+    // Description logic based on table origin
+    let description = record.tipo_operacion;
+    if (record.tabla_origen === 'Historial de Pagos' || record.tabla_origen === 'Plan_de_Pago') {
+        description = `${record.tabla_origen} - ${record.tipo_operacion}`;
     }
+    
+    itemsHtml = `
+        <tr>
+            <td>${description}</td>
+            <td>${details.Comentarios || details.detalles || details.detalle || '-'}</td>
+            <td style="text-align: right;">${montoDisplay}</td>
+        </tr>
+    `;
 
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="es">
       <head>
           <meta charset="UTF-8">
-          <title>Comprobante - ${record.id}</title>
+          <title>Comprobante de Pago - ${record.id}</title>
           <style>
-              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
-              .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #0056b3; }
-              .header h1 { margin: 0; color: #0056b3; }
-              .header p { margin: 5px 0 0; color: #666; }
-              .info-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px; margin-bottom: 30px; }
-              .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-              .info-row span:first-child { font-weight: bold; color: #495057; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background-color: #0056b3; color: white; padding: 10px; text-align: left; }
-              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; }
-              @media print {
-                  body { padding: 0; }
-                  .no-print { display: none; }
-              }
+              body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+              .container { width: 100%; max-width: 800px; margin: 0 auto; border: 1px solid #eee; padding: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.05); }
+              .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+              .header h1 { color: #0056b3; margin: 0; font-size: 24px; }
+              .details { margin-bottom: 20px; }
+              .details p { margin: 5px 0; }
+              .items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              .items th, .items td { border: 1px solid #eee; padding: 8px; text-align: left; }
+              .items th { background-color: #f8f8f8; }
+              .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
+              .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #777; }
+              .no-print { text-align: center; margin-bottom: 20px; }
+              @media print { .no-print { display: none; } .container { border: none; box-shadow: none; } }
           </style>
       </head>
       <body>
-          <div class="no-print" style="margin-bottom: 20px;">
-              <button onclick="window.print()" style="padding: 10px 20px; background: #0056b3; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Imprimir / Guardar PDF</button>
+          <div class="no-print">
+              <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Imprimir Comprobante</button>
           </div>
-          <div class="header">
-              <h1>Comprobante Histórico</h1>
-              <p>Período: 19 de Enero al 10 de Febrero 2026</p>
-          </div>
-          
-          <div class="info-box">
-              <div class="info-row"><span>ID Registro:</span> <span>#${record.id}</span></div>
-              <div class="info-row"><span>Fecha:</span> <span>${record.fecha_registro}</span></div>
-              <div class="info-row"><span>Origen de Datos:</span> <span>${record.origen} - ${record.tabla_origen}</span></div>
-              <div class="info-row"><span>Tipo de Operación:</span> <span>${record.tipo_operacion}</span></div>
-              <div class="info-row"><span>Responsable:</span> <span>${record.nombre_responsable || '-'}</span></div>
-              <div class="info-row"><span>Monto:</span> <span style="font-size: 1.2em; color: #0056b3; font-weight: bold;">${record.monto ? '$' + record.monto : '-'}</span></div>
-          </div>
-
-          <h3>Detalles Completos (Datos Crudos)</h3>
-          <table>
-              <thead>
-                  <tr>
-                      <th>Campo</th>
-                      <th>Valor</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  ${detalleRows}
-              </tbody>
-          </table>
-
-          <div class="footer">
-              <p>Este comprobante fue generado automáticamente por el sistema de auditoría del Tablero Traful.</p>
-              <p>Fecha de emisión: ${new Date().toLocaleString()}</p>
+          <div class="container">
+              <div class="header">
+                  <h1>Comprobante de Pago</h1>
+                  <p><strong>Comuna de Villa Traful - Provincia de Neuquén</strong></p>
+                  <p style="font-size: 12px; margin-top: 5px;">CUIT: 30-67297005-5. Laffitte 0 . Villa Traful.</p>
+              </div>
+              <div class="details">
+                  <p><strong>ID de Comprobante:</strong> HIST-${record.id}</p>
+                  <p><strong>Fecha de Registro:</strong> ${new Date(record.fecha_registro).toLocaleString('es-AR')}</p>
+                  <p><strong>Estado:</strong> REGISTRADO</p>
+                  <p><strong>Origen:</strong> ${record.origen} (${record.tabla_origen})</p>
+                  <p><strong>Nombre del Pagador:</strong> ${record.nombre_responsable || '-'}</p>
+                  <p><strong>Email:</strong> ${record.email || '-'}</p>
+                  <p><strong>Medio de Pago:</strong> ${record.tipo_operacion}</p>
+              </div>
+              <table class="items">
+                  <thead>
+                      <tr>
+                          <th>Descripción</th>
+                          <th>Referencia / Nota</th>
+                          <th>Monto</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${itemsHtml}
+                  </tbody>
+              </table>
+              <div class="total">
+                  Total Pagado: ${montoDisplay}
+              </div>
+              <div class="footer">
+                  <p>Gracias por tu pago.</p>
+                  <p>Este es un comprobante histórico generado automáticamente para el período 19/01 al 10/02.</p>
+              </div>
           </div>
       </body>
       </html>
@@ -156,7 +166,7 @@ const HistoricalJanFebData: React.FC = () => {
             ← Volver al Panel
           </Button>
           <h1 className="fw-bold text-primary">Datos Históricos (19 Ene - 10 Feb 2026)</h1>
-          <p className="text-muted">Total de registros unificados: {records.length}</p>
+          <p className="text-muted">Mostrando registros de cobros y pagos unificados.</p>
         </div>
         <Button variant="outline-danger" onClick={handleLogout}>Cerrar Sesión</Button>
       </div>
@@ -164,7 +174,7 @@ const HistoricalJanFebData: React.FC = () => {
       {loading && (
         <div className="text-center py-5">
            <Spinner animation="border" variant="primary" />
-           <p className="mt-3">Cargando 1.903 registros. Por favor, espera...</p>
+           <p className="mt-3">Cargando registros. Por favor, espera...</p>
         </div>
       )}
 
@@ -177,12 +187,13 @@ const HistoricalJanFebData: React.FC = () => {
           <Table striped bordered hover className="mb-0 bg-white">
             <thead className="table-dark">
               <tr>
+                <th>ID</th>
                 <th>Origen</th>
-                <th>Tabla</th>
+                <th>Tabla Original</th>
                 <th>Fecha</th>
                 <th>Tipo</th>
                 <th>Monto</th>
-                <th>Responsable</th>
+                <th>Contribuyente</th>
                 <th>Email</th>
                 <th>Acción</th>
               </tr>
@@ -190,16 +201,17 @@ const HistoricalJanFebData: React.FC = () => {
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-4 text-muted">
-                    No se encontraron registros históricos en la base de datos para estas fechas.
+                  <td colSpan={9} className="text-center py-4 text-muted">
+                    No se encontraron registros históricos.
                   </td>
                 </tr>
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
+                    <td><small className="text-muted">#{record.id}</small></td>
                     <td><span className={`badge ${record.origen === 'Airtable' ? 'bg-info' : 'bg-secondary'}`}>{record.origen}</span></td>
                     <td>{record.tabla_origen}</td>
-                    <td><small>{new Date(record.fecha_registro).toLocaleString()}</small></td>
+                    <td><small>{new Date(record.fecha_registro).toLocaleString('es-AR')}</small></td>
                     <td>{record.tipo_operacion}</td>
                     <td className="text-end fw-bold">{record.monto ? `$${record.monto}` : '-'}</td>
                     <td>{record.nombre_responsable || '-'}</td>
@@ -211,11 +223,7 @@ const HistoricalJanFebData: React.FC = () => {
                         onClick={() => generatePDF(record)}
                         className="d-flex align-items-center gap-1"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
-                          <path d="M4.603 14.087a.81.81 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.198-.307.526-.568.897-.787a7.68 7.68 0 0 1 1.482-.645 19.697 19.697 0 0 0 1.062-2.227 7.269 7.269 0 0 1-.43-1.295c-.086-.4-.119-.796-.046-1.136.075-.354.274-.672.65-.823.192-.077.4-.12.602-.077a.7.7 0 0 1 .477.365c.088.164.12.356.127.538.007.188-.012.396-.047.614-.084.51-.27 1.134-.52 1.794a10.954 10.954 0 0 0 .98 1.686 5.753 5.753 0 0 1 1.334.05c.364.066.734.195.96.465.12.144.193.32.2.518.007.192-.047.382-.138.563a1.04 1.04 0 0 1-.354.416.856.856 0 0 1-.51.138c-.331-.014-.654-.196-.933-.417a5.712 5.712 0 0 1-.911-.95 11.651 11.651 0 0 0-1.997.406 11.307 11.307 0 0 1-1.02 1.51c-.292.35-.609.656-.927.787a.793.793 0 0 1-.58.029zm1.379-1.901c-.166.076-.32.156-.459.238-.328.194-.541.383-.647.547-.094.145-.096.25-.04.361.01.022.02.036.026.044a.266.266 0 0 0 .035-.012c.137-.056.355-.235.635-.572a8.18 8.18 0 0 0 .45-.606zm1.64-1.33a12.71 12.71 0 0 1 1.01-.193 11.744 11.744 0 0 1-.51-.858 20.801 20.801 0 0 1-.5 1.05zm2.446.45c.15.163.296.3.435.41.24.19.407.253.498.256a.107.107 0 0 0 .07-.015.307.307 0 0 0 .094-.125.436.436 0 0 0 .059-.2.095.095 0 0 0-.026-.063c-.052-.062-.2-.152-.518-.209a3.876 3.876 0 0 0-.612-.053zM8.078 7.8a6.7 6.7 0 0 0 .2-.828c.031-.188.043-.343.038-.465a.613.613 0 0 0-.032-.198.517.517 0 0 0-.145.04c-.087.035-.158.106-.196.283-.04.192-.03.469.046.822.024.111.054.227.09.346z"/>
-                        </svg>
-                        Ver PDF
+                        <i className="bi bi-file-earmark-pdf"></i> PDF
                       </Button>
                     </td>
                   </tr>
@@ -229,4 +237,4 @@ const HistoricalJanFebData: React.FC = () => {
   );
 };
 
-export default HistoricalJanFebData;
+export default HistoricalJanFebData;icalJanFebData;
