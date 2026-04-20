@@ -59,6 +59,44 @@ const HistoricalJanFebData: React.FC = () => {
     localStorage.removeItem('adminPassword');
     navigate('/admin');
   };
+
+  const handleExport = () => {
+    if (records.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    // Headers del CSV
+    const headers = ['ID', 'Origen', 'Tabla Original', 'Fecha Registro', 'Tipo Operacion', 'Monto', 'Nombre Responsable', 'Email'];
+
+    // Filas del CSV (usando punto y coma para mejor compatibilidad con Excel en regiones de habla hispana)
+    const rows = records.map(r => [
+      r.id,
+      r.origen,
+      r.tabla_origen,
+      r.fecha_registro,
+      r.tipo_operacion,
+      r.monto || '0',
+      r.nombre_responsable || '',
+      r.email || ''
+    ]);
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.join(';'))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reporte_historico_19ene_10feb_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const generatePDF = (record: HistoricalRecord) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -168,7 +206,12 @@ const HistoricalJanFebData: React.FC = () => {
           <h1 className="fw-bold text-primary">Datos Históricos (19 Ene - 10 Feb 2026)</h1>
           <p className="text-muted">Mostrando registros de cobros y pagos unificados.</p>
         </div>
-        <Button variant="outline-danger" onClick={handleLogout}>Cerrar Sesión</Button>
+        <div className="d-flex gap-2 align-items-center">
+          <Button variant="success" size="sm" onClick={handleExport} className="d-flex align-items-center gap-1">
+            <i className="bi bi-file-earmark-spreadsheet"></i> Exportar a Excel
+          </Button>
+          <Button variant="outline-danger" size="sm" onClick={handleLogout}>Cerrar Sesión</Button>
+        </div>
       </div>
 
       {loading && (
