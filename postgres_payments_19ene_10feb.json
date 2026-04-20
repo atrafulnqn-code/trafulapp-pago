@@ -1,0 +1,38 @@
+[
+    {
+        "id": 21,
+        "amount": "PAY-1770696369-6ddcc4ce",
+        "items_paid": null,
+        "wallet_response": "approved",
+        "created_at": 50.0,
+        "updated_at": "ARS",
+        "payer_email": "emanueltula89@gmail.com",
+        "detalle": {
+            "item_type": "agua"
+        },
+        "nombre": null,
+        "payment_id": "2026-02-10T00:00:00+00:00",
+        "payment_id_external": "2026-03-18T23:23:42.687691+00:00",
+        "status": "Emanuel Tula",
+        "tipo_impuesto": "Agua",
+        "currency": "Enero 2026"
+    },
+    {
+        "id": 22,
+        "amount": "PAY-1770693032-a8be70d1",
+        "items_paid": null,
+        "wallet_response": "approved",
+        "created_at": 100.0,
+        "updated_at": "ARS",
+        "payer_email": "emanueltula89@gmail.com",
+        "detalle": {
+            "item_type": "lote"
+        },
+        "nombre": null,
+        "payment_id": "2026-02-10T00:00:00+00:00",
+        "payment_id_external": "2026-03-18T23:23:42.867886+00:00",
+        "status": "Emanuel Tula",
+        "tipo_impuesto": "Tasas Retributivas",
+        "currency": "Febrero 2026"
+    }
+]

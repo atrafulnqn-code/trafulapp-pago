@@ -1,0 +1,238 @@
+[
+    {
+        "updated_at": 1,
+        "fecha_pago": "REC-1770730002-539599d5",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "testeo",
+        "items_json": "emanueltula89@gmail.com",
+        "pdf_enviado": 100.0,
+        "created_at": 0.0,
+        "id": 100.0,
+        "administrativo": "Virginia Paicil",
+        "detalle": "aranceles: $100\n\nRecibido por: Virginia Paicil",
+        "email_status": [
+            {
+                "amount": 100.0,
+                "description": "aranceles"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a emanueltula89@gmail.com",
+        "comentarios": "2026-02-10T13:26:42.616946+00:00",
+        "transferencia": "2026-02-10T13:26:47.610570+00:00"
+    },
+    {
+        "updated_at": 2,
+        "fecha_pago": "REC-1770730081-66b3bec5",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "MIRANDA CARLOS ",
+        "items_json": "ferianteporahora@gmail.com",
+        "pdf_enviado": 144483.68,
+        "created_at": 0.0,
+        "id": 144483.68,
+        "administrativo": "Carolina Cobos",
+        "detalle": "aranceles: $144483.68 (4° CUOTA PLAM DE PAGO N°039/2025)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 144483.68,
+                "description": "aranceles - 4° CUOTA PLAM DE PAGO N°039/2025"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a ferianteporahora@gmail.com",
+        "comentarios": "2026-02-10T13:28:01.430597+00:00",
+        "transferencia": "2026-02-10T13:28:03.720495+00:00"
+    },
+    {
+        "updated_at": 3,
+        "fecha_pago": "REC-1770730229-50cd254a",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "MIRANDA CARLOS ",
+        "items_json": "ferianteporahora@gmail.com",
+        "pdf_enviado": 28660.0,
+        "created_at": 0.0,
+        "id": 28660.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "tasa_retributivos: $16660 (LOTE 14 - FEBRERO 2026)\nagua: $12000 (FEBRERO 2026)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 16660.0,
+                "description": "tasa_retributivos - LOTE 14 - FEBRERO 2026"
+            },
+            {
+                "amount": 12000.0,
+                "description": "agua - FEBRERO 2026"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a ferianteporahora@gmail.com",
+        "comentarios": "2026-02-10T13:30:29.624184+00:00",
+        "transferencia": "2026-02-10T13:30:31.977342+00:00"
+    },
+    {
+        "updated_at": 4,
+        "fecha_pago": "REC-1770732305-d45a5e11",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "REMEDIOS MAIRA ",
+        "items_json": "mayra2687ate@gmail.com",
+        "pdf_enviado": 30000.0,
+        "created_at": 0.0,
+        "id": 30000.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "licencia: $30000 (Otorgamiento de Licencia )\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 30000.0,
+                "description": "licencia - Otorgamiento de Licencia "
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a mayra2687ate@gmail.com",
+        "comentarios": "2026-02-10T14:05:05.988338+00:00",
+        "transferencia": "2026-02-10T14:05:08.343110+00:00"
+    },
+    {
+        "updated_at": 5,
+        "fecha_pago": "PAT-1770732632-ffea6c0b",
+        "monto_original": "patente",
+        "descuento": "2026-02-10",
+        "monto_total": "ROJAS PATRICIA",
+        "items_json": "plrojas@intramed.net",
+        "pdf_enviado": 310500.0,
+        "created_at": 0.0,
+        "id": 310500.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "Pago de Patente Automotor\nPatente: ORV 577\nVehículo: RENAULT KANGOO 2015 (2026)\nComentarios: DEUDA AÑO 2024\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 310500,
+                "description": "Patente ORV 577 - RENAULT KANGOO 2015 (2026)"
+            }
+        ],
+        "patente": "ORV 577",
+        "marca": "RENAULT KANGOO",
+        "comprobante_id": "2015",
+        "tipo_pago": "2026",
+        "modelo": "DEUDA AÑO 2024",
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a plrojas@intramed.net",
+        "comentarios": "2026-02-10T14:10:32.492393+00:00",
+        "transferencia": "2026-02-10T14:10:34.828757+00:00"
+    },
+    {
+        "updated_at": 6,
+        "fecha_pago": "PAT-1770733296-0a7d42e1",
+        "monto_original": "patente",
+        "descuento": "2026-02-10",
+        "monto_total": "CORTINA MELANIA ",
+        "items_json": "melaniacortina3@gmail.com",
+        "pdf_enviado": 41990.0,
+        "created_at": 0.0,
+        "id": 41990.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "Pago de Patente Automotor\nPatente: AF 393 SG\nVehículo: VOLKSWAGEN T-CROSS  TRENDLINE 1.6 2021 (2026)\nComentarios: FEBRERO 2026\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 41990,
+                "description": "Patente AF 393 SG - VOLKSWAGEN T-CROSS  TRENDLINE 1.6 2021 (2026)"
+            }
+        ],
+        "patente": "AF 393 SG",
+        "marca": "VOLKSWAGEN T-CROSS  TRENDLINE 1.6",
+        "comprobante_id": "2021",
+        "tipo_pago": "2026",
+        "modelo": "FEBRERO 2026",
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a melaniacortina3@gmail.com",
+        "comentarios": "2026-02-10T14:21:36.439831+00:00",
+        "transferencia": "2026-02-10T14:21:40.999232+00:00"
+    },
+    {
+        "updated_at": 7,
+        "fecha_pago": "REC-1770733661-d5c4a834",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "ARIEL MAYANS",
+        "items_json": "pelucadelospelos@gmail.com",
+        "pdf_enviado": 30000.0,
+        "created_at": 0.0,
+        "id": 30000.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "licencia: $30000 (RENOVACIÓN)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 30000.0,
+                "description": "licencia - RENOVACIÓN"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a pelucadelospelos@gmail.com",
+        "comentarios": "2026-02-10T14:27:42.019289+00:00",
+        "transferencia": "2026-02-10T14:27:46.723722+00:00"
+    },
+    {
+        "updated_at": 8,
+        "fecha_pago": "REC-1770734232-4006ea9d",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "KIRMAYR MARTIN Y OTROS ",
+        "items_json": "trafullauquencamping@gmail.com",
+        "pdf_enviado": 4734900.0,
+        "created_at": 10.0,
+        "id": 4261410.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "tasa_retributivos: $4734900 (Lote 50 - Marzo a Diciembre 2025 - Retributivos + agua 2 viviendas + agua camping 240 plazas )\n\nDescuento aplicado: 010%\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 4734900.0,
+                "description": "tasa_retributivos - Lote 50 - Marzo a Diciembre 2025 - Retributivos + agua 2 viviendas + agua camping 240 plazas "
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a trafullauquencamping@gmail.com",
+        "comentarios": "2026-02-10T14:37:12.927951+00:00",
+        "transferencia": "2026-02-10T14:37:17.656531+00:00"
+    }
+]

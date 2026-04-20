@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL Dashboard - Traful</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --error: #ef4444;
+            --success: #10b981;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card:hover, .stat-card.active {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            border-color: var(--accent);
+        }
+
+        .stat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        main {
+            flex: 1;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            border-radius: 0.5rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        thead {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            color: #a78bfa;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><i data-lucide="database"></i> Postgres Sentinel</h1>
+        <div style="font-size: 0.9rem; color: var(--text-muted);">
+            Fechas: 19 Ene 2026 - 10 Feb 2026
+        </div>
+    </header>
+
+    <div class="stats-container">
+        <div class="stat-card active" onclick="loadTable('error_logs', this)">
+            <div class="stat-header">
+                <span>Error Logs</span>
+                <i data-lucide="alert-triangle" style="color: var(--error)"></i>
+            </div>
+            <div class="stat-value" id="count-error">0</div>
+        </div>
+        <div class="stat-card" onclick="loadTable('cash_payments', this)">
+            <div class="stat-header">
+                <span>Cash Payments</span>
+                <i data-lucide="banknote" style="color: var(--success)"></i>
+            </div>
+            <div class="stat-value" id="count-cash">0</div>
+        </div>
+        <div class="stat-card" onclick="loadTable('payments', this)">
+            <div class="stat-header">
+                <span>Payments</span>
+                <i data-lucide="credit-card" style="color: var(--accent)"></i>
+            </div>
+            <div class="stat-value" id="count-payments">0</div>
+        </div>
+    </div>
+
+    <main>
+        <div class="table-controls">
+            <h2 id="table-title">Error Logs</h2>
+        </div>
+        <div class="table-responsive">
+            <table id="data-table">
+                <thead id="table-head">
+                    <!-- headers generated dynamically -->
+                </thead>
+                <tbody id="table-body">
+                    <!-- rows generated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // Injected Data
+        const errorLogs = [
+    {
+        "id": 1,
+        "detalles": "INFO",
+        "fecha_hora": "API Search",
+        "mensaje": "Recibida petición en /api/search/contributivo",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:00:22.477417+00:00"
+    },
+    {
+        "id": 2,
+        "detalles": "INFO",
+        "fecha_hora": "API Search",
+        "mensaje": "Recibida petición en /api/search/agua",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:05:59.422962+00:00"
+    },
+    {
+        "id": 3,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Create",
+        "mensaje": "Creando pago: Pago de Agua - Monto: $50",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "items": {
+                "deuda": false,
+                "email": "emanueltula89@gmail.com",
+                "meses": {
+                    "enero": true
+                },
+                "item_type": "agua",
+                "record_id": "recfuuEvvFsG682vj",
+                "deuda_monto": 0,
+                "meses_montos": {
+                    "enero": 50
+                },
+                "total_amount": 50
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:08.773266+00:00"
+    },
+    {
+        "id": 4,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Create",
+        "mensaje": "Pago PAY-1770696369-6ddcc4ce guardado en PostgreSQL",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:09.218412+00:00"
+    },
+    {
+        "id": 5,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Auth",
+        "mensaje": "Token de Pago TIC obtenido.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:10.114381+00:00"
+    },
+    {
+        "id": 6,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Create",
+        "mensaje": "Datos obtenidos de Airtable: emanuel tula testeo, DNI: 35270992",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "table": "agua",
+            "record_id": "recfuuEvvFsG682vj"
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:10.572939+00:00"
+    },
+    {
+        "id": 7,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Create",
+        "mensaje": "Pago creado exitosamente: PAY-1770696369-6ddcc4ce",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": {
+            "pagotic_response": {
+                "id": "6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "payer": {
+                    "name": "emanuel tula testeo",
+                    "email": "emanueltula89@gmail.com",
+                    "identification": {
+                        "type": "DNI_ARG",
+                        "number": "35270992",
+                        "country": "ARG"
+                    },
+                    "external_reference": "35270992"
+                },
+                "review": false,
+                "source": {
+                    "id": "b0d2bb40-bd3d-4e06-8ec9-c1e19bdb679d",
+                    "name": "t1mioofyxdihyz7s",
+                    "type": "collector"
+                },
+                "status": "pending",
+                "channel": "web",
+                "details": [
+                    {
+                        "amount": 50.0,
+                        "concept_id": "pago_municipal",
+                        "external_reference": "PAY-1770696369-6ddcc4ce",
+                        "concept_description": "Pago de Agua"
+                    }
+                ],
+                "due_date": "2026-02-17T07:06:10+0000",
+                "form_url": "https://checkout.paypertic.com/app/6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "metadata": {
+                    "deuda": false,
+                    "email": "emanueltula89@gmail.com",
+                    "meses": {
+                        "enero": true
+                    },
+                    "item_type": "agua",
+                    "record_id": "recfuuEvvFsG682vj",
+                    "deuda_monto": 0,
+                    "meses_montos": {
+                        "enero": 50
+                    },
+                    "total_amount": 50
+                },
+                "validation": false,
+                "currency_id": "ARS",
+                "collector_id": "13536",
+                "final_amount": 50.0,
+                "request_date": "2026-02-10T04:06:11+0000",
+                "last_due_date": "2026-03-12T07:06:10+0000",
+                "collector_detail": {
+                    "name": "Comisión de Fomento Villa Traful",
+                    "public_email": "atrafulnqn@gmail.com"
+                },
+                "last_update_date": "2026-02-10T04:06:11+0000",
+                "notification_url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                "external_transaction_id": "PAY-1770696369-6ddcc4ce"
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:11.657842+00:00"
+    },
+    {
+        "id": 8,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Webhook recibido de Pago TIC",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "webhook_data": {
+                "id": "6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "type": "qr",
+                "payer": {
+                    "name": "emanuel tula testeo",
+                    "email": "emanueltula89@gmail.com",
+                    "phones": [
+                        {}
+                    ],
+                    "identification": {
+                        "type": "DNI_ARG",
+                        "number": "35270992",
+                        "country": "ARG"
+                    },
+                    "external_reference": "35270992"
+                },
+                "review": false,
+                "source": {
+                    "id": "1127ce2e-229a-420b-867c-2542f80eb2fa",
+                    "name": "api-payment-checkout",
+                    "type": "system"
+                },
+                "status": "issued",
+                "channel": "web",
+                "details": [
+                    {
+                        "amount": 50.0,
+                        "concept_id": "pago_municipal",
+                        "external_reference": "PAY-1770696369-6ddcc4ce",
+                        "concept_description": "Pago de Agua"
+                    }
+                ],
+                "due_date": "2026-02-17T07:06:10+0000",
+                "form_url": "https://checkout.paypertic.com/app/6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "metadata": {
+                    "deuda": false,
+                    "email": "emanueltula89@gmail.com",
+                    "meses": {
+                        "enero": true
+                    },
+                    "qr_hash": "39673b0c724640194e53097bfe5da6e986b08d9ccbf6207e5ef6c199637f0d35",
+                    "item_type": "agua",
+                    "record_id": "recfuuEvvFsG682vj",
+                    "deuda_monto": 0,
+                    "meses_montos": {
+                        "enero": 50
+                    },
+                    "total_amount": 50
+                },
+                "validation": false,
+                "currency_id": "ARS",
+                "collector_id": "13536",
+                "final_amount": 50.0,
+                "process_date": "2026-02-10T04:06:19+0000",
+                "request_date": "2026-02-10T04:06:11+0000",
+                "last_due_date": "2026-03-12T07:06:10+0000",
+                "status_detail": "QR Issued",
+                "payment_methods": [
+                    {
+                        "type": "qr",
+                        "amount": 50.0,
+                        "raw_qr": "00020101021143200016ar.com.paypertic50150011306729700555204939953030325802AR5919Comuna Villa Traful6012Villa Traful62280524698aaebbf20b7935fc03962c63048F6C",
+                        "gateway": {
+                            "id": 176763736,
+                            "name": "QR",
+                            "status": "issued",
+                            "ppt_owner": true,
+                            "status_detail": "QR Issued",
+                            "transaction_id": "8f623f5d-f3be-4d12-8e83-bdd9d8c0763d",
+                            "establishment_number": "QR_PPT"
+                        },
+                        "currency_id": "ARS",
+                        "final_amount": 50.0,
+                        "media_payment_id": 85,
+                        "payment_method_id": 0,
+                        "media_payment_detail": "QR"
+                    }
+                ],
+                "collector_detail": {
+                    "name": "Comisión de Fomento Villa Traful",
+                    "public_email": "atrafulnqn@gmail.com"
+                },
+                "last_update_date": "2026-02-10T04:06:19+0000",
+                "notification_url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                "external_transaction_id": "PAY-1770696369-6ddcc4ce"
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:19.899954+00:00"
+    },
+    {
+        "id": 9,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Procesando pago PAY-1770696369-6ddcc4ce con estado issued",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": {
+            "status": "issued",
+            "pagotic_id": "6357d5f5-94f4-4a5c-ac17-cff58a7a752c"
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:20.225698+00:00"
+    },
+    {
+        "id": 10,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Inicio del procesamiento de pago para ID interno: PAY-1770696369-6ddcc4ce",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:20.514568+00:00"
+    },
+    {
+        "id": 11,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de pago PAY-1770696369-6ddcc4ce actualizado en PostgreSQL a issued.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:20.923188+00:00"
+    },
+    {
+        "id": 12,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Webhook recibido de Pago TIC",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "webhook_data": {
+                "id": "6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "type": "qr",
+                "payer": {
+                    "name": "emanuel tula testeo",
+                    "email": "emanueltula89@gmail.com",
+                    "phones": [
+                        {}
+                    ],
+                    "identification": {
+                        "type": "DNI_ARG",
+                        "number": "35270992",
+                        "country": "ARG"
+                    },
+                    "external_reference": "35270992"
+                },
+                "review": false,
+                "source": {
+                    "name": "GenericPayload",
+                    "type": "system"
+                },
+                "status": "approved",
+                "channel": "web",
+                "details": [
+                    {
+                        "amount": 50.0,
+                        "concept_id": "pago_municipal",
+                        "external_reference": "PAY-1770696369-6ddcc4ce",
+                        "concept_description": "Pago de Agua"
+                    }
+                ],
+                "due_date": "2026-02-17T07:06:10+0000",
+                "form_url": "https://checkout.paypertic.com/app/6357d5f5-94f4-4a5c-ac17-cff58a7a752c",
+                "metadata": {
+                    "deuda": false,
+                    "email": "emanueltula89@gmail.com",
+                    "meses": {
+                        "enero": true
+                    },
+                    "qr_hash": "39673b0c724640194e53097bfe5da6e986b08d9ccbf6207e5ef6c199637f0d35",
+                    "item_type": "agua",
+                    "record_id": "recfuuEvvFsG682vj",
+                    "deuda_monto": 0,
+                    "meses_montos": {
+                        "enero": 50
+                    },
+                    "total_amount": 50
+                },
+                "paid_date": "2026-02-10T04:06:33+0000",
+                "validation": false,
+                "currency_id": "ARS",
+                "fee_details": [
+                    {
+                        "type": "tariff",
+                        "amount": 0.45,
+                        "fee_payer": "collector",
+                        "description": "Tariff QR"
+                    },
+                    {
+                        "type": "media_payment_cost",
+                        "amount": 0.4,
+                        "fee_payer": "collector",
+                        "description": "Cost media payment QR",
+                        "fee_recipient": "ppt"
+                    }
+                ],
+                "collector_id": "13536",
+                "final_amount": 50.0,
+                "process_date": "2026-02-10T04:06:19+0000",
+                "request_date": "2026-02-10T04:06:11+0000",
+                "last_due_date": "2026-03-12T07:06:10+0000",
+                "payment_methods": [
+                    {
+                        "type": "qr",
+                        "amount": 50.0,
+                        "raw_qr": "00020101021143200016ar.com.paypertic50150011306729700555204939953030325802AR5919Comuna Villa Traful6012Villa Traful62280524698aaebbf20b7935fc03962c63048F6C",
+                        "gateway": {
+                            "id": 176763736,
+                            "name": "QR",
+                            "status": "approved",
+                            "ppt_owner": true,
+                            "status_detail": "DEBITO CONFIRMADO CORRECTAMENTE",
+                            "transaction_id": "8f623f5d-f3be-4d12-8e83-bdd9d8c0763d",
+                            "establishment_number": "QR_PPT"
+                        },
+                        "currency_id": "ARS",
+                        "final_amount": 50.0,
+                        "media_payment_id": 85,
+                        "payment_method_id": 0,
+                        "media_payment_detail": "QR"
+                    }
+                ],
+                "collector_detail": {
+                    "name": "Comisión de Fomento Villa Traful",
+                    "public_email": "atrafulnqn@gmail.com"
+                },
+                "last_update_date": "2026-02-10T04:06:33+0000",
+                "notification_url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                "accreditation_date": "2026-02-10T03:00:00+0000",
+                "collector_notifications": [
+                    {
+                        "url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                        "status": "issued",
+                        "response": 200,
+                        "last_retry": "2026-02-10T04:06:21+0000",
+                        "retry_count": 0,
+                        "original_request": "2026-02-10T04:06:21+0000"
+                    }
+                ],
+                "external_transaction_id": "PAY-1770696369-6ddcc4ce"
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:34.045994+00:00"
+    },
+    {
+        "id": 13,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Procesando pago PAY-1770696369-6ddcc4ce con estado approved",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": {
+            "status": "approved",
+            "pagotic_id": "6357d5f5-94f4-4a5c-ac17-cff58a7a752c"
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:34.444533+00:00"
+    },
+    {
+        "id": 14,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Inicio del procesamiento de pago para ID interno: PAY-1770696369-6ddcc4ce",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:34.739403+00:00"
+    },
+    {
+        "id": 15,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de pago PAY-1770696369-6ddcc4ce actualizado en PostgreSQL a approved.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:35.033774+00:00"
+    },
+    {
+        "id": 16,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Pago APROBADO. Procesando actualizaciones de deuda en Airtable para ID: PAY-1770696369-6ddcc4ce",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:35.303366+00:00"
+    },
+    {
+        "id": 17,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Airtable de deuda actualizado para ID: recfuuEvvFsG682vj",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": {
+            "updates": {
+                "Enero agua": 0,
+                "Enero Comercial": 0
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:35.826335+00:00"
+    },
+    {
+        "id": 18,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de historial creado con ID: recOXUJ4EYsEoAraK",
+        "payment_id": "PAY-1770696369-6ddcc4ce",
+        "related_id": "PAY-1770696369-6ddcc4ce",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:06:36.393534+00:00"
+    },
+    {
+        "id": 19,
+        "detalles": "ERROR",
+        "fecha_hora": "Admin DB Error Logs",
+        "mensaje": "Error obteniendo error_logs: column \"created_at\" does not exist\nLINE 3:                            fecha_hora, created_at\n                                               ^\n",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:20:41.323183+00:00"
+    },
+    {
+        "id": 20,
+        "detalles": "ERROR",
+        "fecha_hora": "Admin DB Error Logs",
+        "mensaje": "Error obteniendo error_logs: column \"created_at\" does not exist\nLINE 3:                            fecha_hora, created_at\n                                               ^\n",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T04:20:46.322618+00:00"
+    },
+    {
+        "id": 21,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Webhook recibido de Pago TIC",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "webhook_data": {
+                "id": "9f97a3df-9682-487e-9d8e-71d8b835a6d6",
+                "type": "qr",
+                "payer": {
+                    "name": "sin nombre",
+                    "email": "emanueltula89@gmail.com",
+                    "phones": [
+                        {}
+                    ],
+                    "identification": {
+                        "type": "DNI_ARG",
+                        "number": "00000000",
+                        "country": "ARG"
+                    },
+                    "external_reference": "PAY-1770691151-16e521b9"
+                },
+                "review": false,
+                "source": {
+                    "name": "GenericPayload",
+                    "type": "system"
+                },
+                "status": "approved",
+                "channel": "web",
+                "details": [
+                    {
+                        "amount": 100.0,
+                        "concept_id": "pago_municipal",
+                        "external_reference": "PAY-1770691151-16e521b9",
+                        "concept_description": "Pago de Tasas Retributivas"
+                    }
+                ],
+                "due_date": "2026-02-17T05:39:12+0000",
+                "form_url": "https://checkout.paypertic.com/app/9f97a3df-9682-487e-9d8e-71d8b835a6d6",
+                "metadata": {
+                    "qr_hash": "9172c6a53dab4da417227d8da6a5b816da560ec84258920a755b9b8a5d114d86"
+                },
+                "paid_date": "2026-02-10T02:39:52+0000",
+                "validation": false,
+                "currency_id": "ARS",
+                "fee_details": [
+                    {
+                        "type": "tariff",
+                        "amount": 0.9,
+                        "fee_payer": "collector",
+                        "description": "Tariff QR"
+                    },
+                    {
+                        "type": "media_payment_cost",
+                        "amount": 0.8,
+                        "fee_payer": "collector",
+                        "description": "Cost media payment QR",
+                        "fee_recipient": "ppt"
+                    }
+                ],
+                "collector_id": "13536",
+                "final_amount": 100.0,
+                "process_date": "2026-02-10T02:39:28+0000",
+                "request_date": "2026-02-10T02:39:13+0000",
+                "last_due_date": "2026-03-12T05:39:12+0000",
+                "notifications": [
+                    {
+                        "id": "b80399d4-3611-4981-8577-38ebfe24efbb",
+                        "date": "2026-02-10T02:39:54+0000",
+                        "type": "payment",
+                        "action": "payment.payment"
+                    }
+                ],
+                "payment_methods": [
+                    {
+                        "type": "qr",
+                        "amount": 100.0,
+                        "raw_qr": "00020101021143200016ar.com.paypertic50150011306729700555204939953030325802AR5919Comuna Villa Traful6012Villa Traful62280524698a9a60f20b7935fc0395c56304264C",
+                        "gateway": {
+                            "id": 176763736,
+                            "name": "QR",
+                            "status": "approved",
+                            "ppt_owner": true,
+                            "status_detail": "DEBITO CONFIRMADO CORRECTAMENTE",
+                            "transaction_id": "9c4f68af-f8ee-4932-8532-2d8f81251636",
+                            "establishment_number": "QR_PPT"
+                        },
+                        "currency_id": "ARS",
+                        "final_amount": 100.0,
+                        "media_payment_id": 85,
+                        "payment_method_id": 0,
+                        "media_payment_detail": "QR"
+                    }
+                ],
+                "collector_detail": {
+                    "name": "Comisión de Fomento Villa Traful",
+                    "public_email": "atrafulnqn@gmail.com"
+                },
+                "last_update_date": "2026-02-10T02:39:54+0000",
+                "notification_url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                "accreditation_date": "2026-02-09T03:00:00+0000",
+                "collector_notifications": [
+                    {
+                        "url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                        "status": "issued",
+                        "response": 500,
+                        "last_retry": "2026-02-10T02:39:29+0000",
+                        "retry_count": 0,
+                        "original_request": "2026-02-10T02:39:29+0000"
+                    },
+                    {
+                        "url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                        "status": "approved",
+                        "response": 500,
+                        "last_retry": "2026-02-10T02:39:54+0000",
+                        "retry_count": 0,
+                        "original_request": "2026-02-10T02:39:54+0000"
+                    }
+                ],
+                "external_transaction_id": "PAY-1770691151-16e521b9"
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:15.167141+00:00"
+    },
+    {
+        "id": 22,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Procesando pago PAY-1770691151-16e521b9 con estado approved",
+        "payment_id": "PAY-1770691151-16e521b9",
+        "related_id": "PAY-1770691151-16e521b9",
+        "user_agent": {
+            "status": "approved",
+            "pagotic_id": "9f97a3df-9682-487e-9d8e-71d8b835a6d6"
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:18.189329+00:00"
+    },
+    {
+        "id": 23,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Inicio del procesamiento de pago para ID interno: PAY-1770691151-16e521b9",
+        "payment_id": "PAY-1770691151-16e521b9",
+        "related_id": "PAY-1770691151-16e521b9",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:18.538051+00:00"
+    },
+    {
+        "id": 24,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Pago APROBADO. Procesando actualizaciones de deuda en Airtable para ID: PAY-1770691151-16e521b9",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:19.016735+00:00"
+    },
+    {
+        "id": 25,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de historial creado con ID: rec9rXkb7zgzsD4r2",
+        "payment_id": "PAY-1770691151-16e521b9",
+        "related_id": "PAY-1770691151-16e521b9",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:19.576811+00:00"
+    },
+    {
+        "id": 26,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Webhook recibido de Pago TIC",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": {
+            "webhook_data": {
+                "id": "9d8a98dd-1f2c-4ffd-9688-71e64dc5b1b6",
+                "type": "qr",
+                "payer": {
+                    "name": "emanuel tula testeo",
+                    "email": "emanueltula89@gmail.com",
+                    "phones": [
+                        {}
+                    ],
+                    "identification": {
+                        "type": "DNI_ARG",
+                        "number": "35270992",
+                        "country": "ARG"
+                    },
+                    "external_reference": "35270992"
+                },
+                "review": false,
+                "source": {
+                    "name": "GenericPayload",
+                    "type": "system"
+                },
+                "status": "approved",
+                "channel": "web",
+                "details": [
+                    {
+                        "amount": 100.0,
+                        "concept_id": "pago_municipal",
+                        "external_reference": "PAY-1770692535-ee8ed7d8",
+                        "concept_description": "Pago de Tasas Retributivas"
+                    }
+                ],
+                "due_date": "2026-02-17T06:02:16+0000",
+                "form_url": "https://checkout.paypertic.com/app/9d8a98dd-1f2c-4ffd-9688-71e64dc5b1b6",
+                "metadata": {
+                    "deuda": false,
+                    "email": "emanueltula89@gmail.com",
+                    "meses": {
+                        "enero": true
+                    },
+                    "qr_hash": "e96904b1787355ad9ecd3f8f1c26f60984040f3b6839587471e3ec3b7b539e4a",
+                    "item_type": "lote",
+                    "record_id": "recy2mbw1kh5QllES",
+                    "deuda_monto": 0,
+                    "meses_montos": {
+                        "enero": 100
+                    },
+                    "total_amount": 100
+                },
+                "paid_date": "2026-02-10T03:02:52+0000",
+                "validation": false,
+                "currency_id": "ARS",
+                "fee_details": [
+                    {
+                        "type": "tariff",
+                        "amount": 0.9,
+                        "fee_payer": "collector",
+                        "description": "Tariff QR"
+                    },
+                    {
+                        "type": "media_payment_cost",
+                        "amount": 0.8,
+                        "fee_payer": "collector",
+                        "description": "Cost media payment QR",
+                        "fee_recipient": "ppt"
+                    }
+                ],
+                "collector_id": "13536",
+                "final_amount": 100.0,
+                "process_date": "2026-02-10T03:02:27+0000",
+                "request_date": "2026-02-10T03:02:16+0000",
+                "last_due_date": "2026-03-12T06:02:16+0000",
+                "notifications": [
+                    {
+                        "id": "16051b85-645b-4670-a4e5-2da840041ab3",
+                        "date": "2026-02-10T03:02:55+0000",
+                        "type": "payment",
+                        "action": "payment.payment"
+                    }
+                ],
+                "payment_methods": [
+                    {
+                        "type": "qr",
+                        "amount": 100.0,
+                        "raw_qr": "00020101021143200016ar.com.paypertic50150011306729700555204939953030325802AR5919Comuna Villa Traful6012Villa Traful62280524698a9fc3f20b7935fc0395ec630494B4",
+                        "gateway": {
+                            "id": 176763736,
+                            "name": "QR",
+                            "status": "approved",
+                            "ppt_owner": true,
+                            "status_detail": "DEBITO CONFIRMADO CORRECTAMENTE",
+                            "transaction_id": "de750578-1b14-4f87-adb1-8bed659b7322",
+                            "establishment_number": "QR_PPT"
+                        },
+                        "currency_id": "ARS",
+                        "final_amount": 100.0,
+                        "media_payment_id": 85,
+                        "payment_method_id": 0,
+                        "media_payment_detail": "QR"
+                    }
+                ],
+                "collector_detail": {
+                    "name": "Comisión de Fomento Villa Traful",
+                    "public_email": "atrafulnqn@gmail.com"
+                },
+                "last_update_date": "2026-02-10T03:02:55+0000",
+                "notification_url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                "accreditation_date": "2026-02-10T03:00:00+0000",
+                "collector_notifications": [
+                    {
+                        "url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                        "status": "issued",
+                        "response": 200,
+                        "last_retry": "2026-02-10T03:02:29+0000",
+                        "retry_count": 0,
+                        "original_request": "2026-02-10T03:02:29+0000"
+                    },
+                    {
+                        "url": "https://traful-backend-docker.onrender.com/api/pagotic_webhook",
+                        "status": "approved",
+                        "response": 500,
+                        "last_retry": "2026-02-10T03:02:55+0000",
+                        "retry_count": 0,
+                        "original_request": "2026-02-10T03:02:55+0000"
+                    }
+                ],
+                "external_transaction_id": "PAY-1770692535-ee8ed7d8"
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:21.031887+00:00"
+    },
+    {
+        "id": 27,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Webhook",
+        "mensaje": "Procesando pago PAY-1770692535-ee8ed7d8 con estado approved",
+        "payment_id": "PAY-1770692535-ee8ed7d8",
+        "related_id": "PAY-1770692535-ee8ed7d8",
+        "user_agent": {
+            "status": "approved",
+            "pagotic_id": "9d8a98dd-1f2c-4ffd-9688-71e64dc5b1b6"
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:21.325404+00:00"
+    },
+    {
+        "id": 28,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Inicio del procesamiento de pago para ID interno: PAY-1770692535-ee8ed7d8",
+        "payment_id": "PAY-1770692535-ee8ed7d8",
+        "related_id": "PAY-1770692535-ee8ed7d8",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:21.603274+00:00"
+    },
+    {
+        "id": 29,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de pago PAY-1770692535-ee8ed7d8 actualizado en PostgreSQL a approved.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:21.930205+00:00"
+    },
+    {
+        "id": 30,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Pago APROBADO. Procesando actualizaciones de deuda en Airtable para ID: PAY-1770692535-ee8ed7d8",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:22.201069+00:00"
+    },
+    {
+        "id": 31,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Airtable de deuda actualizado para ID: recy2mbw1kh5QllES",
+        "payment_id": "PAY-1770692535-ee8ed7d8",
+        "related_id": "PAY-1770692535-ee8ed7d8",
+        "user_agent": {
+            "updates": {
+                "enero": 0
+            }
+        },
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:22.807240+00:00"
+    },
+    {
+        "id": 32,
+        "detalles": "INFO",
+        "fecha_hora": "Pago TIC Process",
+        "mensaje": "Registro de historial creado con ID: recWUXhvvLzslLes3",
+        "payment_id": "PAY-1770692535-ee8ed7d8",
+        "related_id": "PAY-1770692535-ee8ed7d8",
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T05:47:23.324150+00:00"
+    },
+    {
+        "id": 33,
+        "detalles": "INFO",
+        "fecha_hora": "API Search",
+        "mensaje": "Recibida petición en /api/search/contributivo",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:13:01.323322+00:00"
+    },
+    {
+        "id": 34,
+        "detalles": "INFO",
+        "fecha_hora": "API Search",
+        "mensaje": "Recibida petición en /api/search/agua",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:14:00.291762+00:00"
+    },
+    {
+        "id": 35,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:26:45.415886+00:00"
+    },
+    {
+        "id": 36,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para emanueltula89@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:26:46.748424+00:00"
+    },
+    {
+        "id": 37,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a emanueltula89@gmail.com con comprobante REC-1770730002-539599d5",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:26:47.318131+00:00"
+    },
+    {
+        "id": 38,
+        "detalles": "WARNING",
+        "fecha_hora": "Staff Access",
+        "mensaje": "No se pudo registrar acceso: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblAILbaYmnWkkPiV', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Nombre\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:27:32.765734+00:00"
+    },
+    {
+        "id": 39,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:28:01.724734+00:00"
+    },
+    {
+        "id": 40,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para ferianteporahora@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:28:02.815368+00:00"
+    },
+    {
+        "id": 41,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a ferianteporahora@gmail.com con comprobante REC-1770730081-66b3bec5",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:28:03.435428+00:00"
+    },
+    {
+        "id": 42,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:30:30.062611+00:00"
+    },
+    {
+        "id": 43,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para ferianteporahora@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:30:31.204262+00:00"
+    },
+    {
+        "id": 44,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a ferianteporahora@gmail.com con comprobante REC-1770730229-50cd254a",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T13:30:31.721662+00:00"
+    },
+    {
+        "id": 45,
+        "detalles": "WARNING",
+        "fecha_hora": "Staff Access",
+        "mensaje": "No se pudo registrar acceso: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblAILbaYmnWkkPiV', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Nombre\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:03:36.701577+00:00"
+    },
+    {
+        "id": 46,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:05:06.268491+00:00"
+    },
+    {
+        "id": 47,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para mayra2687ate@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:05:07.455226+00:00"
+    },
+    {
+        "id": 48,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a mayra2687ate@gmail.com con comprobante REC-1770732305-d45a5e11",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:05:08.037188+00:00"
+    },
+    {
+        "id": 49,
+        "detalles": "ERROR",
+        "fecha_hora": "Patente Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblO0nlUQx3isKkXF', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:10:32.810708+00:00"
+    },
+    {
+        "id": 50,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Pago Patente Efectivo\" no válido para plrojas@intramed.net. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:10:33.961893+00:00"
+    },
+    {
+        "id": 51,
+        "detalles": "INFO",
+        "fecha_hora": "Patente Efectivo",
+        "mensaje": "Email enviado a plrojas@intramed.net con comprobante PAT-1770732632-ffea6c0b",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:10:34.543379+00:00"
+    },
+    {
+        "id": 52,
+        "detalles": "ERROR",
+        "fecha_hora": "Patente Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblO0nlUQx3isKkXF', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:21:38.952785+00:00"
+    },
+    {
+        "id": 53,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Pago Patente Efectivo\" no válido para melaniacortina3@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:21:40.156228+00:00"
+    },
+    {
+        "id": 54,
+        "detalles": "INFO",
+        "fecha_hora": "Patente Efectivo",
+        "mensaje": "Email enviado a melaniacortina3@gmail.com con comprobante PAT-1770733296-0a7d42e1",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:21:40.708409+00:00"
+    },
+    {
+        "id": 55,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:27:44.419706+00:00"
+    },
+    {
+        "id": 56,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para pelucadelospelos@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:27:45.784421+00:00"
+    },
+    {
+        "id": 57,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a pelucadelospelos@gmail.com con comprobante REC-1770733661-d5c4a834",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:27:46.426829+00:00"
+    },
+    {
+        "id": 58,
+        "detalles": "ERROR",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Error guardando en Airtable: ('422 Client Error: Unprocessable Entity for url: https://api.airtable.com/v0/appoJs8XY2j2kwlYf/tblzRhxpeqbuhrf78', '{\\'type\\': \\'UNKNOWN_FIELD_NAME\\', \\'message\\': \\'Unknown field name: \"Comprobante ID\"\\'}')",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:37:15.550267+00:00"
+    },
+    {
+        "id": 59,
+        "detalles": "WARNING",
+        "fecha_hora": "Contactos",
+        "mensaje": "Valor de origen \"Recaudación Efectivo\" no válido para trafullauquencamping@gmail.com. Guardando sin origen.",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:37:16.779601+00:00"
+    },
+    {
+        "id": 60,
+        "detalles": "INFO",
+        "fecha_hora": "Recaudacion Efectivo",
+        "mensaje": "Email enviado a trafullauquencamping@gmail.com con comprobante REC-1770734232-4006ea9d",
+        "payment_id": null,
+        "related_id": null,
+        "user_agent": null,
+        "stack_trace": null,
+        "ip_address": null,
+        "nivel": null,
+        "tipo": "2026-02-10T14:37:17.380162+00:00"
+    }
+];
+        const cashPayments = [
+    {
+        "updated_at": 1,
+        "fecha_pago": "REC-1770730002-539599d5",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "testeo",
+        "items_json": "emanueltula89@gmail.com",
+        "pdf_enviado": 100.0,
+        "created_at": 0.0,
+        "id": 100.0,
+        "administrativo": "Virginia Paicil",
+        "detalle": "aranceles: $100\n\nRecibido por: Virginia Paicil",
+        "email_status": [
+            {
+                "amount": 100.0,
+                "description": "aranceles"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a emanueltula89@gmail.com",
+        "comentarios": "2026-02-10T13:26:42.616946+00:00",
+        "transferencia": "2026-02-10T13:26:47.610570+00:00"
+    },
+    {
+        "updated_at": 2,
+        "fecha_pago": "REC-1770730081-66b3bec5",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "MIRANDA CARLOS ",
+        "items_json": "ferianteporahora@gmail.com",
+        "pdf_enviado": 144483.68,
+        "created_at": 0.0,
+        "id": 144483.68,
+        "administrativo": "Carolina Cobos",
+        "detalle": "aranceles: $144483.68 (4° CUOTA PLAM DE PAGO N°039/2025)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 144483.68,
+                "description": "aranceles - 4° CUOTA PLAM DE PAGO N°039/2025"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a ferianteporahora@gmail.com",
+        "comentarios": "2026-02-10T13:28:01.430597+00:00",
+        "transferencia": "2026-02-10T13:28:03.720495+00:00"
+    },
+    {
+        "updated_at": 3,
+        "fecha_pago": "REC-1770730229-50cd254a",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "MIRANDA CARLOS ",
+        "items_json": "ferianteporahora@gmail.com",
+        "pdf_enviado": 28660.0,
+        "created_at": 0.0,
+        "id": 28660.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "tasa_retributivos: $16660 (LOTE 14 - FEBRERO 2026)\nagua: $12000 (FEBRERO 2026)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 16660.0,
+                "description": "tasa_retributivos - LOTE 14 - FEBRERO 2026"
+            },
+            {
+                "amount": 12000.0,
+                "description": "agua - FEBRERO 2026"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a ferianteporahora@gmail.com",
+        "comentarios": "2026-02-10T13:30:29.624184+00:00",
+        "transferencia": "2026-02-10T13:30:31.977342+00:00"
+    },
+    {
+        "updated_at": 4,
+        "fecha_pago": "REC-1770732305-d45a5e11",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "REMEDIOS MAIRA ",
+        "items_json": "mayra2687ate@gmail.com",
+        "pdf_enviado": 30000.0,
+        "created_at": 0.0,
+        "id": 30000.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "licencia: $30000 (Otorgamiento de Licencia )\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 30000.0,
+                "description": "licencia - Otorgamiento de Licencia "
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a mayra2687ate@gmail.com",
+        "comentarios": "2026-02-10T14:05:05.988338+00:00",
+        "transferencia": "2026-02-10T14:05:08.343110+00:00"
+    },
+    {
+        "updated_at": 5,
+        "fecha_pago": "PAT-1770732632-ffea6c0b",
+        "monto_original": "patente",
+        "descuento": "2026-02-10",
+        "monto_total": "ROJAS PATRICIA",
+        "items_json": "plrojas@intramed.net",
+        "pdf_enviado": 310500.0,
+        "created_at": 0.0,
+        "id": 310500.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "Pago de Patente Automotor\nPatente: ORV 577\nVehículo: RENAULT KANGOO 2015 (2026)\nComentarios: DEUDA AÑO 2024\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 310500,
+                "description": "Patente ORV 577 - RENAULT KANGOO 2015 (2026)"
+            }
+        ],
+        "patente": "ORV 577",
+        "marca": "RENAULT KANGOO",
+        "comprobante_id": "2015",
+        "tipo_pago": "2026",
+        "modelo": "DEUDA AÑO 2024",
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a plrojas@intramed.net",
+        "comentarios": "2026-02-10T14:10:32.492393+00:00",
+        "transferencia": "2026-02-10T14:10:34.828757+00:00"
+    },
+    {
+        "updated_at": 6,
+        "fecha_pago": "PAT-1770733296-0a7d42e1",
+        "monto_original": "patente",
+        "descuento": "2026-02-10",
+        "monto_total": "CORTINA MELANIA ",
+        "items_json": "melaniacortina3@gmail.com",
+        "pdf_enviado": 41990.0,
+        "created_at": 0.0,
+        "id": 41990.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "Pago de Patente Automotor\nPatente: AF 393 SG\nVehículo: VOLKSWAGEN T-CROSS  TRENDLINE 1.6 2021 (2026)\nComentarios: FEBRERO 2026\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 41990,
+                "description": "Patente AF 393 SG - VOLKSWAGEN T-CROSS  TRENDLINE 1.6 2021 (2026)"
+            }
+        ],
+        "patente": "AF 393 SG",
+        "marca": "VOLKSWAGEN T-CROSS  TRENDLINE 1.6",
+        "comprobante_id": "2021",
+        "tipo_pago": "2026",
+        "modelo": "FEBRERO 2026",
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a melaniacortina3@gmail.com",
+        "comentarios": "2026-02-10T14:21:36.439831+00:00",
+        "transferencia": "2026-02-10T14:21:40.999232+00:00"
+    },
+    {
+        "updated_at": 7,
+        "fecha_pago": "REC-1770733661-d5c4a834",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "ARIEL MAYANS",
+        "items_json": "pelucadelospelos@gmail.com",
+        "pdf_enviado": 30000.0,
+        "created_at": 0.0,
+        "id": 30000.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "licencia: $30000 (RENOVACIÓN)\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 30000.0,
+                "description": "licencia - RENOVACIÓN"
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a pelucadelospelos@gmail.com",
+        "comentarios": "2026-02-10T14:27:42.019289+00:00",
+        "transferencia": "2026-02-10T14:27:46.723722+00:00"
+    },
+    {
+        "updated_at": 8,
+        "fecha_pago": "REC-1770734232-4006ea9d",
+        "monto_original": "recaudacion",
+        "descuento": "2026-02-10",
+        "monto_total": "KIRMAYR MARTIN Y OTROS ",
+        "items_json": "trafullauquencamping@gmail.com",
+        "pdf_enviado": 4734900.0,
+        "created_at": 10.0,
+        "id": 4261410.0,
+        "administrativo": "Carolina Cobos",
+        "detalle": "tasa_retributivos: $4734900 (Lote 50 - Marzo a Diciembre 2025 - Retributivos + agua 2 viviendas + agua camping 240 plazas )\n\nDescuento aplicado: 010%\n\nRecibido por: Carolina Cobos",
+        "email_status": [
+            {
+                "amount": 4734900.0,
+                "description": "tasa_retributivos - Lote 50 - Marzo a Diciembre 2025 - Retributivos + agua 2 viviendas + agua camping 240 plazas "
+            }
+        ],
+        "patente": null,
+        "marca": null,
+        "comprobante_id": null,
+        "tipo_pago": null,
+        "modelo": null,
+        "nombre": "",
+        "email": true,
+        "anio": "Enviado a trafullauquencamping@gmail.com",
+        "comentarios": "2026-02-10T14:37:12.927951+00:00",
+        "transferencia": "2026-02-10T14:37:17.656531+00:00"
+    }
+];
+        const payments = [
+    {
+        "id": 21,
+        "amount": "PAY-1770696369-6ddcc4ce",
+        "items_paid": null,
+        "wallet_response": "approved",
+        "created_at": 50.0,
+        "updated_at": "ARS",
+        "payer_email": "emanueltula89@gmail.com",
+        "detalle": {
+            "item_type": "agua"
+        },
+        "nombre": null,
+        "payment_id": "2026-02-10T00:00:00+00:00",
+        "payment_id_external": "2026-03-18T23:23:42.687691+00:00",
+        "status": "Emanuel Tula",
+        "tipo_impuesto": "Agua",
+        "currency": "Enero 2026"
+    },
+    {
+        "id": 22,
+        "amount": "PAY-1770693032-a8be70d1",
+        "items_paid": null,
+        "wallet_response": "approved",
+        "created_at": 100.0,
+        "updated_at": "ARS",
+        "payer_email": "emanueltula89@gmail.com",
+        "detalle": {
+            "item_type": "lote"
+        },
+        "nombre": null,
+        "payment_id": "2026-02-10T00:00:00+00:00",
+        "payment_id_external": "2026-03-18T23:23:42.867886+00:00",
+        "status": "Emanuel Tula",
+        "tipo_impuesto": "Tasas Retributivas",
+        "currency": "Febrero 2026"
+    }
+];
+
+        const formatValue = (key, val) => {
+            if (val === null) return '-';
+            if (typeof val === 'object') return `<div class="code-block">${JSON.stringify(val, null, 2)}</div>`;
+            if (key.includes('error') || key.includes('stack')) return `<div class="code-block">${val}</div>`;
+            return val;
+        };
+
+        function loadTable(type, element) {
+            // Update active styling
+            document.querySelectorAll('.stat-card').forEach(el => el.classList.remove('active'));
+            if(element) element.classList.add('active');
+
+            let data = [];
+            let title = '';
+
+            if (type === 'error_logs') {
+                data = errorLogs;
+                title = 'Registros de Errores';
+            } else if (type === 'cash_payments') {
+                data = cashPayments;
+                title = 'Pagos en Efectivo';
+            } else if (type === 'payments') {
+                data = payments;
+                title = 'Registro de Pagos (Digital/General)';
+            }
+
+            document.getElementById('table-title').innerText = title;
+            
+            const thead = document.getElementById('table-head');
+            const tbody = document.getElementById('table-body');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100%" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay registros para este rango de fechas.</td></tr>';
+                return;
+            }
+
+            // Get all possible keys
+            const keys = new Set();
+            data.forEach(item => Object.keys(item).forEach(k => keys.add(k)));
+            const columns = Array.from(keys);
+
+            // Create Headers
+            const trHead = document.createElement('tr');
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.innerText = col.replace(/_/g, ' ');
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+
+            // Create Rows
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.innerHTML = formatValue(col, item[col]);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Initialize icons and counts
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            document.getElementById('count-error').innerText = errorLogs.length;
+            document.getElementById('count-cash').innerText = cashPayments.length;
+            document.getElementById('count-payments').innerText = payments.length;
+
+            // Load default table
+            loadTable('error_logs');
+        });
+
+    </script>
+</body>
+</html>

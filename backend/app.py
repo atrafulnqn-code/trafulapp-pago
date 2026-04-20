@@ -4887,5 +4887,48 @@ def get_stats():
 
 
 
+@app.route('/api/historical-jan-feb', methods=['GET'])
+def get_historical_jan_feb():
+    # Validar autorizacin
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Error de conexin a base de datos"}), 500
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, origen, tabla_origen, fecha_registro, tipo_operacion, 
+                       monto, nombre_responsable, email, datos_adicionales
+                FROM historico_19ene_10feb_2026
+                ORDER BY id DESC
+            """)
+            rows = cur.fetchall()
+            
+            data = []
+            for r in rows:
+                data.append({
+                    "id": r[0],
+                    "origen": r[1],
+                    "tabla_origen": r[2],
+                    "fecha_registro": r[3],
+                    "tipo_operacion": r[4],
+                    "monto": r[5],
+                    "nombre_responsable": r[6],
+                    "email": r[7],
+                    "datos_adicionales": r[8]
+                })
+
+            return jsonify({"status": "success", "data": data}), 200
+
+    except Exception as e:
+        print(f"ERROR al obtener histrico: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)
