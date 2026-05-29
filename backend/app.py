@@ -4932,5 +4932,76 @@ def get_historical_jan_feb():
     finally:
         conn.close()
 
+@app.route('/api/admin/rendicion', methods=['GET', 'OPTIONS'])
+def get_rendicion_data():
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    is_valid, error_response = validate_admin_auth()
+    if not is_valid:
+        return error_response
+
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+
+    if not month or not year:
+        return jsonify({"error": "Faltan parámetros 'month' y 'year'"}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Error de conexión a la base de datos"}), 500
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, payment_id, nombre_apellido, monto, detalles, estado, fecha_hora
+                FROM payment_history
+                WHERE EXTRACT(MONTH FROM fecha_hora) = %s AND EXTRACT(YEAR FROM fecha_hora) = %s
+                  AND estado = 'exitoso'
+                ORDER BY fecha_hora DESC
+            """, (month, year))
+            rows = cur.fetchall()
+
+            data = []
+            for r in rows:
+                p_id = str(r[1] or "")
+                nombre = r[2]
+                monto = float(r[3]) if r[3] else 0.0
+                detalles = str(r[4] or "")
+                
+                # Clasificar
+                if p_id.startswith('PAY-') or 'Pago TIC' in detalles:
+                    tipo = 'Pago TIC'
+                elif p_id.startswith('POLI-') or 'Polideportivo' in detalles or 'polideportivo' in detalles.lower():
+                    tipo = 'Pagos Polideportivo'
+                elif p_id.startswith('PLAN-') or 'plan de pago' in detalles.lower():
+                    tipo = 'Plan de Pago'
+                elif p_id.startswith('PAT-') or detalles.startswith('Pago de Patente Automotor'):
+                    tipo = 'Pago de Patente'
+                elif p_id.startswith('REC-') or detalles.startswith('Recaudación efectivo') or detalles.startswith('Recaudaci'):
+                    tipo = 'Recaudación'
+                else:
+                    tipo = 'Otro'
+
+                pdf_url = f"/api/admin/db/payment-history/{r[0]}/pdf"
+
+                data.append({
+                    "id": r[0],
+                    "nombre": nombre,
+                    "monto": monto,
+                    "tipo_pago": tipo,
+                    "fecha": r[6].strftime("%Y-%m-%d %H:%M:%S") if r[6] else "",
+                    "pdf_url": pdf_url
+                })
+
+            return jsonify({"status": "success", "data": data}), 200
+
+    except Exception as e:
+        print(f"ERROR en rendicion: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=True)

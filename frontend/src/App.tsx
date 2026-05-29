@@ -21,6 +21,7 @@ import AdminDBCashPayments from './pages/AdminDBCashPayments';
 import AdminDBHRPayslips from './pages/AdminDBHRPayslips';
 import AdminPolideportivo from './pages/AdminPolideportivo';
 import HistoricalJanFebData from './pages/HistoricalJanFebData';
+import Rendicion from './pages/Rendicion';
 import StaffLogin from './pages/StaffLogin';
 import StaffDashboard from './pages/StaffDashboard';
 import RecaudacionForm from './pages/RecaudacionForm';
@@ -67,6 +68,7 @@ const AppContent: React.FC = () => {
           <Route path="/admin/db/hr-payslips" element={<AdminDBHRPayslips />} />
           <Route path="/admin/db/polideportivo" element={<AdminPolideportivo />} />
           <Route path="/admin/db/historico-19ene-10feb" element={<HistoricalJanFebData />} />
+          <Route path="/admin/db/rendicion" element={<Rendicion />} />
           <Route path="/staff/login" element={<StaffLogin />} />
           <Route path="/staff/dashboard" element={<StaffDashboard />} />
           <Route path="/staff/recaudacion" element={<RecaudacionForm />} />
