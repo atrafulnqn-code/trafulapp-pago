@@ -1466,7 +1466,8 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
 
             dni_nombre = (items_context.get('dni') or
                           items_context.get('nombre_contribuyente'))
-            nombre_pagador = (items_context.get('nombre_contribuyente') or
+            nombre_pagador = (items_context.get('nombre_pagador') or
+                              items_context.get('nombre_contribuyente') or
                               items_context.get('nombre') or
                               items_context.get('email', 'N/A'))
             historial_data = {
@@ -1514,7 +1515,8 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
 
             email_sent_status = "No enviado"
             try:
-                nombre_pag = (items_context.get('nombre_contribuyente') or
+                nombre_pag = (items_context.get('nombre_pagador') or
+                              items_context.get('nombre_contribuyente') or
                               items_context.get('email', 'Contribuyente'))
                 identificador_pag = (items_context.get('dni') or
                                      items_context.get('email', 'N/A'))

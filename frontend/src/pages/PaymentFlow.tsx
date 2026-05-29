@@ -295,8 +295,9 @@ const PaymentFlow: React.FC = () => {
 
         return {
             record_id: result?.originalRecordId, item_type: itemTypeForBackend, dni: systemConfig?.searchParam === 'dni' ? inputValue : undefined,
-            nombre_contribuyente: systemConfig?.searchParam === 'nombre' ? inputValue : undefined,
-            email: email, total_amount: totalAmount,
+            nombre_contribuyente: result?.taxpayerName || (systemConfig?.searchParam === 'nombre' ? inputValue : undefined),
+            email: email, 
+            total_amount: totalAmount,
             deuda: selectedDebts.some(id => id.includes('deuda')), deuda_monto: result?.debts.find(d => d.id.includes('deuda'))?.amount || 0,
             meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc: any, d: any) => {
                 const month = d.period.split(' ')[0].toLowerCase();
