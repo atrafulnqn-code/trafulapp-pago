@@ -731,6 +731,72 @@ def save_contacto(email, nombre=None, origen=None, dni=None, celular=None):
                 f'Error guardando contacto {email}: {e}')
 
 
+RECAUDACION_CONCEPTO_LABELS = {
+    'aranceles': 'Aranceles Administrativos',
+    'tasa_retributivos': 'Tasa p/Serv. Retributivos - Barrido y Limp. - Riego - Cons. Calles',
+    'recoleccion': 'Recolección de Residuos',
+    'inspeccion': 'Tasa por Insp. e Higiene',
+    'licencia': 'Por Otorgamiento / Renovación de Lic. Conducir',
+    'publicidad': 'Publicidad y Propaganda',
+    'habilitacion': 'Habilitación Comercial',
+    'solicitud': 'Solicitud',
+    'ambulante': 'Venta Ambulante por día',
+    'deuda': 'Deuda Atrasada',
+    'agua': 'Agua Potable',
+    'libreta': 'Por Otorgamiento / Renovación Libreta Sanitaria',
+    'certificaciones': 'Certificaciones',
+}
+
+
+def get_service_label(item_type):
+    """Etiqueta legible del servicio pagado para el PDF."""
+    labels = {
+        'vehiculo': 'Patente Automotor',
+        'lote': 'Tasas Retributivas / Lote',
+        'agua': 'Agua Potable',
+        'deuda_general': 'Otras Deudas',
+        'plan_pago': 'Plan de Pago',
+        'plan_pago_multiple': 'Plan de Pago',
+        'recaudacion': 'Recaudación',
+        'patente': 'Patente Automotor',
+    }
+    return labels.get((item_type or '').lower(), item_type or 'N/A')
+
+
+def get_payment_reference(items_context):
+    """Obtiene patente, lote o conexión desde el contexto del pago."""
+    if not items_context:
+        return ''
+    item_type = (items_context.get('item_type') or '').lower()
+    ref = (
+        items_context.get('patente')
+        or items_context.get('lote')
+        or items_context.get('referencia')
+        or items_context.get('referenceNumber')
+        or ''
+    )
+    if not ref:
+        return ''
+    if item_type == 'vehiculo':
+        return f"Patente {ref}"
+    if item_type == 'lote':
+        return f"Lote {ref}"
+    if item_type == 'agua':
+        return f"Conexión / Lote {ref}"
+    return str(ref)
+
+
+def enrich_pdf_items_with_reference(items_for_pdf, items_context):
+    """Completa la columna Referencia/Nota de cada ítem del PDF."""
+    ref = get_payment_reference(items_context)
+    if not ref or not items_for_pdf:
+        return items_for_pdf
+    for item in items_for_pdf:
+        if not item.get('nota') and not item.get('note'):
+            item['nota'] = ref
+    return items_for_pdf
+
+
 def create_receipt_pdf(payment_details, pdf_id=None):
     try:
         if not pdf_id:
@@ -766,6 +832,12 @@ def create_receipt_pdf(payment_details, pdf_id=None):
             payment_details.get("IDENTIFICADOR_PAGADOR", "N/A"))
         html_filled = html_filled.replace(
             "{{IDENTIFICADOR_PAGADOR}}", identificador_pagador)
+        tipo_servicio = str(payment_details.get("TIPO_SERVICIO", "N/A"))
+        html_filled = html_filled.replace("{{TIPO_SERVICIO}}", tipo_servicio)
+        referencia_servicio = str(
+            payment_details.get("REFERENCIA_SERVICIO", "N/A"))
+        html_filled = html_filled.replace(
+            "{{REFERENCIA_SERVICIO}}", referencia_servicio)
         html_filled = html_filled.replace("{{ITEMS_PAGADOS}}", items_html)
         monto_total = str(payment_details.get("MONTO_TOTAL", 0))
         html_filled = html_filled.replace("{{MONTO_TOTAL}}", monto_total)
@@ -1389,7 +1461,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                             deuda_field = "Deuda patente"
                         fields_to_update_origin[deuda_field] = "0"
                         items_for_pdf.append({
-                            "description": f"Deuda {item_type.capitalize()}",
+                            "description": f"Deuda {get_service_label(item_type)}",
                             "amount": items_context.get('deuda_monto', 0)
                         })
 
@@ -1427,7 +1499,7 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                             else:
                                 if item_type == "lote":
                                     fields_to_update_origin[mes_key] = 0
-                                    desc = f"Cuota Tasas {mesCapitalized}"
+                                    desc = f"Cuota Tasas Retributivas {mesCapitalized}"
                                 elif item_type == "vehiculo":
                                     fields_to_update_origin[mes_key] = "0"
                                     desc = f"Cuota Patente {mesCapitalized}"
@@ -1439,6 +1511,9 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                                     "description": desc,
                                     "amount": monto
                                 })
+
+                # Completar detalle (patente / lote / agua) en cada ítem del PDF
+                enrich_pdf_items_with_reference(items_for_pdf, items_context)
 
                 if fields_to_update_origin and api:
                     try:
@@ -1474,7 +1549,8 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                 'Estado': "Exitoso",
                 'Monto': monto_pagado,
                 'Detalle': (f"Pago TIC para "
-                            f"{items_context.get('item_type')}, "
+                            f"{get_service_label(items_context.get('item_type'))}"
+                            f"{(' - ' + get_payment_reference(items_context)) if get_payment_reference(items_context) else ''}, "
                             f"DNI/Nombre: {dni_nombre}"),
                 'MP_Payment_ID': payment_id,
                 'ItemsPagadosJSON': json.dumps(items_for_pdf),
@@ -1505,7 +1581,10 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                 monto=monto_pagado,
                 estado='exitoso',
                 items_pagados=items_for_pdf,
-                detalles=f"Pago TIC para {items_context.get('item_type')}"
+                detalles=(
+                    f"Pago TIC para {get_service_label(items_context.get('item_type'))}"
+                    f"{(' - ' + get_payment_reference(items_context)) if get_payment_reference(items_context) else ''}"
+                )
             )
 
             receipt_url = (f"{BACKEND_URL}/api/receipt/"
@@ -1527,6 +1606,11 @@ def process_pagotic_payment(payment_id, new_status, wallet_response=None):
                     "ID_PAGO_MP": payment_id,
                     "NOMBRE_PAGADOR": nombre_pag,
                     "IDENTIFICADOR_PAGADOR": identificador_pag,
+                    "TIPO_SERVICIO": get_service_label(
+                        items_context.get('item_type')),
+                    "REFERENCIA_SERVICIO": (
+                        get_payment_reference(items_context) or "N/A"),
+                    "MEDIO_PAGO": "Pago TIC / Online",
                     "items": items_for_pdf,
                     "MONTO_TOTAL": monto_pagado
                 }
@@ -1732,13 +1816,27 @@ def create_pagotic_payment():
                     else:
                         if 'contribuyente' in fields:
                             contribuyente_nombre = fields['contribuyente']
+                        if 'titular' in fields and not fields.get('contribuyente'):
+                            contribuyente_nombre = fields['titular']
                         if 'dni' in fields:
                             contribuyente_dni = fields['dni']
+
+                        # Enriquecer identificadores para el detalle del PDF
+                        if item_type == 'vehiculo' and fields.get('patente'):
+                            items_to_pay['patente'] = fields.get('patente')
+                            items_to_pay['referencia'] = fields.get('patente')
+                        elif item_type in ('lote', 'agua') and fields.get('lote'):
+                            items_to_pay['lote'] = fields.get('lote')
+                            items_to_pay['referencia'] = fields.get('lote')
+                        elif fields.get('patente'):
+                            items_to_pay.setdefault('patente', fields.get('patente'))
+                            items_to_pay.setdefault('referencia', fields.get('patente'))
 
                     log_to_airtable(
                         'INFO', 'Pago TIC Create',
                         f'Datos obtenidos de Airtable: {contribuyente_nombre}, DNI: {contribuyente_dni}',
-                        details={'record_id': record_id, 'table': item_type})
+                        details={'record_id': record_id, 'table': item_type,
+                                 'referencia': items_to_pay.get('referencia')})
             except Exception as airtable_error:
                 log_to_airtable(
                     'WARNING', 'Pago TIC Create',
@@ -2661,12 +2759,20 @@ def get_payment_history_pdf(record_id):
                     }]
 
                 # Construir pdf_details
+                # Inferir referencia desde ítems guardados (nota) o detalles
+                ref_from_items = ""
+                for it in items_list:
+                    if isinstance(it, dict) and (it.get('nota') or it.get('note')):
+                        ref_from_items = it.get('nota') or it.get('note')
+                        break
                 pdf_details = {
                     "FECHA_PAGO": fecha_hora,
                     "ESTADO_PAGO": estado.capitalize(),
                     "ID_PAGO_MP": comprobante_numero,
                     "NOMBRE_PAGADOR": nombre_apellido,
                     "IDENTIFICADOR_PAGADOR": dni if dni and dni != "N/A" else (email or "N/A"),
+                    "TIPO_SERVICIO": detalles or "N/A",
+                    "REFERENCIA_SERVICIO": ref_from_items or "N/A",
                     "MONTO_TOTAL": str(monto),
                     "MEDIO_PAGO": "Pago TIC" if payment_id.startswith("PAY") else "Efectivo",
                     "items": items_list
@@ -3258,7 +3364,8 @@ def recaudacion_efectivo():
         for concepto_id, monto in importes.items():
             if float(monto) > 0:
                 # Buscar el label del concepto
-                concepto_label = concepto_id  # default
+                concepto_label = RECAUDACION_CONCEPTO_LABELS.get(
+                    concepto_id, concepto_id)
                 nota = notas.get(concepto_id, '')
 
                 items_for_pdf.append({
@@ -3339,6 +3446,14 @@ def recaudacion_efectivo():
             "ID_PAGO_MP": comprobante_id,
             "NOMBRE_PAGADOR": nombre,
             "IDENTIFICADOR_PAGADOR": email,
+            "TIPO_SERVICIO": "Recaudación",
+            "REFERENCIA_SERVICIO": (
+                "; ".join(
+                    f"{item.get('description')}: {item.get('nota')}"
+                    for item in items_for_pdf if item.get('nota')
+                ) or "N/A"
+            ),
+            "MEDIO_PAGO": "Efectivo",
             "items": items_for_pdf,
             "MONTO_TOTAL": total_final
         }
@@ -3562,6 +3677,8 @@ def patente_efectivo():
             "NOMBRE_PAGADOR": nombre,
             "IDENTIFICADOR_PAGADOR": email,
             "ESTADO_PAGO": "Completado (Efectivo/Transferencia)",
+            "TIPO_SERVICIO": "Patente Automotor",
+            "REFERENCIA_SERVICIO": f"Patente {patente}",
             "MEDIO_PAGO": data.get('transferencia', 'Efectivo'),
             "items": items_for_pdf,
             "MONTO_TOTAL": f"{total_final:,.2f}"
