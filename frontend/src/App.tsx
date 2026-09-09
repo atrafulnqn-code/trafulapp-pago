@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { PUBLIC_SERVICES_PAUSED } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -48,8 +49,8 @@ const AppContent: React.FC = () => {
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/pagar/:system" element={<PaymentFlow />} />
-          <Route path="/plan-de-pago" element={<PlanDePago />} />
+          <Route path="/pagar/:system" element={PUBLIC_SERVICES_PAUSED ? <Navigate to="/" replace /> : <PaymentFlow />} />
+          <Route path="/plan-de-pago" element={PUBLIC_SERVICES_PAUSED ? <Navigate to="/" replace /> : <PlanDePago />} />
           <Route path="/exito" element={<Success />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />

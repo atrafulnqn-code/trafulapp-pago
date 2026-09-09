@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PaymentSystem } from '../types';
+import { PaymentSystem, PUBLIC_SERVICES_PAUSED } from '../types';
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 
 const Home: React.FC = () => {
@@ -13,6 +13,7 @@ const Home: React.FC = () => {
       description: 'Pague sus impuestos retributivos y el agua de forma rápida y segura.',
       variant: 'success',
       glowColor: 'var(--glow-success)',
+      disabled: PUBLIC_SERVICES_PAUSED,
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-house-door-fill text-success" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.505h4v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" /></svg> // Home icon
     },
     // NUEVA TARJETA DE AGUA
@@ -22,6 +23,7 @@ const Home: React.FC = () => {
       description: 'Pague sus servicios de agua de forma rápida y segura.',
       variant: 'info',
       glowColor: 'var(--glow-info)',
+      disabled: PUBLIC_SERVICES_PAUSED,
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-droplet-fill text-info" viewBox="0 0 16 16"><path fillRule="evenodd" d="M8 16a6 6 0 0 0 6-6c0-1.655-1.122-2.904-2.432-4.362C10.254 4.176 8.75 2.561 8 0c0 0-6 5.686-6 10a6 6 0 0 0 6 6Z" /></svg> // Water droplet icon
     },
     {
@@ -30,6 +32,7 @@ const Home: React.FC = () => {
       description: 'Pague sus cuotas correspondiente al plan de pago solicitado previamente',
       variant: 'warning',
       glowColor: 'var(--glow-warning)',
+      disabled: PUBLIC_SERVICES_PAUSED,
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-journal-check text-warning" viewBox="0 0 16 16"><path fillRule="evenodd" d="M10.854 6.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 8.793l2.646-2.647a.5.5 0 0 1 .708 0z" /><path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z" /><path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-.5v.5a.5.5 0 0 1-1 0V6h-.5a.5.5 0 0 1 0-1H1z" /></svg> // Journal icon
     },
     {
@@ -38,6 +41,7 @@ const Home: React.FC = () => {
       description: 'Consulte el estado de deuda y pague la patente de su vehículo ingresando su dominio.',
       variant: 'primary',
       glowColor: 'var(--glow-primary)',
+      disabled: PUBLIC_SERVICES_PAUSED,
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-car-front-fill text-primary" viewBox="0 0 16 16"><path d="M7.834 11.378 10.27 7.618H9.35C8.36 7.618 7.33 8.35 6.78 9.3c-.76.1-.76.43-1.14.75-.58.48-1.57.17-2.1-.38a2 2 0 0 1-.36-.45V9.45c-.34-.58-.34-1.28 0-1.87l-.01-.02a.37.37 0 0 1 .1-.1c.36-.18.84-.44 1.1-.9-.12-.3-.25-.63-.3-.97-.24-.87.48-1.8 1.4-2.12.04-.02.09-.04.13-.06a2 2 0 0 1 2.08 1.63c.27 1.02.6 2.05 1 3.08l1.7-2.61.88.57-1.7 2.6c.02.04.05.08.07.12zM12.983 6H12v-.234c0-.622-.56-1.127-1.25-1.127h-8.5C1.56 4.639 1 5.144 1 5.766V6H.016a.2.2 0 0 0-.016.222l.749 2.997A.75.75 0 0 0 1.749 9.5h.211a.75.75 0 0 0 .615-.357l-.3-.797a.75.75 0 0 0-.616-1.09h-.18l-.4-.16V6.5h1.616c.453-.29.98-.445 1.516-.445h4.518c.683 0 1.25 1.127V6h1.017Zm-2.887 2.012a2.001 2.001 0 0 0-2.827-.087c-.64.44-1.166.86-1.55 1.139-.23.17-.4.29-.4.29H1.465l-.36-.615a.75.75 0 0 1-.02-.078l-.348-1.39A.25.25 0 0 1 1.016 6.5H12.984a.25.25 0 0 1 .016.222l-.749 2.997A.75.75 0 0 1 11.25 9.5h-.062c-.172-.045-.37-.1-.587-.197-.4-.18-.75-.383-1.07-.63Z" /></svg> // Car icon
     },
     {
@@ -46,6 +50,7 @@ const Home: React.FC = () => {
       description: 'Acceda al formulario de inscripción para actividades en el polideportivo municipal.',
       variant: 'primary',
       glowColor: 'var(--glow-primary)',
+      disabled: PUBLIC_SERVICES_PAUSED,
       externalUrl: 'https://geoarg.com/?ff_landing=25',
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-person-walking text-primary" viewBox="0 0 16 16"><path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.193 0 .38.074.52.206l2.365 2.22a.25.25 0 0 1 .01.353s-.308.342-.315.348l-1.815 1.63a.4.4 0 0 1-.54 0L7.433 7.218 5.755 11.2a.5.5 0 0 1-.916-.4l1.633-3.872a.4.4 0 0 1 .158-.19l.716-.474-.833-2.4a.4.4 0 0 1 .056-.328l.85-1.428a.4.4 0 0 1 .022-.032zM3.834 8.7a.5.5 0 0 1 .553.433l.4 4a.5.5 0 0 1-.986.098l-.4-4a.5.5 0 0 1 .433-.531m9.366-2.583a.4.4 0 0 1 .4.4V11.5a.5.5 0 0 1-1 0V6.517a.4.4 0 0 1 .4-.4z" /><path d="M7.42 14.73a.5.5 0 0 1-.42-.56l.4-4a.5.5 0 1 1 .99.1l-.4 4a.5.5 0 0 1-.57.46z" /></svg>
     }
@@ -180,10 +185,12 @@ const Home: React.FC = () => {
                     }}
                     disabled={service.disabled}
                     onMouseOver={(e) => {
+                      if (service.disabled) return;
                       (e.currentTarget as HTMLButtonElement).style.backgroundColor = textColors[service.variant] || textColors.primary;
                       (e.currentTarget as HTMLButtonElement).style.color = '#030712';
                     }}
                     onMouseOut={(e) => {
+                      if (service.disabled) return;
                       (e.currentTarget as HTMLButtonElement).style.backgroundColor = softColors[service.variant] || softColors.primary;
                       (e.currentTarget as HTMLButtonElement).style.color = textColors[service.variant] || textColors.primary;
                     }}
