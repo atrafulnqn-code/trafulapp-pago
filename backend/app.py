@@ -1276,8 +1276,7 @@ def send_payslip():
             f'Acceso bloqueado: {email} buscó {query} sin estar en padrón')
         log_payslip_request(query, email, request.remote_addr, False)
         return jsonify({
-            "error": "El correo ingresado no está autorizado para este empleado. "
-                     "Usá el nombre o el DNI y el correo registrados en Recursos Humanos."
+            "error": "No coincide. Usá el nombre, el apellido o el DNI junto con el correo de esa persona."
         }), 403
 
     log_to_airtable(

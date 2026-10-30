@@ -78,7 +78,11 @@ def names_match(query, canonical_name):
 
     query_set = set(query_tokens)
     name_set = set(name_tokens)
-    if query_set <= name_set and (len(query_tokens) >= 2 or len(query_tokens[0]) >= 4):
+    if query_set & name_set:
+        return True
+    if len(compact_query) >= 4 and compact_query in compact_name:
+        return True
+    if any(len(token) >= 4 and token in compact_name for token in query_tokens):
         return True
     if name_set <= query_set:
         return True
@@ -102,7 +106,7 @@ def employee_dnis(canonical_name):
 
 
 def find_empleado(query, email):
-    """Devuelve el nombre del padrón si el correo es de esa persona y coincide el nombre o el DNI."""
+    """Nombre, apellido o DNI, y el correo tiene que ser el de esa misma persona."""
     email_norm = (email or "").strip().lower()
     if not email_norm:
         return None

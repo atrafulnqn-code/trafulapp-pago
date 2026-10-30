@@ -70,7 +70,7 @@ const RecibosSueldos: React.FC = () => {
                         <i className="bi bi-arrow-left me-2"></i> Volver a Recursos Humanos
                     </Button>
                     <h2 className="fw-bold text-primary mb-3">Recibos de Sueldos</h2>
-                    <p className="lead text-secondary">Buscá tu recibo por nombre o DNI. El PDF llega al correo registrado para ese empleado.</p>
+                    <p className="lead text-secondary">Buscá por nombre, apellido o DNI, y el correo de esa persona. Ahí llega el PDF.</p>
                 </Col>
             </Row>
 
@@ -80,17 +80,17 @@ const RecibosSueldos: React.FC = () => {
                         <Card.Body className="p-4">
                             <Form onSubmit={handleSubmit}>
                                 <Form.Group className="mb-3" controlId="searchQuery">
-                                    <Form.Label className="fw-semibold">Nombre y apellido o DNI</Form.Label>
+                                    <Form.Label className="fw-semibold">Nombre, apellido o DNI</Form.Label>
                                     <Form.Control
                                         type="text"
-                                        placeholder="Ej: Emanuel Tula o 12345678"
+                                        placeholder="Ej: Tula, Emanuel o 35270992"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         required
                                         disabled={loading}
                                     />
                                     <Form.Text className="text-muted">
-                                        El DNI tiene que ser el de la persona dueña de ese correo.
+                                        Alcanza con el nombre, el apellido o el DNI.
                                     </Form.Text>
                                 </Form.Group>
 
@@ -105,7 +105,7 @@ const RecibosSueldos: React.FC = () => {
                                         disabled={loading}
                                     />
                                     <Form.Text className="text-muted">
-                                        Tiene que ser el correo registrado para ese empleado. Ahí llega el PDF.
+                                        Tiene que ser el correo registrado de esa misma persona.
                                     </Form.Text>
                                 </Form.Group>
 
