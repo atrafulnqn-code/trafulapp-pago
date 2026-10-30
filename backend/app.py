@@ -23,7 +23,13 @@ from weasyprint import HTML
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from hr_padron import filename_matches_empleado, find_empleado, name_tokens, period_key
+from hr_padron import (
+    employee_dnis,
+    filename_matches_empleado,
+    find_empleado,
+    name_tokens,
+    period_key,
+)
 
 
 # Cargar variables de entorno desde el archivo .env
@@ -1271,7 +1277,7 @@ def send_payslip():
         log_payslip_request(query, email, request.remote_addr, False)
         return jsonify({
             "error": "El correo ingresado no está autorizado para este empleado. "
-                     "Usá el nombre y el correo registrados en Recursos Humanos."
+                     "Usá el nombre o el DNI y el correo registrados en Recursos Humanos."
         }), 403
 
     log_to_airtable(
@@ -1292,7 +1298,9 @@ def send_payslip():
         google_file = _pick_payslip(files, empleado)
 
         if not google_file:
-            for token in sorted(set(name_tokens(empleado)), key=len, reverse=True):
+            search_terms = set(name_tokens(empleado))
+            search_terms.update(employee_dnis(empleado))
+            for token in sorted(search_terms, key=len, reverse=True):
                 print(f"Sin coincidencia en la carpeta. Buscando por '{token}'")
                 google_file = _pick_payslip(_search_pdfs_by_name(service, token), empleado)
                 if google_file:
