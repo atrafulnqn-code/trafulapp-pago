@@ -6,6 +6,9 @@ export enum PaymentSystem {
   POLIDEPORTIVO = 'POLIDEPORTIVO'
 }
 
+/** Pausa temporal de trámites públicos (botones de Home y rutas /pagar /plan-de-pago). */
+export const PUBLIC_SERVICES_PAUSED = true;
+
 export interface Debt {
   id: string;
   period: string;

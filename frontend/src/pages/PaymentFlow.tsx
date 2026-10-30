@@ -293,10 +293,20 @@ const PaymentFlow: React.FC = () => {
         else if (systemKey === PaymentSystem.AGUA) itemTypeForBackend = 'agua'; // NUEVO
         else if (systemKey === PaymentSystem.OTRAS) itemTypeForBackend = 'deuda_general';
 
+        const referencia = result?.referenceNumber || inputValue || '';
+        const patente = systemKey === PaymentSystem.PATENTE ? referencia : undefined;
+        const lote = (systemKey === PaymentSystem.TASAS || systemKey === PaymentSystem.AGUA)
+            ? referencia
+            : undefined;
+
         return {
             record_id: result?.originalRecordId, item_type: itemTypeForBackend, dni: systemConfig?.searchParam === 'dni' ? inputValue : undefined,
             nombre_contribuyente: result?.taxpayerName || (systemConfig?.searchParam === 'nombre' ? inputValue : undefined),
-            email: email, 
+            email: email,
+            // Identificadores para el detalle del PDF (patente / lote / conexión agua)
+            referencia,
+            patente,
+            lote,
             total_amount: totalAmount,
             deuda: selectedDebts.some(id => id.includes('deuda')), deuda_monto: result?.debts.find(d => d.id.includes('deuda'))?.amount || 0,
             meses: selectedDebtDetails?.filter(d => !d.id.includes('deuda')).reduce((acc: any, d: any) => {
