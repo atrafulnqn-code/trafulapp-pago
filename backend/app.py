@@ -5,6 +5,7 @@ import uuid
 import traceback
 import io
 import csv
+import html
 import requests
 import time
 from datetime import datetime
@@ -22,6 +23,7 @@ from weasyprint import HTML
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+from hr_padron import filename_matches_empleado, find_empleado, name_tokens, period_key
 
 
 # Cargar variables de entorno desde el archivo .env
@@ -1062,157 +1064,224 @@ def search_plan_pago():
         return jsonify({"error": "Error interno del servidor"}), 500
 
 
+DRIVE_READONLY_SCOPE = ["https://www.googleapis.com/auth/drive.readonly"]
+_PAYSLIP_INDEX = {"folder_id": None, "at": 0, "files": None}
+
+
+def _drive_credentials():
+    creds = None
+    if GOOGLE_SERVICE_ACCOUNT_JSON:
+        try:
+            print("Intentando autenticar con GOOGLE_SERVICE_ACCOUNT_JSON")
+            service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+            creds = service_account.Credentials.from_service_account_info(
+                service_account_info, scopes=DRIVE_READONLY_SCOPE)
+            print("Autenticación con JSON exitosa")
+        except Exception as e:
+            print(f"Error parseando GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+
+    if not creds and GOOGLE_CREDENTIALS_PATH and os.path.exists(GOOGLE_CREDENTIALS_PATH):
+        print(f"Intentando autenticar con archivo: {GOOGLE_CREDENTIALS_PATH}")
+        creds = service_account.Credentials.from_service_account_file(
+            GOOGLE_CREDENTIALS_PATH, scopes=DRIVE_READONLY_SCOPE)
+        print("Autenticación con archivo exitosa")
+
+    if not creds:
+        try:
+            print("Intentando autenticación por defecto de Google")
+            import google.auth
+            creds, _ = google.auth.default(scopes=DRIVE_READONLY_SCOPE)
+            print("Autenticación por defecto exitosa")
+        except Exception as e:
+            print(f"Error en google.auth.default: {e}")
+    return creds
+
+
+def _list_folder_pdfs(service, folder_id):
+    """PDFs de la carpeta de recibos, incluyendo subcarpetas."""
+    found = []
+    visited = set()
+    queue = [(folder_id, 0)]
+    while queue:
+        current, depth = queue.pop(0)
+        if not current or current in visited or depth > 4:
+            continue
+        visited.add(current)
+        page_token = None
+        while True:
+            response = service.files().list(
+                q=f"'{current}' in parents and trashed = false",
+                spaces="drive",
+                fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
+                pageSize=200,
+                pageToken=page_token,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+            ).execute()
+            for item in response.get("files", []):
+                mime = item.get("mimeType", "")
+                if mime == "application/pdf":
+                    found.append(item)
+                elif mime == "application/vnd.google-apps.folder":
+                    queue.append((item["id"], depth + 1))
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
+        if len(found) > 5000:
+            break
+    return found
+
+
+def _cached_folder_pdfs(service, folder_id):
+    now = time.time()
+    cached = _PAYSLIP_INDEX
+    if (
+        cached["files"] is not None
+        and cached["folder_id"] == folder_id
+        and now - cached["at"] < 600
+    ):
+        return cached["files"]
+    files = _list_folder_pdfs(service, folder_id)
+    cached["folder_id"] = folder_id
+    cached["at"] = now
+    cached["files"] = files
+    return files
+
+
+def _search_pdfs_by_name(service, token):
+    safe = token.replace("\\", "\\\\").replace("'", "\\'")
+    query = (
+        f"name contains '{safe}' and mimeType = 'application/pdf' "
+        "and trashed = false"
+    )
+    response = service.files().list(
+        q=query,
+        fields="files(id, name, modifiedTime)",
+        pageSize=50,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute()
+    return response.get("files", [])
+
+
+def _pick_payslip(files, canonical_name):
+    matches = [
+        item for item in files
+        if filename_matches_empleado(item.get("name", ""), canonical_name)
+    ]
+    if not matches:
+        return None
+
+    def sort_key(item):
+        return (
+            period_key(item.get("name", "")),
+            item.get("modifiedTime") or "",
+        )
+
+    matches.sort(key=sort_key)
+    return matches[-1]
+
+
 @app.route('/api/hr/payslip/send', methods=['POST'])
 def send_payslip():
-    data = request.json
-    query = data.get('query')
-    email = data.get('email')
+    data = request.json or {}
+    query = (data.get('query') or '').strip()
+    email = (data.get('email') or '').strip()
 
     if not query or not email:
         return jsonify({"error": "Faltan datos requeridos (query y email)."}), 400
 
-    # --- Validación contra Padrón de RRHH en Google Sheets ---
-    try:
-        url_padron = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeft4L11UT32SF1gu8fwyNLR-0aMIzv19yTK1dUlk92QzdJkLMt_Q7s38YWabtIdixXYHvrwKfzXDu/pub?output=csv"
-        headers_req = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url_padron, headers=headers_req, timeout=15)
-        
-        if response.status_code == 200 and response.text.strip():
-            lines = response.text.strip().split('\n')
-            if len(lines) > 1:
-                import csv
-                reader = csv.reader(lines)
-                headers_csv = next(reader)
-                
-                autorizado = False
-                query_lower = query.lower().strip()
-                email_lower = email.lower().strip()
-                
-                for row in reader:
-                    if len(row) >= 2:
-                        col_busqueda = row[0].lower().strip()
-                        col_email = row[1].lower().strip()
-                        
-                        # Si ambas celdas no están vacías
-                        if col_busqueda and col_email:
-                            # Flexibilidad si la búsqueda está contenida en el padrón o viceversa, pero email debe ser exacto
-                            if (query_lower in col_busqueda or col_busqueda in query_lower) and col_email == email_lower:
-                                autorizado = True
-                                break
-                
-                if not autorizado:
-                    log_to_airtable('WARNING', 'HR Payslip', f'Acceso bloqueado: {email} buscó {query} sin estar en padrón')
-                    log_payslip_request(query, email, request.remote_addr, False)
-                    return jsonify({"error": "El correo ingresado no está autorizado para este empleado. Contacte a Recursos Humanos para actualizar el padrón."}), 403
-        else:
-            print(f"Padrón no accesible, status: {response.status_code}")
-            return jsonify({"error": "Sistema de validación offline. Reporte este error a RRHH."}), 500
-    except Exception as e:
-        print(f"Error verificando padrón: {e}")
-        return jsonify({"error": "Error interno verificando la autorización de RRHH."}), 500
-    # --- Fin Validación Padrón ---
+    empleado = find_empleado(query, email)
+    if not empleado:
+        log_to_airtable(
+            'WARNING', 'HR Payslip',
+            f'Acceso bloqueado: {email} buscó {query} sin estar en padrón')
+        log_payslip_request(query, email, request.remote_addr, False)
+        return jsonify({
+            "error": "El correo ingresado no está autorizado para este empleado. "
+                     "Usá el nombre y el correo registrados en Recursos Humanos."
+        }), 403
 
-    log_to_airtable('INFO', 'HR Payslip', f'Petición de recibo para: {query}, enviar a: {email}')
+    log_to_airtable(
+        'INFO', 'HR Payslip',
+        f'Petición de recibo para: {empleado}, enviar a: {email}')
 
     try:
-        # Autenticación con Google Drive
-        creds = None
-        if GOOGLE_SERVICE_ACCOUNT_JSON:
-            try:
-                print("Intentando autenticar con GOOGLE_SERVICE_ACCOUNT_JSON")
-                service_account_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-                creds = service_account.Credentials.from_service_account_info(service_account_info)
-                print("Autenticación con JSON exitosa")
-            except Exception as e:
-                print(f"Error parseando GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
-        
-        if not creds and GOOGLE_CREDENTIALS_PATH and os.path.exists(GOOGLE_CREDENTIALS_PATH):
-            print(f"Intentando autenticar con archivo: {GOOGLE_CREDENTIALS_PATH}")
-            creds = service_account.Credentials.from_service_account_file(GOOGLE_CREDENTIALS_PATH)
-            print("Autenticación con archivo exitosa")
-        
-        if not creds:
-            # Intento de autenticación por defecto (útil en entornos GCloud)
-            try:
-                print("Intentando autenticación por defecto de Google")
-                import google.auth
-                creds, _ = google.auth.default()
-                print("Autenticación por defecto exitosa")
-            except Exception as e:
-                print(f"Error en google.auth.default: {e}")
-
+        creds = _drive_credentials()
         if not creds:
             log_to_airtable('ERROR', 'HR Payslip', 'Credenciales de Google no configuradas.')
             return jsonify({"error": "Credenciales de Google no configuradas."}), 500
 
-        print(f"Iniciando búsqueda en carpeta: {GOOGLE_DRIVE_FOLDER_ID} con query: {query}")
+        print(f"Iniciando búsqueda en carpeta: {GOOGLE_DRIVE_FOLDER_ID} para: {empleado}")
         service = build('drive', 'v3', credentials=creds)
 
-        # Buscar el archivo en la carpeta específica
-        folder_id = GOOGLE_DRIVE_FOLDER_ID
-        q = f"'{folder_id}' in parents and name contains '{query}' and mimeType = 'application/pdf' and trashed = false"
-        
-        results = service.files().list(
-            q=q,
-            spaces='drive',
-            fields='files(id, name)',
-            pageSize=10
-        ).execute()
-        
-        files = results.get('files', [])
-        print(f"Resultados de búsqueda: {len(files)} archivos encontrados")
+        files = _cached_folder_pdfs(service, GOOGLE_DRIVE_FOLDER_ID)
+        print(f"PDFs en la carpeta de recibos: {len(files)}")
+        google_file = _pick_payslip(files, empleado)
 
-        if not files:
-            log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {query}')
+        if not google_file:
+            for token in sorted(set(name_tokens(empleado)), key=len, reverse=True):
+                print(f"Sin coincidencia en la carpeta. Buscando por '{token}'")
+                google_file = _pick_payslip(_search_pdfs_by_name(service, token), empleado)
+                if google_file:
+                    break
+
+        if not google_file:
+            log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {empleado}')
             log_payslip_request(query, email, request.remote_addr, False)
-            return jsonify({"error": "No se encontró un recibo para la búsqueda proporcionada."}), 404
+            return jsonify({
+                "error": "No se encontró un PDF de recibo para este empleado."
+            }), 404
 
-        # Seleccionar el mejor archivo (el primero que devuelva la búsqueda con contains)
-        google_file = files[0]
         file_id = google_file['id']
         file_name = google_file['name']
-
         log_to_airtable('INFO', 'HR Payslip', f'Archivo encontrado: {file_name} (ID: {file_id})')
 
-        # Descargar el archivo
         file_request = service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, file_request)
         done = False
         while done is False:
             status, done = downloader.next_chunk()
-        
+
         fh.seek(0)
         file_content = fh.read()
 
-        # Enviar email con Resend
         if not RESEND_API_KEY_FROM_ENV:
             log_payslip_request(query, email, request.remote_addr, False)
             return jsonify({"error": "Configuración de Resend faltante."}), 500
 
-        attachments = [
-            {
-                "filename": file_name,
-                "content": list(file_content)
-            }
-        ]
-
-        # Obtener el email del remitente de la variable de entorno o usar uno por defecto
-        # Render permite usar el dominio configurado en Resend
-        from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
-
+        from_email = os.getenv("RESEND_FROM_EMAIL") or "pagos@comunatraful.ar"
+        safe_name = html.escape(empleado)
+        safe_file = html.escape(file_name)
         email_result = resend.Emails.send({
             "from": f"Comuna de Villa Traful <{from_email}>",
-            "to": email,
+            "to": [email],
             "subject": f"Recibo de Sueldo: {file_name}",
-            "html": f"<p>Hola,</p><p>Adjunto enviamos el recibo de sueldo solicitado para <strong>{query}</strong>.</p><p>Saludos,<br>Comuna de Villa Traful</p>",
-            "attachments": attachments
+            "html": (
+                "<p>Hola,</p>"
+                f"<p>Adjunto enviamos el recibo de sueldo de <strong>{safe_name}</strong> "
+                f"({safe_file}).</p>"
+                "<p>Saludos,<br>Comuna de Villa Traful</p>"
+            ),
+            "attachments": [
+                {
+                    "filename": file_name,
+                    "content": list(file_content),
+                }
+            ],
         })
 
-        log_to_airtable('INFO', 'HR Payslip', f'Email enviado exitosamente a {email} para {query}. Result: {email_result}')
+        log_to_airtable(
+            'INFO', 'HR Payslip',
+            f'Email enviado exitosamente a {email} para {empleado}. Result: {email_result}')
         log_payslip_request(query, email, request.remote_addr, True)
 
-        return jsonify({"message": "Recibo encontrado exitosamente.", "file_name": file_name}), 200
+        return jsonify({
+            "message": "Recibo encontrado exitosamente.",
+            "file_name": file_name,
+            "empleado": empleado,
+        }), 200
 
     except Exception as e:
         error_msg = f"Error en send_payslip: {str(e)}"

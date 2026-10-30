@@ -42,7 +42,8 @@ const RecibosSueldos: React.FC = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage({ type: 'success', text: 'Recibo encontrado exitosamente. Se ha enviado a tu email.' });
+                const archivo = data.file_name ? ` (${data.file_name})` : '';
+                setMessage({ type: 'success', text: `Listo. Enviamos el recibo${archivo} a tu correo.` });
                 // Limpiar campos después de éxito
                 setSearchQuery('');
                 setEmail('');
@@ -69,7 +70,7 @@ const RecibosSueldos: React.FC = () => {
                         <i className="bi bi-arrow-left me-2"></i> Volver a Recursos Humanos
                     </Button>
                     <h2 className="fw-bold text-primary mb-3">Recibos de Sueldos</h2>
-                    <p className="lead text-secondary">Busca tu recibo por DNI o Nombre y recíbelo directamente en tu correo electrónico.</p>
+                    <p className="lead text-secondary">Buscá tu recibo por nombre. El PDF llega al correo registrado para ese empleado.</p>
                 </Col>
             </Row>
 
@@ -79,17 +80,17 @@ const RecibosSueldos: React.FC = () => {
                         <Card.Body className="p-4">
                             <Form onSubmit={handleSubmit}>
                                 <Form.Group className="mb-3" controlId="searchQuery">
-                                    <Form.Label className="fw-semibold">Nombre y Apellido o DNI</Form.Label>
+                                    <Form.Label className="fw-semibold">Nombre y apellido</Form.Label>
                                     <Form.Control
                                         type="text"
-                                        placeholder="Ej: Juan Pérez o 12345678"
+                                        placeholder="Ej: Carlos Alberto Lagos"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         required
                                         disabled={loading}
                                     />
                                     <Form.Text className="text-muted">
-                                        Busca igual si escribes en minúsculas o mayúsculas.
+                                        Podés escribir en minúsculas. Alcanza con el apellido si es claro.
                                     </Form.Text>
                                 </Form.Group>
 
@@ -104,7 +105,7 @@ const RecibosSueldos: React.FC = () => {
                                         disabled={loading}
                                     />
                                     <Form.Text className="text-muted">
-                                        Aquí recibirás el archivo PDF de tu recibo.
+                                        Tiene que ser el correo registrado para ese empleado. Ahí llega el PDF.
                                     </Form.Text>
                                 </Form.Group>
 
