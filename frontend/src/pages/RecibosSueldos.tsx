@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
 // Configuración de URL de API robusta
@@ -83,7 +83,7 @@ const RecibosSueldos: React.FC = () => {
                                     <Form.Label className="fw-semibold">Nombre, apellido o DNI</Form.Label>
                                     <Form.Control
                                         type="text"
-                                        placeholder="Ej: Tula, Emanuel o 35270992"
+                                        placeholder="Nombre, apellido o DNI"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         required
@@ -118,16 +118,17 @@ const RecibosSueldos: React.FC = () => {
                                 <Button
                                     variant="primary"
                                     type="submit"
-                                    className="w-100 py-2 fw-bold"
+                                    className={`payslip-send w-100 ${loading ? 'is-loading' : ''}`}
                                     disabled={loading || !searchQuery || !email}
+                                    aria-busy={loading}
                                 >
                                     {loading ? (
-                                        <>
-                                            <Spinner animation="border" size="sm" className="me-2" />
-                                            Buscando y Enviando...
-                                        </>
+                                        <span className="payslip-send-label">
+                                            <span className="payslip-send-spinner" aria-hidden="true" />
+                                            Cargando...
+                                        </span>
                                     ) : (
-                                        'Enviar Recibo de Sueldo'
+                                        'Enviar recibo'
                                     )}
                                 </Button>
                             </Form>
