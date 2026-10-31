@@ -1175,13 +1175,40 @@ def _drive_credentials():
     return creds
 
 
+def _folder_meta(service, folder_id):
+    try:
+        return service.files().get(
+            fileId=folder_id,
+            fields="id, name, driveId",
+            supportsAllDrives=True,
+        ).execute()
+    except Exception as exc:
+        print(f"No se pudo leer la carpeta de recibos: {exc}")
+        return {}
+
+
+def _list_kwargs(folder_meta):
+    kwargs = {
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": True,
+    }
+    drive_id = (folder_meta or {}).get("driveId")
+    if drive_id:
+        kwargs["corpora"] = "drive"
+        kwargs["driveId"] = drive_id
+    return kwargs
+
+
 def _list_folder_pdfs(service, folder_id):
     """PDFs de la carpeta de recibos, incluyendo subcarpetas."""
+    folder_meta = _folder_meta(service, folder_id)
+    list_kwargs = _list_kwargs(folder_meta)
     found = []
     visited = set()
-    queue = [(folder_id, 0)]
+    root_name = (folder_meta or {}).get("name") or ""
+    queue = [(folder_id, 0, root_name)]
     while queue:
-        current, depth = queue.pop(0)
+        current, depth, folder_path = queue.pop(0)
         if not current or current in visited or depth > 4:
             continue
         visited.add(current)
@@ -1189,19 +1216,20 @@ def _list_folder_pdfs(service, folder_id):
         while True:
             response = service.files().list(
                 q=f"'{current}' in parents and trashed = false",
-                spaces="drive",
                 fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
                 pageSize=200,
                 pageToken=page_token,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
+                **list_kwargs,
             ).execute()
             for item in response.get("files", []):
                 mime = item.get("mimeType", "")
-                if mime == "application/pdf":
+                name = item.get("name") or ""
+                if mime == "application/pdf" or name.lower().endswith(".pdf"):
+                    item["label"] = f"{folder_path} {name}".strip()
                     found.append(item)
                 elif mime == "application/vnd.google-apps.folder":
-                    queue.append((item["id"], depth + 1))
+                    next_path = f"{folder_path} {name}".strip()
+                    queue.append((item["id"], depth + 1, next_path))
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
@@ -1232,12 +1260,12 @@ def _search_pdfs_by_name(service, token):
         f"name contains '{safe}' and mimeType = 'application/pdf' "
         "and trashed = false"
     )
+    folder_meta = _folder_meta(service, GOOGLE_DRIVE_FOLDER_ID)
     response = service.files().list(
         q=query,
         fields="files(id, name, modifiedTime)",
         pageSize=50,
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True,
+        **_list_kwargs(folder_meta),
     ).execute()
     return response.get("files", [])
 
@@ -1245,7 +1273,10 @@ def _search_pdfs_by_name(service, token):
 def _pick_payslip(files, canonical_name):
     matches = [
         item for item in files
-        if filename_matches_empleado(item.get("name", ""), canonical_name)
+        if filename_matches_empleado(
+            item.get("label") or item.get("name", ""),
+            canonical_name,
+        )
     ]
     if not matches:
         return None
@@ -1309,7 +1340,8 @@ def send_payslip():
             log_to_airtable('WARNING', 'HR Payslip', f'Recibo no encontrado para: {empleado}')
             log_payslip_request(query, email, request.remote_addr, False)
             return jsonify({
-                "error": "No se encontró un PDF de recibo para este empleado."
+                "error": "No se encontró un PDF de recibo para este empleado.",
+                "pdfs_en_carpeta": len(files),
             }), 404
 
         file_id = google_file['id']
